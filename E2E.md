@@ -1,6 +1,6 @@
 # End-to-end evidence
 
-The Kotlin sample was built and run against real public HTTPS services on **2026-09-29 UTC** (September 28 in the development machine's local time), using an **Android 17 / API 37 arm64 emulator**. The source is MIT licensed. This repository is local; no GitHub remote or publication has been configured.
+The Kotlin sample was built and run against real public HTTPS services on **2026-09-29 UTC** (September 28 in the development machine's local time), using an **Android 17 / API 37 arm64 emulator**. The source is MIT licensed. The public repository is [patjackson52/http-sequence-logger](https://github.com/patjackson52/http-sequence-logger).
 
 ## Recorded results
 

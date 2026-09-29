@@ -1,6 +1,8 @@
-# Mobile network log contract
+# HTTP sequence logger
 
 Draft **1.1** capture format (reader also accepts **1.0**) for Android and iOS development SDKs and a local-file sequence viewer. This repository contains the shared contract, a working Kotlin Android recorder, a small auth-style SDK, and a runnable Android sample. The web sequence viewer and iOS implementation remain future work.
+
+Repository: [patjackson52/http-sequence-logger](https://github.com/patjackson52/http-sequence-logger) · [MIT license](LICENSE).
 
 ## Run the Android sample
 
