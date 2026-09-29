@@ -1,6 +1,15 @@
 # Mobile network log contract
 
-Draft **1.0** capture format for Android and iOS development SDKs and a local-file sequence viewer. This package defines the shared contract and synthetic examples; it does not implement a mobile SDK or the viewer.
+Draft **1.0** capture format for Android and iOS development SDKs and a local-file sequence viewer. This repository contains the shared contract, a working Kotlin Android recorder, a small auth-style SDK, and a runnable Android sample. The web sequence viewer and iOS implementation remain future work.
+
+## Run the Android sample
+
+See [Android setup and integration](android/README.md). The MIT-licensed sample makes real HTTPS requests to three free public services, records both SDK-owned and manually instrumented app requests, and exports local NDJSON. No service registration is required.
+
+- [Successful live capture](samples/live/successful-sign-in.ndjson): 8 successful requests.
+- [Recovered live capture](samples/live/recovered-sign-in.ndjson): 9 requests with an expected 401 followed by refresh/retry.
+- [Both sessions in one file](samples/live/multi-session.ndjson).
+- [End-to-end verification](E2E.md).
 
 ## Start here
 
@@ -61,4 +70,4 @@ npm test
 
 The tests check generated-file reproducibility, all reference examples, import recovery, and rejection of contradictory records. Modify the authoring sources and regenerate; do not edit generated files independently.
 
-This draft remains reviewable before native implementation. Version `1.0` identifies the proposed format, not a claim of a released SDK. Dependencies and lockfile are scoped to this package, independent of the surrounding application.
+Version `1.0` identifies the draft format. The Kotlin SDK is a working development prototype, not a published production release. Dependencies and lockfile are scoped to this package, independent of the surrounding application.

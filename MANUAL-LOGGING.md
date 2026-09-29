@@ -1,6 +1,6 @@
 # Customer manual logging — required SDK API
 
-Customers must be able to add logging to existing networking code without replacing the client, installing a tracing framework, or implementing a native interceptor. This is a normative requirement for the future SDK. The API names and examples below are design sketches; this package does not yet ship runnable Kotlin/Swift SDKs.
+Customers must be able to add logging to existing networking code without replacing the client, installing a tracing framework, or implementing a native interceptor. This is a normative requirement. A runnable Kotlin prototype now implements the core API: see [Android integration and current boundaries](android/README.md) and [the customer-owned sample request](android/app/src/main/kotlin/dev/networklog/app/SampleFlow.kt). The broader API sketches below include planned capabilities; Swift remains a design only.
 
 ## Minimum integration
 
@@ -151,4 +151,4 @@ For async `data(for:)`, begin before awaiting, record the returned pair on succe
 - [manual-observation-stopped.ndjson](examples/manual-observation-stopped.ndjson) retains a known HTTP status without claiming completion.
 - [stream-read-timeout.ndjson](examples/stream-read-timeout.ndjson) retains a late read failure after the calling method returns at headers.
 
-The schema and fixtures establish representability. Implementing these convenience methods and testing their behavior on Android/iOS devices remains required before customers can use a released SDK.
+The schema and fixtures establish representability. The Kotlin implementation is tested on an Android emulator, including a real manually recorded customer request; see [E2E.md](E2E.md). iOS implementation, broader native coverage, and release qualification remain future work.

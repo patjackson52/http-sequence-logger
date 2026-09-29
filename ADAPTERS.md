@@ -1,6 +1,6 @@
 # Native adapter contract — draft
 
-The Android and iOS implementations should share the JSON contract and these lifecycle rules. This document is an API proposal, not a claim that the adapters exist.
+The Android and iOS implementations should share the JSON contract and these lifecycle rules. This document describes the target API. A Kotlin recorder and opt-in HttpURLConnection client now exist; see [implemented capabilities and boundaries](android/README.md). Broader native wrappers and iOS remain proposals.
 
 ## Recorder boundary
 
