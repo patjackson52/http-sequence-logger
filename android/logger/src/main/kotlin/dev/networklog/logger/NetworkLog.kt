@@ -64,11 +64,12 @@ class Session internal constructor(
     internal var ended = false
     private val requests = mutableSetOf<Exchange>()
     private val operations = mutableSetOf<Operation>()
+    private val handlers = mutableSetOf<HandlerCall>()
     init {
         require(sessionId.isNotEmpty() && sessionId.length <= 512)
         guarded {
             emit("session.started", null, obj("name" to name, "id_source" to if (providedId == null) "generated" else "provided",
-                "producer" to obj("platform" to "android", "app_id" to appId, "app_version" to "0.1.0", "os_version" to osVersion, "sdk_version" to "0.1.0"),
+                "producer" to obj("platform" to "android", "app_id" to appId, "app_version" to "0.1.0", "os_version" to osVersion, "sdk_version" to "0.2.0"),
                 "adapters" to array(listOf("customer.manual", "httpurlconnection").map { adapter ->
                     obj("adapter" to adapter(adapter), "capabilities" to obj("attempts" to "logical", "request_body" to "partial", "response_body" to "partial", "transaction_metrics" to false))
                 }), "capture_policy" to policy.json(), "trace_propagation" to "disabled", "propagation_origins" to array(emptyList<Any>())), 0L)
@@ -82,7 +83,7 @@ class Session internal constructor(
     }
     internal fun emit(type: String, context: CaptureContext?, data: JSONObject, time: Long = now(), extensions: JSONObject? = null) {
         if (ended) return
-        val event = obj("schema_version" to "1.0", "event_type" to type, "event_id" to UUID.randomUUID().toString(),
+        val event = obj("schema_version" to "1.1", "event_type" to type, "event_id" to UUID.randomUUID().toString(),
             "session_namespace" to namespace, "session_id" to sessionId, "recording_id" to recordingId,
             "sequence" to ++sequence, "timestamp" to clock.timestamp(), "monotonic_ns" to time.toString(), "data" to data)
         context?.let { event.put("context", it.json()) }
@@ -98,6 +99,32 @@ class Session internal constructor(
         Operation(this, context(parent), now()).also { op -> guarded {
             if (!ended) { operations.add(op); emit("operation.started", op.context, obj("name" to name, "origin" to actor.json()), op.started) }
         } }
+    }
+    /** Observe a synchronous local call. The parent is the invoking method; origin is the handler. */
+    fun startHandler(name: String, caller: Actor, handler: Actor, parent: CaptureContext? = null): HandlerCall = synchronized(lock) {
+        HandlerCall(this, context(parent), now()).also { call -> guarded {
+            if (!ended) {
+                emit("operation.started", call.context, obj("name" to name, "origin" to handler.json(),
+                    "invocation" to obj("kind" to "handler", "dispatch" to "synchronous", "caller" to caller.json())), call.started)
+                handlers.add(call)
+            }
+        } }
+    }
+    /** Runs application code outside the recorder lock. Preserves the exact result or exception. */
+    fun <T> invokeHandler(name: String, caller: Actor, handler: Actor, parent: CaptureContext? = null,
+                         block: (CaptureContext) -> T): T {
+        val call = startHandler(name, caller, handler, parent)
+        try {
+            val result = block(call.context)
+            call.returned()
+            return result
+        } catch (error: java.util.concurrent.CancellationException) {
+            call.cancelled(error)
+            throw error
+        } catch (error: Throwable) {
+            call.threw(error)
+            throw error
+        }
     }
     fun startRequest(method: String, url: String, parent: CaptureContext? = null,
         initiator: Actor = Actor(), executor: Actor = initiator,
@@ -122,10 +149,12 @@ class Session internal constructor(
         } }
     }
     internal fun forget(exchange: Exchange) { requests.remove(exchange) }
+    internal fun forget(handler: HandlerCall) { handlers.remove(handler) }
     internal fun forget(operation: Operation) { operations.remove(operation) }
     fun end() = guarded {
         if (!ended) {
             requests.toList().forEach { it.stopObservation("session_ended") }
+            handlers.toList().asReversed().forEach { it.stopObservation("session_ended") }
             operations.toList().forEach { it.complete("cancelled") }
             emit("session.ended", null, obj("reason" to "completed", "dropped_events" to dropped))
             ended = true
@@ -142,6 +171,25 @@ class Operation internal constructor(private val session: Session, val context: 
             val end = session.now(); terminal = true
             session.emit("operation.ended", context, obj("outcome" to outcome, "duration_ns" to (end - started).toString(),
                 "error" to error?.let { safeError(it, "unknown") }), end)
+            session.forget(this)
+        }
+    }
+}
+
+/** One invocation, identified by its span ID; completion observes method exit, not an HTTP status. */
+class HandlerCall internal constructor(private val session: Session, val context: CaptureContext, internal val started: Long) {
+    private var terminal = false
+    fun returned() = finish("returned", "success")
+    fun threw(error: Throwable) = finish("threw", "error", error)
+    fun cancelled(error: Throwable? = null) = finish("cancelled", "cancelled", error)
+    fun stopObservation(reason: String = "observation_stopped") = finish("observation_stopped", "unknown", reason = reason)
+    private fun finish(boundary: String, outcome: String, error: Throwable? = null, reason: String? = null) = session.guarded {
+        if (!terminal && !session.ended) {
+            val end = session.now(); terminal = true
+            session.emit("operation.ended", context, obj("outcome" to outcome, "completion" to boundary,
+                "duration_ns" to (end - started).toString(),
+                "error" to error?.let { obj("type" to it.javaClass.simpleName, "message" to "Handler invocation failed", "stage" to "unknown") }),
+                end, reason?.let { obj("capture.observation_stop_reason" to it) })
             session.forget(this)
         }
     }

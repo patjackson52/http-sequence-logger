@@ -1,6 +1,6 @@
 # Mobile network log contract
 
-Draft **1.0** capture format for Android and iOS development SDKs and a local-file sequence viewer. This repository contains the shared contract, a working Kotlin Android recorder, a small auth-style SDK, and a runnable Android sample. The web sequence viewer and iOS implementation remain future work.
+Draft **1.1** capture format (reader also accepts **1.0**) for Android and iOS development SDKs and a local-file sequence viewer. This repository contains the shared contract, a working Kotlin Android recorder, a small auth-style SDK, and a runnable Android sample. The web sequence viewer and iOS implementation remain future work.
 
 ## Run the Android sample
 
@@ -10,6 +10,8 @@ See [Android setup and integration](android/README.md). The MIT-licensed sample 
 - [Recovered live capture](samples/live/recovered-sign-in.ndjson): 9 requests with an expected 401 followed by refresh/retry.
 - [Both sessions in one file](samples/live/multi-session.ndjson).
 - [End-to-end verification](E2E.md).
+- [SDK → app handler → SDK tracing](HANDLER-TRACING.md): local calls, nested HTTP, explicit return/throw/cancel, and incomplete observation.
+- [Claude design-spec update prompt](docs/claude-handler-design-prompt.md).
 
 ## Start here
 
@@ -34,7 +36,7 @@ node validate.mjs /absolute/path/to/capture.ndjson
 
 Validation performs JSON Schema checks and additional relationship, timing, body-byte, retry, and outcome checks. Exit code `0` means no detected contradictions; warnings can still identify missing data. Exit code `1` means invalid input; `2` means the CLI was called without a filename.
 
-`interrupted.ndjson` deliberately produces warnings for its missing session/operation/request ends. The importer preserves those records rather than inventing completion.
+`interrupted.ndjson` and `handler-interrupted.ndjson` deliberately produce warnings for missing lifecycle ends. The importer preserves those records rather than inventing completion.
 
 ## Reference scenarios
 
@@ -56,6 +58,12 @@ Validation performs JSON Schema checks and additional relationship, timing, body
 | [stream-read-timeout](examples/stream-read-timeout.ndjson) | Calling method returns at headers; later body timeout remains a failure |
 | [ios-partial-metrics](examples/ios-partial-metrics.ndjson) | Failed TLS phase retains start and null end |
 | [ios-logical-transactions](examples/ios-logical-transactions.ndjson) | Multiple native transaction snapshots under one logical task |
+| [handler-http](examples/handler-http.ndjson) | SDK → app handler → HTTP → app return → SDK resumes |
+| [handler-no-http](examples/handler-no-http.ndjson) | Handler call and return without any HTTP |
+| [handler-throw](examples/handler-throw.ndjson) | Handler exception caught by a successful SDK caller |
+| [handler-cancelled](examples/handler-cancelled.ndjson) | Cancellation exit stays distinct from normal return |
+| [handler-stopped](examples/handler-stopped.ndjson) | Observation stops without claiming method exit |
+| [handler-interrupted](examples/handler-interrupted.ndjson) | Missing handler end remains unfinished |
 
 All examples are synthetic. Hosts use reserved `.example` names. Readable event/recording IDs make review easier; real producers should generate collision-resistant IDs. The generated session example uses a UUID.
 
@@ -70,4 +78,4 @@ npm test
 
 The tests check generated-file reproducibility, all reference examples, import recovery, and rejection of contradictory records. Modify the authoring sources and regenerate; do not edit generated files independently.
 
-Version `1.0` identifies the draft format. The Kotlin SDK is a working development prototype, not a published production release. Dependencies and lockfile are scoped to this package, independent of the surrounding application.
+Version `1.1` adds explicit handler calls and returns to the draft format; version `1.0` remains readable. The Kotlin SDK is a working development prototype, not a published production release. Dependencies and lockfile are scoped to this package, independent of the surrounding application.

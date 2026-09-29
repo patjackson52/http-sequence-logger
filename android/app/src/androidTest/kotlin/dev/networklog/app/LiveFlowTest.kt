@@ -31,6 +31,17 @@ class LiveFlowTest {
         assertEquals(1, typed("http.ended").count { it.getJSONObject("data").getInt("status_code") == 401 })
         assertEquals(2, typed("http.request.started").count { it.getJSONObject("data").getJSONObject("adapter").getString("name") == "customer.manual" })
         assertEquals(3, typed("http.request.started").map { java.net.URI(it.getJSONObject("data").getJSONObject("request").getString("url")).host }.toSet().size)
+        val handlers = typed("operation.started").filter { it.getJSONObject("data").has("invocation") }
+        assertEquals(2, handlers.size)
+        for (handler in handlers) {
+            val spanId = handler.getJSONObject("context").getString("span_id")
+            val end = typed("operation.ended").single { it.getJSONObject("context").getString("span_id") == spanId }
+            assertEquals("returned", end.getJSONObject("data").getString("completion"))
+            val child = typed("http.request.started").single { it.getJSONObject("context").optString("parent_span_id") == spanId }
+            assertEquals("customer.manual", child.getJSONObject("data").getJSONObject("adapter").getString("name"))
+            val resumed = typed("operation.started").single { it.getString("recording_id") == handler.getString("recording_id") && it.getJSONObject("data").getString("name") == "DemoAuthSdk.acceptTask" }
+            assertTrue(end.getLong("sequence") < resumed.getLong("sequence"))
+        }
         assertFalse(file.readText().contains("emilyspass"))
         assertFalse(file.readText().contains("eyJhbGci"))
     }

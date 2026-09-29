@@ -87,10 +87,13 @@ const definitions = {
     propagation_origins: array(url),
   }),
   sessionEnd: object({ reason: choices('completed', 'stopped'), dropped_events: count }),
-  operationStart: object({ name: text, origin: ref('actor') }),
+  operationStart: object({ name: text, origin: ref('actor'),
+    invocation: object({ kind: { const: 'handler' }, dispatch: { const: 'synchronous' }, caller: ref('actor') }),
+  }, ['name', 'origin']),
   operationEnd: object({
-    outcome: choices('success', 'error', 'cancelled'), duration_ns: ref('ns'), error: nullable(ref('error')),
-  }),
+    outcome: choices('success', 'error', 'cancelled', 'unknown'), duration_ns: ref('ns'), error: nullable(ref('error')),
+    completion: choices('returned', 'threw', 'cancelled', 'observation_stopped'),
+  }, ['outcome', 'duration_ns', 'error']),
   requestStart: object({
     name: text, origin: ref('origin'), adapter: ref('adapter'), request: ref('request'),
     attempt: object({
@@ -163,17 +166,25 @@ const events = [
 ];
 const schema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
-  $id: 'urn:mobile-network-log:event:1.0',
-  title: 'Mobile network log event, draft contract 1.0',
+  $id: 'urn:mobile-network-log:event:1.1',
+  title: 'Mobile network log event, draft contracts 1.0 and 1.1',
   description: 'One NDJSON record. See CONTRACT.md for cross-event and capture semantics. Custom format, not OTLP JSON.',
   ...object({
-    schema_version: { const: '1.0' },
+    schema_version: choices('1.0', '1.1'),
     event_type: { enum: events.map(([name]) => name) },
     event_id: ref('id'), session_namespace: ref('id'), session_id: ref('id'), recording_id: ref('id'),
     sequence: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
     timestamp, monotonic_ns: ref('ns'), context: ref('context'), data: { type: 'object' },
     extensions: { type: 'object', propertyNames: { pattern: '^[a-z][a-z0-9_-]*\\.[a-zA-Z0-9_.-]+$' } },
   }, ['schema_version', 'event_type', 'event_id', 'session_namespace', 'session_id', 'recording_id', 'sequence', 'timestamp', 'monotonic_ns', 'data']),
+  // 1.0 remains strict: handler fields and unknown operation outcomes are new in 1.1.
+  allOf: [{
+    if: { properties: { schema_version: { const: '1.0' } } },
+    then: { allOf: [
+      { if: { properties: { event_type: { const: 'operation.started' } } }, then: { properties: { data: { properties: { invocation: false } } } } },
+      { if: { properties: { event_type: { const: 'operation.ended' } } }, then: { properties: { data: { properties: { completion: false, outcome: choices('success', 'error', 'cancelled') } } } } },
+    ] },
+  }],
   oneOf: events.map(([name, data, span]) => ({
     properties: { event_type: { const: name }, data: ref(data), ...(!span ? { context: false } : {}) },
     ...(span ? { required: ['context'] } : {}),

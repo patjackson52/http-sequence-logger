@@ -79,6 +79,7 @@ export function validateCapture(input) {
     }
     let previous;
     for (const event of recording) {
+      if (event.schema_version !== first.schema_version) error(event, 'schema version changed within recording');
       if (sessionKey(event) !== sessionKey(first)) error(event, 'recording_id reused across different sessions or namespaces');
       if (previous) {
         if (event.sequence === previous.sequence) error(event, 'duplicate sequence within recording');
@@ -173,7 +174,16 @@ export function validateCapture(input) {
         if (attempt.index !== 0 || attempt.previous_span_id !== null) error(start, 'initial attempt must have index 0 and no previous span');
       } else if (attempt.index === 0 || attempt.previous_span_id === null) error(start, 'retry/redirect requires a positive index and previous span');
     }
+    if (start?.data.invocation && end && !end.data.completion) error(end, 'handler end requires an explicit completion boundary');
+    if (start && !start.data.invocation && end?.data.completion) error(end, 'handler completion attached to a non-handler operation');
     if (end?.event_type === 'operation.ended') {
+      const outcomes = { returned: 'success', threw: 'error', cancelled: 'cancelled', observation_stopped: 'unknown' };
+      if (end.data.completion && outcomes[end.data.completion] !== end.data.outcome) error(end, 'handler completion boundary disagrees with outcome');
+      if (end.data.outcome === 'unknown' && end.data.completion !== 'observation_stopped') error(end, 'unknown operation requires observation_stopped handler boundary');
+      if (end.data.completion === 'observation_stopped') {
+        if (end.data.error !== null) error(end, 'stopped handler observation cannot claim a known error');
+        if (typeof end.extensions?.['capture.observation_stop_reason'] !== 'string' || !end.extensions['capture.observation_stop_reason']) error(end, 'stopped handler observation requires a reason');
+      }
       if (end.data.outcome === 'error' && end.data.error === null) error(end, 'failed operation requires error details');
       if (end.data.outcome === 'success' && end.data.error !== null) error(end, 'successful operation cannot carry an error');
     }
@@ -187,6 +197,13 @@ export function validateCapture(input) {
       if (!parent) warn(start, 'local parent span missing');
       else if (parent.recording_id !== start.recording_id) error(start, 'local parent is in a different recording');
       else if (parent.sequence >= start.sequence) error(start, 'local child starts before its parent');
+      if (parent && start.data.invocation) {
+        if (parent.event_type !== 'operation.started' || stable(parent.data.origin) !== stable(start.data.invocation.caller)) error(start, 'handler caller must match its parent operation actor');
+        const parentEnd = spanEnds.get(spanKey(parent.context));
+        const handlerEnd = spanEnds.get(key);
+        if (parentEnd && parentEnd.sequence < start.sequence) error(start, 'synchronous handler starts after caller ended');
+        if (parentEnd && handlerEnd && handlerEnd.sequence > parentEnd.sequence) error(handlerEnd, 'synchronous handler completes after caller ended');
+      }
     }
     if (start.event_type === 'http.request.started' && start.data.attempt.previous_span_id) {
       const previousKey = `${context.trace_id}/${start.data.attempt.previous_span_id}`;
@@ -207,6 +224,7 @@ export function validateCapture(input) {
   }
 
   const requests = [...spanStarts.values()].filter((e) => e.event_type === 'http.request.started');
+  const handlers = [...spanStarts.values()].filter(e => e.data.invocation?.kind === 'handler');
   const httpEnds = [...spanEnds.values()].filter((e) => e.event_type === 'http.ended');
   return {
     valid: errors.length === 0, errors, warnings, events,
@@ -214,6 +232,9 @@ export function validateCapture(input) {
       sessions: new Set(events.map(sessionKey)).size,
       recordings: records.size, events: events.length, duplicate_events: duplicateEvents,
       requests: requests.length,
+      handler_calls: handlers.length,
+      unfinished_handler_calls: handlers.filter(e => !spanEnds.has(spanKey(e.context))).length,
+      unknown_handler_outcomes: handlers.filter(e => spanEnds.get(spanKey(e.context))?.data.completion === 'observation_stopped').length,
       failed_requests: httpEnds.filter((e) => e.data.status_code >= 400 || ['http_error', 'transport_error', 'timeout'].includes(e.data.outcome) || e.data.application_outcome === 'error').length,
       cancelled_requests: httpEnds.filter((e) => e.data.outcome === 'cancelled').length,
       unknown_outcomes: httpEnds.filter((e) => e.data.outcome === 'unknown').length,

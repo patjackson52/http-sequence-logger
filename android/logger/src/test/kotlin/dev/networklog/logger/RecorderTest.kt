@@ -152,4 +152,65 @@ class RecorderTest {
         assertEquals(200, end.getInt("status_code")); assertEquals("timeout", end.getString("outcome"))
         assertFalse(f.lines.joinToString().contains("sensitive error detail"))
     }
+    private val sdkActor = Actor("sdk", "DemoSdk", "run")
+    private val appHandler = Actor("integrator", "AppHandler", "handle")
+    @Test fun handlerWithoutHttpRetainsCallerAndReturnsExactObject() {
+        val f = Fixture(); val parent = f.session.startOperation("DemoSdk.run", sdkActor)
+        val result = Any()
+        assertSame(result, f.session.invokeHandler("AppHandler.handle", sdkActor, appHandler, parent.context) { result })
+        val start = f.events("operation.started").last().getJSONObject("data")
+        assertEquals("integrator", start.getJSONObject("origin").getString("owner"))
+        assertEquals("sdk", start.getJSONObject("invocation").getJSONObject("caller").getString("owner"))
+        assertEquals("returned", f.events("operation.ended").last().getJSONObject("data").getString("completion"))
+        assertTrue(f.events("http.request.started").isEmpty())
+    }
+    @Test fun handlerExceptionUnwindsWithoutChangingItsIdentity() {
+        val f = Fixture(); val original = IllegalStateException("sensitive handler message")
+        try { f.session.invokeHandler("handler", sdkActor, appHandler) { throw original }; fail("expected handler error") }
+        catch (actual: IllegalStateException) { assertSame(original, actual) }
+        val end = f.events("operation.ended").single().getJSONObject("data")
+        assertEquals("threw", end.getString("completion")); assertEquals("error", end.getString("outcome"))
+        assertFalse(f.lines.joinToString().contains("sensitive handler message"))
+    }
+    @Test fun handlerCancellationIsNotSuccessfulReturn() {
+        val f = Fixture(); val original = java.util.concurrent.CancellationException()
+        try { f.session.invokeHandler("handler", sdkActor, appHandler) { throw original } }
+        catch (actual: java.util.concurrent.CancellationException) { assertSame(original, actual) }
+        assertEquals("cancelled", f.events("operation.ended").single().getJSONObject("data").getString("completion"))
+    }
+    @Test fun stoppingSessionDoesNotInventHandlerReturn() {
+        val f = Fixture()
+        f.session.invokeHandler("handler", sdkActor, appHandler) { f.session.end() }
+        val end = f.events("operation.ended").single()
+        assertEquals("observation_stopped", end.getJSONObject("data").getString("completion"))
+        assertEquals("unknown", end.getJSONObject("data").getString("outcome"))
+        assertEquals("session_ended", end.getJSONObject("extensions").getString("capture.observation_stop_reason"))
+    }
+    @Test fun handlerRunsOutsideLockAndParentsCustomerHttp() {
+        val f = Fixture()
+        f.session.invokeHandler("handler", sdkActor, appHandler) { context ->
+            val worker = Thread { f.session.startRequest("GET", "https://example.com/", context).completeResponse(200) }
+            worker.start(); worker.join(2000)
+            assertFalse("Recorder must not hold a lock while running customer code", worker.isAlive)
+            assertEquals(context.spanId, f.events("http.request.started").single().getJSONObject("context").getString("parent_span_id"))
+        }
+    }
+    @Test fun repeatedAndNestedHandlerCallsHaveDistinctSpansAndCorrectNesting() {
+        val f = Fixture()
+        repeat(2) {
+            f.session.invokeHandler("handler", sdkActor, appHandler) { outer ->
+                f.session.invokeHandler("nested", appHandler, Actor("integrator", "Nested", "run"), outer) { }
+            }
+        }
+        val starts = f.events("operation.started")
+        assertEquals(4, starts.map { it.getJSONObject("context").getString("span_id") }.toSet().size)
+        assertEquals(starts[0].getJSONObject("context").getString("span_id"), starts[1].getJSONObject("context").getString("parent_span_id"))
+        assertEquals(4, f.events("operation.ended").size)
+    }
+    @Test fun handlerStillRunsWhenSinkFails() {
+        val logger = NetworkLog(EventSink { throw java.io.IOException() }, "test", clock = Clock(), osVersion = "test")
+        val value = logger.startSession("test").invokeHandler("handler", sdkActor, appHandler) { 42 }
+        assertEquals(42, value)
+    }
+
 }

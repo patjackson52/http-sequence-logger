@@ -4,8 +4,9 @@ import dev.networklog.logger.*
 import org.json.JSONObject
 
 /** Demonstration authentication, NOT OAuth, identity proofing, or a production security decision. */
-class DemoAuthSdk(private val session: Session, private val progress: (String) -> Unit = {}) {
-    data class Identity(val displayName: String, val userId: Int, val challengeId: String)
+class DemoAuthSdk(private val session: Session, private val taskHandler: TaskHandler, private val progress: (String) -> Unit = {}) {
+    fun interface TaskHandler { fun loadTask(context: CaptureContext): String }
+    data class Identity(val displayName: String, val userId: Int, val challengeId: String, val task: String)
     fun authenticate(parent: CaptureContext, recoverFrom401: Boolean = false): Identity {
         val actor = Actor("sdk", "DemoAuthSdk", "authenticate")
         val op = session.startOperation("DemoAuthSdk.authenticate", actor, parent)
@@ -34,8 +35,19 @@ class DemoAuthSdk(private val session: Session, private val progress: (String) -
             progress(if (rejected == null) "Confirm refreshed session · DummyJSON" else "Retry rejected profile · DummyJSON")
             val confirmed = http.execute("GET", "https://dummyjson.com/auth/me", listOf("Authorization" to "Bearer $refreshed"), retryOf = rejected?.exchange).requireSuccess().json()
             check(confirmed.getInt("id") == profile.getInt("id"))
+            progress("SDK → app handler · CustomerTaskHandler.loadTask")
+            val task = session.invokeHandler("CustomerTaskHandler.loadTask", actor,
+                Actor("integrator", "CustomerTaskHandler", "loadTask"), op.context) { context ->
+                taskHandler.loadTask(context)
+            }
+            progress("App handler → SDK · returned")
+            val resume = session.startOperation("DemoAuthSdk.acceptTask", Actor("sdk", "DemoAuthSdk", "acceptTask"), op.context)
+            try {
+                check(task.isNotBlank()) { "Handler returned an empty task" }
+                resume.complete()
+            } catch (error: Exception) { resume.complete("error", error); throw error }
             op.complete()
-            return Identity(profile.getString("firstName"), profile.getInt("id"), challenge)
+            return Identity(profile.getString("firstName"), profile.getInt("id"), challenge, task)
         } catch (error: Exception) { op.complete("error", error); throw error }
     }
     fun completeDemo(identity: Identity, parent: CaptureContext) {

@@ -26,6 +26,7 @@ for (const fixture of manifest.captures) {
     assert.deepEqual(result.errors, []);
     for (const [key, value] of Object.entries(fixture.expected)) assert.equal(result.summary[key], value, key);
     if (fixture.file === 'interrupted.ndjson') assert.equal(result.warnings.length, 4);
+    else if (fixture.file === 'handler-interrupted.ndjson') assert.equal(result.warnings.length, 1);
     else assert.deepEqual(result.warnings, []);
   });
 }
@@ -286,3 +287,69 @@ test('manual custom clients can retain OPTIONS asterisk request targets', () => 
   Object.assign(request, { method: 'OPTIONS', request_target: { value: '*', source: 'observed', redacted: false } });
   assert.equal(validateCapture(encode(events)).valid, true);
 });
+
+
+function rejectHandler(name, change, pattern) {
+  test(name, () => {
+    const events = parse('handler-http');
+    change(events);
+    const result = validateCapture(encode(events));
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), pattern);
+  });
+}
+rejectHandler('handler end must explicitly describe method exit', events => {
+  delete events.find(e => e.data.completion).data.completion;
+}, /handler end requires/);
+rejectHandler('handler return cannot claim an error outcome', events => {
+  events.find(e => e.data.completion).data.completion = 'threw';
+}, /completion boundary disagrees/);
+rejectHandler('caller metadata must agree with parent method', events => {
+  events.find(e => e.data.invocation).data.invocation.caller.owner = 'integrator';
+}, /caller must match/);
+rejectHandler('1.0 rejects handler fields instead of silently changing its schema', events => {
+  events.forEach(e => { e.schema_version = '1.0'; });
+}, /schema validation/);
+rejectHandler('a recording cannot change its schema version midstream', events => {
+  events[0].schema_version = '1.0';
+}, /schema version changed/);
+rejectHandler('generic operation cannot carry a handler return', events => {
+  const lastOperation = events.filter(e => e.event_type === 'operation.ended').at(-1);
+  lastOperation.data.completion = 'returned';
+}, /non-handler operation/);
+test('no-HTTP handler is a complete traceable invocation with no server origins', () => {
+  const result = validateCapture(read('handler-no-http'));
+  assert.equal(result.valid, true);
+  assert.equal(result.summary.requests, 0);
+  assert.equal(result.summary.handler_calls, 1);
+  assert.deepEqual(result.summary.origins, []);
+});
+test('a handler may return while its causally linked HTTP child continues', () => {
+  const events = parse('handler-http');
+  const end = events.find(e => e.data.completion);
+  end.monotonic_ns = '25000000'; end.data.duration_ns = '20000000';
+  events.sort((a,b) => Number(BigInt(a.monotonic_ns) - BigInt(b.monotonic_ns)));
+  events.forEach((e,i) => { e.sequence = i + 1; });
+  const result = validateCapture(encode(events));
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+});
+test('stopped handler observation requires a retained reason', () => {
+  const events = parse('handler-stopped');
+  delete events.find(e => e.data.completion).extensions;
+  assert.match(validateCapture(encode(events)).errors.join('\n'), /requires a reason/);
+});
+
+for (const [name, time, pattern] of [
+  ['synchronous handler cannot begin after its caller ended', 4, /synchronous handler starts after caller ended/],
+  ['synchronous handler must exit before its caller ends', 6, /synchronous handler completes after caller ended/],
+]) {
+  rejectHandler(name, events => {
+    const handler = events.find(e => e.data.invocation);
+    const parent = events.find(e => e.event_type === 'operation.started' && e.context.span_id === handler.context.parent_span_id);
+    const end = events.find(e => e.event_type === 'operation.ended' && e.context.span_id === parent.context.span_id);
+    end.monotonic_ns = String(time * 1_000_000);
+    end.data.duration_ns = String(BigInt(end.monotonic_ns) - BigInt(parent.monotonic_ns));
+    events.sort((a,b) => Number(BigInt(a.monotonic_ns) - BigInt(b.monotonic_ns)));
+    events.forEach((e,i) => { e.sequence = i + 1; });
+  }, pattern);
+}

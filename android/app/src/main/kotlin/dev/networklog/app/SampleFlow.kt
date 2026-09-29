@@ -15,13 +15,16 @@ object SampleFlow {
         val session = logger.startSession(if (recovery) "Sign in with 401 recovery" else "Successful sign in", sessionId)
         val operation = session.startOperation("SampleApp.signIn", Actor("integrator", "SampleApp", "signIn"))
         try {
-            val sdk = DemoAuthSdk(session, progress)
+            // The app supplies a handler. The SDK invokes it while authenticate is still active.
+            val handler = DemoAuthSdk.TaskHandler { context ->
+                progress("App handler HTTP · customer manual logging · JSONPlaceholder")
+                manuallyRecordedTask(session, context)
+            }
+            val sdk = DemoAuthSdk(session, handler, progress)
             val identity = sdk.authenticate(operation.context, recovery)
-            progress("Load sample task · customer manual logging · JSONPlaceholder")
-            val task = manuallyRecordedTask(session, operation.context)
             sdk.completeDemo(identity, operation.context)
             operation.complete()
-            return Result(identity.displayName, task, session.sessionId)
+            return Result(identity.displayName, identity.task, session.sessionId)
         } catch (error: Exception) { operation.complete("error", error); throw error }
         finally { session.end() }
     }
@@ -31,7 +34,8 @@ object SampleFlow {
     private fun manuallyRecordedTask(session: Session, parent: CaptureContext): String {
         val url = "https://jsonplaceholder.typicode.com/todos/1"
         val exchange = session.startRequest("GET", url, parent,
-            Actor("integrator", "CustomerTaskClient", "loadTask"), headers = HeaderCapture.partial(emptyList(), "application_configured_only"))
+            Actor("integrator", "CustomerTaskHandler", "loadTask"),
+            executor = Actor("integrator", "CustomerTaskClient", "loadTask"), headers = HeaderCapture.partial(emptyList(), "application_configured_only"))
         var connection: HttpURLConnection? = null
         var stage = "unknown"
         try {

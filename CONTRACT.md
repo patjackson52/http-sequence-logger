@@ -1,8 +1,8 @@
-# Network capture contract 1.0 — draft
+# Network and local-control capture contract 1.1 — draft
 
 This document and [event.schema.json](schema/event.schema.json) define a project-specific JSON format. It uses distributed tracing identities but **is not OTLP JSON or HAR**. Future adapters may export those formats with documented loss of custom capture details.
 
-The words **must**, **should**, and **may** distinguish requirements, recommendations, and options within this proposed contract. No native implementation has been tested against it yet.
+The words **must**, **should**, and **may** distinguish requirements, recommendations, and options within this proposed contract. A Kotlin recorder and Android sample are validated against it; see [E2E.md](E2E.md).
 
 ## Scope and structure
 
@@ -14,7 +14,7 @@ Every event must have:
 
 | Field | Meaning |
 | --- | --- |
-| `schema_version` | Exact version, currently `1.0` |
+| `schema_version` | Exact version per recording: `1.0` or `1.1`; new producers write `1.1` |
 | `event_type` | Event discriminator from the schema |
 | `event_id` | Collision-resistant identity, stable across re-export/replay |
 | `session_namespace` | Stable project/environment scope, shared across relevant producers |
@@ -51,14 +51,26 @@ HTTP origin has separate `initiator` and `executor` actors. For example, Checkou
 
 Local parents start before their children. Children can outlive a parent's return when work is asynchronous; the viewer must not fabricate strict lifetime nesting. A missing local parent is an incomplete-data warning. Remote parents may be absent from this file. A span must not parent itself or change identity halfway through a request.
 
+## Local handler invocations (1.1)
+
+A handler is an ordinary operation span with explicit invocation metadata. It is independent of HTTP and must be representable when there are zero requests or server origins. On `operation.started`, optional `data.invocation` has `kind: handler`, `dispatch: synchronous`, and a `caller` actor. `data.origin` identifies the handler/callee. The parent context, if present, points to the invoking operation and its actor must match `invocation.caller`. The handler span ID distinguishes each invocation; names do not serve as identities.
+
+A handler's `operation.ended` must include `data.completion`: `returned` with outcome `success`, `threw` with outcome `error`, `cancelled` with outcome `cancelled`, or `observation_stopped` with outcome `unknown`. Observation stop requires a nonempty `extensions["capture.observation_stop_reason"]` and no known error. A missing end is an incomplete-data warning, never an inferred return. A normal return does not mean a returned business value was true or accepted. A thrown handler error can be caught by a successful parent.
+
+These completion fields belong only to handler spans. Generic method operations retain their original start/end shape. HTTP calls inside the handler use its context as parent and preserve the actual integrator executor. Their lifetimes remain independent and may extend beyond handler return. For the implemented synchronous handoff, a known caller must still be active at invocation and cannot end before the handler's known exit. The viewer represents the caller waiting for this invocation without claiming all SDK threads are paused.
+
+The Kotlin `invokeHandler` helper records entry/exit around actual customer code. It forwards the identical return object or exception, captures no arguments/return payloads, and runs user code outside the recorder lock. For manual integration, `startHandler` exposes a first-terminal-wins handle. Async dispatch and coroutine suspension/resumption require a future extension; do not model them as a synchronous wait without corresponding evidence.
+
+All events in one recording must use the same schema version. The current reader accepts both versions. The schema rejects invocation/completion fields and unknown operation outcomes in 1.0; old captures are not rewritten or retroactively assigned handler boundaries. [Handler tracing](HANDLER-TRACING.md) defines the API, rendering requirements, and fixtures. Summary `handler_calls`, `unfinished_handler_calls`, and `unknown_handler_outcomes` are separate from HTTP counters.
+
 ## Event vocabulary
 
 | Event | Purpose |
 | --- | --- |
 | `session.started` | Recording metadata, capabilities, policy, and ID source |
 | `session.ended` | Terminal recording boundary and dropped-event count |
-| `operation.started` | Integrator/SDK method or other named operation begins |
-| `operation.ended` | Method outcome and monotonic duration |
+| `operation.started` | Integrator/SDK method or handler invocation begins; optional explicit caller |
+| `operation.ended` | Method outcome/duration; explicit handler return, unwind, or observation-stop boundary |
 | `http.request.started` | Request metadata, source attribution, adapter, and attempt linkage |
 | `http.response.headers` | One informational or final HTTP response header observation |
 | `http.body.captured` | Terminal capture snapshot for the request or response body |

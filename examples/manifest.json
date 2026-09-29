@@ -208,6 +208,102 @@
         "unfinished_requests": 0,
         "unknown_outcomes": 0
       }
+    },
+    {
+      "file": "handler-http.ndjson",
+      "description": "SDK invokes an app-owned handler (http); return/unwind is separate from HTTP.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0,
+        "handler_calls": 1,
+        "unfinished_handler_calls": 0,
+        "unknown_handler_outcomes": 0
+      }
+    },
+    {
+      "file": "handler-no-http.ndjson",
+      "description": "SDK invokes an app-owned handler (no-http); return/unwind is separate from HTTP.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 0,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0,
+        "handler_calls": 1,
+        "unfinished_handler_calls": 0,
+        "unknown_handler_outcomes": 0
+      }
+    },
+    {
+      "file": "handler-throw.ndjson",
+      "description": "SDK invokes an app-owned handler (throw); return/unwind is separate from HTTP.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 0,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0,
+        "handler_calls": 1,
+        "unfinished_handler_calls": 0,
+        "unknown_handler_outcomes": 0
+      }
+    },
+    {
+      "file": "handler-cancelled.ndjson",
+      "description": "SDK invokes an app-owned handler (cancelled); return/unwind is separate from HTTP.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 0,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0,
+        "handler_calls": 1,
+        "unfinished_handler_calls": 0,
+        "unknown_handler_outcomes": 0
+      }
+    },
+    {
+      "file": "handler-stopped.ndjson",
+      "description": "SDK invokes an app-owned handler (stopped); return/unwind is separate from HTTP.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 0,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0,
+        "handler_calls": 1,
+        "unfinished_handler_calls": 0,
+        "unknown_handler_outcomes": 1
+      }
+    },
+    {
+      "file": "handler-interrupted.ndjson",
+      "description": "SDK invokes an app-owned handler (interrupted); return/unwind is separate from HTTP.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 0,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0,
+        "handler_calls": 1,
+        "unfinished_handler_calls": 1,
+        "unknown_handler_outcomes": 0
+      }
     }
   ]
 }

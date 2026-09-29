@@ -1,6 +1,6 @@
 # Kotlin Android SDK and sample
 
-This runnable sample integrates the draft 1.0 recorder with native `HttpURLConnection`, a small demo auth SDK, and customer-owned networking code. Source is MIT licensed. Android API 26+; no Java source/API examples are maintained. The iOS contract remains a design for a future implementation.
+This runnable sample integrates the draft 1.1 recorder with native `HttpURLConnection`, a small demo auth SDK, and customer-owned networking code. Source is MIT licensed. Android API 26+; no Java source/API examples are maintained. The iOS contract remains a design for a future implementation.
 
 ## Modules
 
@@ -37,7 +37,9 @@ Each run writes `files/captures/capture-<time>.ndjson` in private app storage. *
 | Optional rejection | DemoAuthSdk | DummyJSON `/auth/me` | Deliberately invalid token produces HTTP 401 |
 | Refresh | DemoAuthSdk | DummyJSON `/auth/refresh` | Exchange the demo refresh token |
 | Confirm/retry | DemoAuthSdk | DummyJSON `/auth/me` | Successful profile; recovery links to rejected request |
-| Load sample task | CustomerTaskClient | JSONPlaceholder `/todos/1` | Customer connection uses the manual recording API |
+| Invoke app handler | SDK → CustomerTaskHandler | Local method call | Explicit handoff while `authenticate` remains active |
+| Load sample task | CustomerTaskClient inside handler | JSONPlaceholder `/todos/1` | Customer connection uses manual recording with handler parent |
+| Return / accept task | Handler → DemoAuthSdk | Local method return and SDK method | Explicit `returned` boundary, then `acceptTask` |
 | Complete demonstration | DemoAuthSdk | httpbin `/anything/receipt` | Echo a synthetic receipt; no server-side persistence |
 
 The normal run has **8 requests**. Recovery has **9**, with one expected 401 and an overall successful operation. All use HTTPS. This is an auth-style orchestration example, **not OAuth, Prove integration, phone verification, or production identity verification**. The public endpoints do not trust each other or enforce a shared security decision. No real credentials or phone numbers are required. Tokens never go to the echo or task services.
@@ -49,6 +51,12 @@ The services are free and need no keys or dashboard setup. Their implementations
 - [JSONPlaceholder service](https://jsonplaceholder.typicode.com/) · [source](https://github.com/typicode/jsonplaceholder)
 
 Public services can be unavailable or rate limited. Live tests intentionally fail on unexpected status/content; they never substitute fabricated success data. Unit tests use controlled connections and need no network.
+
+## Trace a supplied app handler
+
+The sample constructs `DemoAuthSdk` with a `TaskHandler`. Inside `authenticate`, the SDK uses `session.invokeHandler(...)` to call it. The app uses the supplied handler context for its existing HTTP client. On method exit, the recorder writes an explicit `returned`, `threw`, or `cancelled` boundary before SDK code continues. Session shutdown records `observation_stopped` instead of a return. This tracing works even when the handler makes no HTTP calls.
+
+See [handler API, format, and GUI mapping](../HANDLER-TRACING.md). The sample now has two additional local progress steps; its HTTP request counts remain 8 and 9.
 
 ## Add logging to a customer's existing client
 
@@ -106,6 +114,6 @@ npm test
 node validate.mjs artifacts/live/*.ndjson
 ```
 
-The script builds APKs, runs 19 deterministic Kotlin tests, installs the sample/test APKs on the selected device, then performs the two real network flows. It extracts the NDJSON via `run-as`, validates it, and separates the recordings without changing event contents. Output goes to ignored `artifacts/live/`. To intentionally replace the checked-in evidence, pass `samples/live` as the script's first argument.
+The script builds APKs, runs 26 deterministic Kotlin tests, installs the sample/test APKs on the selected device, then performs the two real network flows. It extracts the NDJSON via `run-as`, validates it, and separates the recordings without changing event contents. Output goes to ignored `artifacts/live/`. To intentionally replace the checked-in evidence, pass `samples/live` as the script's first argument.
 
 Checked-in [live captures](../samples/live/manifest.json) were generated on an Android 17 / API 37 emulator. See [E2E evidence](../E2E.md) for verification and [the actual customer connection](app/src/main/kotlin/dev/networklog/app/SampleFlow.kt) for a complete runnable manual integration.

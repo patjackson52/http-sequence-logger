@@ -12,6 +12,9 @@ Conceptual API, to be expressed idiomatically in Kotlin and Swift/Objective-C:
 logger.startSession(optionalSessionId, name) -> Session
 Session.startRequest(method, url, optionalMetadata) -> Exchange
 Session.startOperation(name, owner, component, method, optionalParent) -> Operation
+Session.invokeHandler(name, caller, handler, optionalParent, block) -> originalResult
+Session.startHandler(name, caller, handler, optionalParent) -> HandlerCall
+HandlerCall.returned() / threw(error) / cancelled(error?) / stopObservation(reason)
 Operation.context -> immutable CaptureContext
 Operation.complete(outcome, optionalError)
 
@@ -30,6 +33,8 @@ Session.end(reason) -> completion/flush result
 The names are illustrative. The returned handles own span/session identity. A caller need not thread raw IDs through every callback. Direct custom clients call this interface; native adapters call it automatically. The recorder computes durations. Terminal methods are thread-safe and nonthrowing: the first terminal call wins, later calls are ignored with an optional local diagnostic. Logger failure or a cancellation/completion race must never escape into the customer's networking code.
 
 The public customer API must include session-level request creation, complete-response/fail/timeout/cancel helpers, body helpers, and an explicit observation-stop helper. Method spans, tracing-framework adoption, client replacement, manual adapter registration, and hand-authored JSON are not prerequisites. See [MANUAL-LOGGING.md](MANUAL-LOGGING.md) for Kotlin and Swift examples and the defaults the recorder supplies.
+
+Handler invocations are local operation spans independent of HTTP adapters. Observe the actual call/return, propagate the handler context to app-owned requests, and preserve original results/exceptions. Customer code must run outside the recorder lock. See [HANDLER-TRACING.md](HANDLER-TRACING.md).
 
 Operation propagation follows coroutine/task context or explicitly passed handles. Do not assume thread-local state survives arbitrary async dispatch. Capturing a callsite is optional evidence; explicit owner/component/method metadata is authoritative when supplied. Keep instrumentation overhead separate from the captured network duration where possible and record the actual observation boundary.
 

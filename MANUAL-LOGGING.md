@@ -49,6 +49,10 @@ The session can use a caller-supplied ID or generate one. Manual and built-in ad
 
 For streams, either use the SDK's non-consuming observer wrapper or manually feed the recorder bytes already read/written. Supply at most one final snapshot per direction. Retain bounded prefixes rather than collecting an unbounded body. Close/EOF/error are distinct; an early close marks incomplete capture even when it is an intentional application action.
 
+## Non-HTTP handler calls
+
+Customers can also instrument a local SDK-to-app handoff. `Session.invokeHandler(name, caller, handler, parent) { context -> ... }` observes method entry and exit without requiring any networking. `Session.startHandler` supplies the equivalent manual handle for existing method boundaries. The handler context parents any app-owned HTTP or nested operations; `returned`, `threw`, `cancelled`, and `stopObservation` retain distinct completion semantics. See [HANDLER-TRACING.md](HANDLER-TRACING.md) for runnable sample integration and GUI requirements.
+
 ## Kotlin: keep the customer's client
 
 This example assumes an existing custom client whose result already contains the consumed body. The logger does not read the response a second time. `HttpResult` and `existingClient` represent the customer's existing types.

@@ -17,6 +17,15 @@ for (const sample of manifest.files) {
     const requests = events.filter(e => e.event_type === 'http.request.started');
     assert.equal(requests.filter(e => e.data.adapter.name === 'customer.manual').length, 1);
     assert.equal(requests.find(e => e.data.adapter.name === 'customer.manual').data.origin.executor.owner, 'integrator');
+    const handler = events.find(e => e.data.invocation?.kind === 'handler');
+    assert.ok(handler);
+    assert.equal(handler.data.invocation.caller.owner, 'sdk');
+    assert.equal(handler.data.origin.owner, 'integrator');
+    assert.equal(requests.find(e => e.data.adapter.name === 'customer.manual').context.parent_span_id, handler.context.span_id);
+    const returned = events.find(e => e.context?.span_id === handler.context.span_id && e.event_type === 'operation.ended');
+    assert.equal(returned.data.completion, 'returned');
+    const resumed = events.find(e => e.data.name === 'DemoAuthSdk.acceptTask');
+    assert.ok(resumed.sequence > returned.sequence);
     assert.ok(requests.some(e => e.data.origin.executor.owner === 'sdk'));
     assert.equal(events.find(e => e.event_type === 'session.started').data.trace_propagation, 'disabled');
   });

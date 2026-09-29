@@ -267,4 +267,37 @@ const expected = (requests = 1, failed = 0, extra = {}) => ({ sessions: 1, recor
   save('ios-logical-transactions', r, 'One observed task and two native transaction snapshots; no retrospective spans or fabricated callback timing.', expected());
 }
 
+// Control-flow spans are independent of HTTP. Keep the original 1.0 fixtures unchanged.
+for (const mode of ['http', 'no-http', 'throw', 'cancelled', 'stopped', 'interrupted']) {
+  const name = `handler-${mode}`;
+  const r = recording(name);
+  const sdkStart = r.events.find(e => e.event_type === 'operation.started' && e.data.origin.owner === 'sdk');
+  const handler = actor('integrator', 'CustomerTaskHandler', 'loadTask');
+  const ctx = { ...sdkStart.context, span_id: hex(name + '/handler', 16), parent_span_id: sdkStart.context.span_id, parent_scope: 'local' };
+  r.emit('operation.started', 5, { name: 'CustomerTaskHandler.loadTask', origin: handler,
+    invocation: { kind: 'handler', dispatch: 'synchronous', caller: sdk } }, ctx);
+  if (mode === 'http') {
+    const request = r.request('handler-http', 10, { method: 'GET', url: 'https://tasks.example/todos/1', payload: null });
+    request.ctx.parent_span_id = ctx.span_id;
+    r.events.find(e => e.event_type === 'http.request.started').data.origin = { initiator: handler, executor: handler, callsite: null };
+    request.respond(30, 200, { title: 'Review task' }); request.finish(35);
+  }
+  if (mode !== 'interrupted') {
+    const outcome = mode === 'throw' ? 'error' : mode === 'cancelled' ? 'cancelled' : mode === 'stopped' ? 'unknown' : 'success';
+    const completion = mode === 'throw' ? 'threw' : mode === 'cancelled' ? 'cancelled' : mode === 'stopped' ? 'observation_stopped' : 'returned';
+    const end = r.emit('operation.ended', 45, { outcome, completion, duration_ns: '40000000',
+      error: mode === 'throw' ? err('HandlerError', 'Handler rejected task', 'unknown') : null }, ctx);
+    if (mode === 'stopped') end.extensions = { 'capture.observation_stop_reason': 'capture_disabled' };
+  }
+  if (['http', 'no-http', 'throw'].includes(mode)) {
+    const resume = { ...ctx, span_id: hex(name + '/resume', 16), parent_span_id: sdkStart.context.span_id };
+    r.emit('operation.started', 46, { name: 'VerificationClient.acceptTask', origin: actor('sdk', 'VerificationClient', 'acceptTask') }, resume);
+    r.emit('operation.ended', 48, { outcome: 'success', duration_ns: '2000000', error: null }, resume);
+  }
+  r.finish(50);
+  r.events.forEach(e => { e.schema_version = '1.1'; });
+  save(name, r, `SDK invokes an app-owned handler (${mode}); return/unwind is separate from HTTP.`,
+    expected(mode === 'http' ? 1 : 0, 0, { handler_calls: 1, unfinished_handler_calls: mode === 'interrupted' ? 1 : 0, unknown_handler_outcomes: mode === 'stopped' ? 1 : 0 }));
+}
+
 writeFileSync(new URL('../examples/manifest.json', import.meta.url), `${JSON.stringify({ synthetic: true, captures }, null, 2)}\n`);
