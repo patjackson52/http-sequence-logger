@@ -1,10 +1,10 @@
 # HTTP sequence logger
 
-Draft **1.1** capture format (reader also accepts **1.0**) for mobile development SDKs. Includes a Kotlin Android recorder and auth sample, a Swift transfer package and manually instrumented iOS demo, a local desktop collector, and an interactive web sequence viewer.
+Draft **1.2** capture format (reader also accepts **1.0/1.1**) for mobile and browser development SDKs. Includes Kotlin Android and browser recorders with auth samples, a Swift transfer package and manually instrumented iOS demo, a local desktop collector, and an interactive web sequence viewer.
 
 Repository: [patjackson52/http-sequence-logger](https://github.com/patjackson52/http-sequence-logger) · [MIT license](LICENSE).
 
-**Integrating an existing app with a coding agent?** Start at [AGENTS.md](AGENTS.md) and the [integration guide](docs/integration/README.md), or copy the [agent prompt](docs/integration/AGENT-PROMPT.md). They cover Android/iOS installation, implemented SDK capabilities, JSON specs, device file locations, pairing, the viewer, and production isolation.
+**Integrating an existing app with a coding agent?** Start at [AGENTS.md](AGENTS.md) and the [integration guide](docs/integration/README.md), or copy the [agent prompt](docs/integration/AGENT-PROMPT.md). They cover Android/iOS/browser installation, implemented capabilities, JSON specs, files and IndexedDB, transfer, the viewer, and production isolation.
 
 ## Stream logs into the viewer
 
@@ -17,6 +17,17 @@ npm run collector
 ```
 
 Open the printed viewer link. [Web viewer guide](viewer/README.md) · [Swift transport and iOS demo](ios/README.md).
+
+## Run the browser sample
+
+```sh
+npm ci
+npm run web:sample
+```
+
+Open `http://127.0.0.1:4180`. The simulated auth flow uses two local servers, a small SDK, Fetch, and an SDK-awaited app handler making an XHR request. It includes expected token expiry and refresh; no account is needed. A separate action exercises two public APIs. Export NDJSON from the development panel, or configure its same-origin relay for explicit collector upload.
+
+The [browser SDK](web-sdk/README.md) includes manual customer-client recording, bounded memory/IndexedDB storage, redaction and a small production no-op entry. [Existing frontend integration](docs/integration/WEB.md) explains source installation, build aliases, log locations and delivery. Run `npm run check:web-types` and `npm run check:web-release` for typed consumer and shipping isolation checks. [Real browser captures](samples/web/README.md) · [Browser design](docs/web/PLAN.md) · [Review/evidence](docs/web/REVIEW.md).
 
 ## Run the Android sample
 
@@ -97,7 +108,7 @@ npm test
 
 The tests check generated-file reproducibility, all reference examples, import recovery, and rejection of contradictory records. Modify the authoring sources and regenerate; do not edit generated files independently.
 
-Version `1.1` adds explicit handler calls and returns to the draft format; version `1.0` remains readable. The Kotlin SDK is a working development prototype, not a published production release. Dependencies and lockfile are scoped to this package, independent of the surrounding application.
+Version `1.1` adds explicit synchronous handler calls and returns; `1.2` adds browser producers and explicitly awaited handler settlement. Older recordings retain their original semantics. SDKs are source-integrated development prototypes, not published production releases. Dependencies and lockfile are scoped to this repository, independent of the surrounding application.
 
 ## Interactive viewer
 

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Structured mobile HTTP and handler logging with a local sequence viewer",
+  "description": "Structured mobile and browser HTTP and handler logging with a local sequence viewer",
   "scripts": {
     "generate": "node scripts/build-schema.mjs && node scripts/build-validator.mjs && node scripts/build-examples.mjs",
     "validate": "node validate.mjs examples/*.ndjson",
@@ -11,7 +11,12 @@
     "viewer": "vite --config viewer/vite.config.mjs",
     "build:viewer": "vite build --config viewer/vite.config.mjs",
     "preview:viewer": "vite preview --config viewer/vite.config.mjs",
-    "collector": "node collector/cli.mjs"
+    "collector": "node collector/cli.mjs",
+    "web:sample": "vite --config web-sample/vite.config.mjs",
+    "build:web-sample": "vite build --config web-sample/vite.config.mjs",
+    "check:web-release": "node scripts/check-web-release.mjs",
+    "check:web-types": "tsc --ignoreConfig --noEmit --strict --types node --module nodenext --target es2022 --lib es2022,dom,dom.iterable integration/web-consumer/check.mts",
+    "check:web-browser": "npm run build:viewer && npm run build:web-sample && node scripts/check-web-browser.mjs"
   },
   "engines": {
     "node": ">=22.12.0"
@@ -25,7 +30,11 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "26.6.3",
     "@vitejs/plugin-react": "6.1.1",
+    "fake-indexeddb": "6.2.5",
+    "typescript": "7.0.2",
     "vite": "8.3.1"
   }
 }

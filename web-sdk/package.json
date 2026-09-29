@@ -1,0 +1,22 @@
+{
+  "name": "@http-sequence-logger/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/api.d.mts",
+      "default": "./src/api.mjs"
+    },
+    "./debug": {
+      "types": "./src/index.d.mts",
+      "default": "./src/index.mjs"
+    },
+    "./dev-relay": {
+      "types": "./dev-relay.d.mts",
+      "default": "./dev-relay.mjs"
+    }
+  },
+  "license": "MIT"
+}

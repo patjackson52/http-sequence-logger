@@ -49,7 +49,7 @@ export default function Sequence({ session, filters = {}, collapsed = EMPTY_SET,
   while (related && !seen.has(related.id)) { seen.add(related.id); relatedIds.add(related.id); related = related.parentScope === 'local' ? layout.opMap.get(related.parentId) : null; }
   return <div className="nll-sequence" role="group" tabIndex={0} aria-label="Sequence diagram. Event order, not a duration scale. Arrow keys or j and k move between rows. Enter opens details; Escape closes details. Left and right navigate caller and children. Brackets collapse or expand methods; h toggles HTTP only." onKeyDown={onKeyDown} style={{ width: layout.width, minWidth: '100%' }}>
     <div className="nll-seq-header" style={{ width: layout.width }}>
-      <div className="nll-seq-mobile-band" style={{ left: layout.clientGroup.x, width: layout.clientGroup.width }}>Mobile client</div>
+      <div className="nll-seq-mobile-band" style={{ left: layout.clientGroup.x, width: layout.clientGroup.width }}>Client</div>
       {layout.lanes.map((lane) => <div key={lane.id} className={`nll-seq-lane ${lane.muted ? 'is-muted' : ''}`} tabIndex={0} title={lane.title} aria-label={lane.title} style={{ left: lane.left, width: lane.width }}>
         <strong>{lane.label}</strong><span>{lane.sub || 'No components recorded'}</span>
       </div>)}

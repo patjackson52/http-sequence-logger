@@ -1,0 +1,64 @@
+{
+  "browser": "154.0.8037.58",
+  "date": "2026-09-29T06:58:44.685Z",
+  "auth": {
+    "sessions": 1,
+    "recordings": 1,
+    "events": 36,
+    "duplicate_events": 0,
+    "requests": 6,
+    "handler_calls": 1,
+    "unfinished_handler_calls": 0,
+    "unknown_handler_outcomes": 0,
+    "failed_requests": 1,
+    "cancelled_requests": 0,
+    "unknown_outcomes": 0,
+    "unfinished_requests": 0,
+    "origins": [
+      "http://127.0.0.1:4181",
+      "http://127.0.0.1:4182"
+    ]
+  },
+  "combined": {
+    "sessions": 2,
+    "recordings": 2,
+    "events": 63,
+    "duplicate_events": 0,
+    "requests": 11,
+    "handler_calls": 2,
+    "unfinished_handler_calls": 0,
+    "unknown_handler_outcomes": 0,
+    "failed_requests": 1,
+    "cancelled_requests": 1,
+    "unknown_outcomes": 2,
+    "unfinished_requests": 0,
+    "origins": [
+      "http://127.0.0.1:4181",
+      "http://127.0.0.1:4182"
+    ]
+  },
+  "checks": [
+    "native Fetch/XHR and awaited handler",
+    "manual custom HTTP",
+    "opaque response",
+    "AbortError",
+    "parse failure after HTTP EOF",
+    "unread response",
+    "IndexedDB close/reopen and page reload",
+    "NDJSON download",
+    "relay upload, duplicate replay, offline recovery",
+    "live viewer import",
+    "production no-op sign-in succeeds"
+  ],
+  "browserChecks": [
+    "PASS JSON parsing failure preserves HTTP completion",
+    "PASS Abort preserves native error",
+    "PASS Opaque response remains opaque",
+    "PASS Adapter leaves unread response untouched",
+    "PASS Synchronous handler preserves Promise identity",
+    "PASS Custom client manual recording works",
+    "PASS Capture validates (63 events)",
+    "PASS Query secrets are removed before persistence",
+    "PASS IndexedDB reload preserves capture"
+  ]
+}

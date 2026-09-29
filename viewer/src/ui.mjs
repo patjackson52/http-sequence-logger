@@ -9,7 +9,8 @@ export function statusInfo(item) {
  const outcome=item?.outcome;
  if(item?.applicationOutcome==='error'||item?.end?.data.application_outcome==='error')return ['failed','✕','Application error'];
  if(item?.isHandler){
-  return ({returned:['success','↩','Returned'],threw:['failed','↯','Threw'],cancelled:['cancelled','⊘','Cancelled'],observation_stopped:['incomplete','?','Observation stopped']}[item.completion]||['incomplete','…','Unfinished']);
+  const awaited=item.invocation?.dispatch==='awaited';
+  return ({returned:['success','↩',awaited?'Resolved':'Returned'],threw:['failed','↯',awaited?'Rejected':'Threw'],cancelled:['cancelled','⊘','Cancelled'],observation_stopped:['incomplete','?','Observation stopped']}[item.completion]||['incomplete','…','Unfinished']);
  }
  if(item?.request || item?.rawEvents?.some(e=>e.event_type.startsWith('http.'))){
   if(['timeout','transport_error','http_error'].includes(outcome))return ['failed',outcome==='timeout'?'◷':outcome==='transport_error'?'⚠':'✕',{timeout:'Timeout',transport_error:'Transport error',http_error:'HTTP error'}[outcome]];

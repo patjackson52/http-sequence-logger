@@ -7,3 +7,6 @@ local.properties
 .DS_Store
 artifacts/
 viewer/dist/
+
+web-sample/dist/
+web-sample/dist-debug/

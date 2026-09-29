@@ -1,4 +1,4 @@
-# Network and local-control capture contract 1.1 — draft
+# Network and local-control capture contract 1.2 — draft
 
 This document and [event.schema.json](schema/event.schema.json) define a project-specific JSON format. It uses distributed tracing identities but **is not OTLP JSON or HAR**. Future adapters may export those formats with documented loss of custom capture details.
 
@@ -14,7 +14,7 @@ Every event must have:
 
 | Field | Meaning |
 | --- | --- |
-| `schema_version` | Exact version per recording: `1.0` or `1.1`; new producers write `1.1` |
+| `schema_version` | Exact version per recording: `1.0`, `1.1`, or `1.2`; browser producers write `1.2`, Android remains `1.1` |
 | `event_type` | Event discriminator from the schema |
 | `event_id` | Collision-resistant identity, stable across re-export/replay |
 | `session_namespace` | Stable project/environment scope, shared across relevant producers |
@@ -51,15 +51,15 @@ HTTP origin has separate `initiator` and `executor` actors. For example, Checkou
 
 Local parents start before their children. Children can outlive a parent's return when work is asynchronous; the viewer must not fabricate strict lifetime nesting. A missing local parent is an incomplete-data warning. Remote parents may be absent from this file. A span must not parent itself or change identity halfway through a request.
 
-## Local handler invocations (1.1)
+## Local handler invocations (1.1 and 1.2)
 
-A handler is an ordinary operation span with explicit invocation metadata. It is independent of HTTP and must be representable when there are zero requests or server origins. On `operation.started`, optional `data.invocation` has `kind: handler`, `dispatch: synchronous`, and a `caller` actor. `data.origin` identifies the handler/callee. The parent context, if present, points to the invoking operation and its actor must match `invocation.caller`. The handler span ID distinguishes each invocation; names do not serve as identities.
+A handler is an ordinary operation span with explicit invocation metadata. It is independent of HTTP and must be representable when there are zero requests or server origins. On `operation.started`, optional `data.invocation` has `kind: handler`, `dispatch: synchronous` (or `awaited` in 1.2), and a `caller` actor. `data.origin` identifies the handler/callee. The parent context, if present, points to the invoking operation and its actor must match `invocation.caller`. The handler span ID distinguishes each invocation; names do not serve as identities.
 
 A handler's `operation.ended` must include `data.completion`: `returned` with outcome `success`, `threw` with outcome `error`, `cancelled` with outcome `cancelled`, or `observation_stopped` with outcome `unknown`. Observation stop requires a nonempty `extensions["capture.observation_stop_reason"]` and no known error. A missing end is an incomplete-data warning, never an inferred return. A normal return does not mean a returned business value was true or accepted. A thrown handler error can be caught by a successful parent.
 
 These completion fields belong only to handler spans. Generic method operations retain their original start/end shape. HTTP calls inside the handler use its context as parent and preserve the actual integrator executor. Their lifetimes remain independent and may extend beyond handler return. For the implemented synchronous handoff, a known caller must still be active at invocation and cannot end before the handler's known exit. The viewer represents the caller waiting for this invocation without claiming all SDK threads are paused.
 
-The Kotlin `invokeHandler` helper records entry/exit around actual customer code. It forwards the identical return object or exception, captures no arguments/return payloads, and runs user code outside the recorder lock. For manual integration, `startHandler` exposes a first-terminal-wins handle. Async dispatch and coroutine suspension/resumption require a future extension; do not model them as a synchronous wait without corresponding evidence.
+The Kotlin `invokeHandler` helper records entry/exit around actual customer code. It forwards the identical return object or exception, captures no arguments/return payloads, and runs user code outside the recorder lock. For manual integration, `startHandler` exposes a first-terminal-wins handle. Version 1.2 adds `dispatch: awaited` for an explicitly awaited handler: the terminal boundary records fulfillment (`returned`) or rejection (`threw`) of the awaited value. The viewer calls these resolved/rejected. The caller must remain active until this settlement. This does not claim a blocked thread, implicit context propagation, or suspension/resumption events. A synchronous handler that returns a Promise still ends at its immediate return. General asynchronous enqueue/continuation tracing remains future work.
 
 All events in one recording must use the same schema version. The current reader accepts both versions. The schema rejects invocation/completion fields and unknown operation outcomes in 1.0; old captures are not rewritten or retroactively assigned handler boundaries. [Handler tracing](HANDLER-TRACING.md) defines the API, rendering requirements, and fixtures. Summary `handler_calls`, `unfinished_handler_calls`, and `unknown_handler_outcomes` are separate from HTTP counters.
 
@@ -208,3 +208,13 @@ Before an incompatible format change, bump the major schema version. Even additi
 - [HAR 1.2](https://www.softwareishard.com/blog/har-12-spec/) for a future HTTP archive adapter.
 - [Android SystemClock](https://developer.android.com/reference/android/os/SystemClock) and [Apple continuous time](https://developer.apple.com/documentation/kernel/1646199-mach_continuous_time) for elapsed time that includes device sleep.
 - [HTTP informational responses](https://www.rfc-editor.org/rfc/rfc9110.html#section-15.2) for interim-before-final ordering.
+
+## Browser producer (1.2)
+
+Version 1.2 adds `producer.platform: web` and awaited handler dispatch. Versions 1.0/1.1 remain readable and reject these new values. Native producers need not upgrade. Browser and native recordings may coexist in one imported file, each with a fixed version. Transfer protocol remains version 1.
+
+The browser observes logical Fetch/XHR calls: browser-added request headers, cookie details, filtered response headers, redirects, preflights and hidden attempts are not fabricated. Header sets are partial. Fetch opaque/opaque-redirect status 0 becomes unavailable status and an unknown observation, not an HTTP response or success. A CORS failure does not establish whether a server processed the request. Trace propagation remains disabled by default.
+
+Fetch helpers consume only when the application requests consumption, without cloning/teeing/draining. Native EOF completes HTTP before application JSON parsing; parsing errors are not transport failures. XHR load/error/abort/timeout determines the observed terminal boundary. Parsed XHR JSON/Blob/Document bodies may be withheld rather than reconstructed as original bytes. Text snapshots count the UTF-8 representation of application-visible strings; ArrayBuffer snapshots count application bytes. Neither is a wire-size measurement, and Content-Length cannot substitute for observed bytes.
+
+Browser relative time comes from `performance.now()`, recorded as integer nanosecond units with reduced browser precision. Some engines pause this clock through system sleep; browser durations do not inherit the native continuous-clock guarantee. Wall time remains a separate observation. Error messages/stacks are withheld. Capture/body/header bounds and privacy exclusions are stated in producer policy and availability reasons.

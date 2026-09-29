@@ -1,6 +1,6 @@
 # Development capture transfer v1
 
-The SDK's schema 1.0/1.1 NDJSON is unchanged. Transport frames never become capture events. All records must have passed the producer's capture/redaction policy before entering a transfer sink.
+Capture event schemas `1.0`, `1.1` and `1.2` travel unchanged under transfer version `1`. Browser producers use capture `1.2`; native producers retain their existing versions. Transport frames never become capture events. All records must have passed the producer's capture/redaction policy before entering a transfer sink.
 
 ## Connection configuration
 
@@ -40,6 +40,21 @@ The collector's loopback HTTP listener serves the built viewer. Its separate bro
 - `GET /api/v1/pairing` returns loopback and available LAN connection configurations for explicit pairing.
 
 A browser disconnect is transport state, not a synthetic HTTP failure or method return. Live records with no terminal event display 'completion not yet observed'; imported files retain the existing incomplete-capture wording. The viewer preserves selection, filters and scroll while adding events. HTTP-only and handler behavior remain unchanged.
+
+## Browser SDK delivery through a development relay
+
+The browser SDK is a producer distinct from the desktop viewer. Its canonical journal is bounded, origin-scoped IndexedDB (or explicitly selected memory storage); an NDJSON file is created by export. Browser delivery is an **explicit foreground upload**, not the native sender's timed spool flushing/backoff/cursor behavior.
+
+The opt-in Node middleware `web-sdk/dev-relay.mjs` mounts on the frontend's loopback-bound development server. It reads the collector's private loopback pairing file at startup and accepts only a collector endpoint with `http:` and hostname `127.0.0.1`. No native LAN certificate-pinning route is implemented by this relay. The frontend origin is configured explicitly; Host must match, a supplied Origin must match, and uploads require that matching Origin. No permissive CORS response or arbitrary proxy target is supplied. The upload token stays in Node memory, never browser code, public configuration, capture events or URL parameters.
+
+Default same-origin routes:
+
+- `GET /__network_log/config` returns `{version:1,collector_id}` with no upload token.
+- `POST /__network_log/events` accepts uncompressed `application/x-ndjson`, at most 1 MiB / 500 complete lines, and forwards to the fixed collector `/api/v1/events` with the device credential. At most two relay uploads are active at once. Collector redirects are rejected; responses/ACKs are capped at 2 MiB. Rejection or timeout preserves the browser journal.
+
+`uploadJournal(journal)` awaits persistence, snapshots the retained NDJSON, and sends bounded batches using an uninstrumented Fetch call. It validates collector identity and acknowledgment of every submitted ID. It never deletes canonical data, advances a browser ACK cursor, or rewrites event identities. Repeated uploads replay retained records and the collector deduplicates them. Appends after the snapshot require another invocation. There is no automatic timer retry, background upload, WebSocket or continuous SDK stream; SSE remains the collector-to-viewer change notification mechanism.
+
+Restart the development server after changing the pairing file. Host apps retain a manual file export when the collector or IndexedDB is unavailable and exclude the relay, recorder, storage and export controls from shipping frontend artifacts. [Browser integration](../integration/WEB.md) gives package entries, storage names, source installation and build-boundary examples.
 
 ## ADB file retrieval
 

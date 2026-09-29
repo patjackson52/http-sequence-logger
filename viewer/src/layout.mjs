@@ -164,17 +164,18 @@ export function layoutSequence(session, options = {}) {
       const sameRole = ownerOf(caller) === ownerOf(entity.origin);
       const callerName = [caller?.component, caller?.method].filter(Boolean).join('.') || 'Caller not recorded';
       const completion = entity.completion;
-      const returnLabels = { returned: '↩ returned', threw: '↯ threw', cancelled: '⊘ cancelled' };
+      const awaited = entity.invocation?.dispatch === 'awaited';
+      const returnLabels = { returned: awaited ? '↩ resolved' : '↩ returned', threw: awaited ? '↯ rejected' : '↯ threw', cancelled: '⊘ cancelled' };
       const errorType = entity.end?.data?.error?.type;
       const label = row.kind === 'call' ? `call · ${bar.label}` : `${returnLabels[completion]}${completion === 'threw' && errorType ? ` · ${errorType}` : ''} · ${durationLabel(entity.durationMs)}`;
-      localArrows.push({ key: `${entity.id}:${row.kind}`, entityId: entity.id, kind: row.kind, x1: row.kind === 'call' ? callerX : calleeX, x2: row.kind === 'call' ? calleeX : callerX, y: row.y + 10, self: sameRole && callerLane.id === calleeLane.id, label, sub: row.kind === 'call' ? `handler · synchronous${parent ? '' : ' · caller not instrumented'}` : '', fromDot: row.kind === 'call' && !parent, tone: row.kind === 'call' || completion === 'returned' ? 'local' : completion === 'threw' ? 'error' : 'neutral', title: row.kind === 'call' ? `Local call from ${OWNER_LABELS[ownerOf(caller)]} ${callerName} to ${OWNER_LABELS[entity.owner]} ${entity.component}.${entity.method}, handler, synchronous. Span ${entity.spanId}. Select invocation.` : `${label} to ${callerName}; elapsed includes nested HTTP and waiting. Span ${entity.spanId}. Select invocation.` });
+      localArrows.push({ key: `${entity.id}:${row.kind}`, entityId: entity.id, kind: row.kind, x1: row.kind === 'call' ? callerX : calleeX, x2: row.kind === 'call' ? calleeX : callerX, y: row.y + 10, self: sameRole && callerLane.id === calleeLane.id, label, sub: row.kind === 'call' ? `handler · ${entity.invocation?.dispatch || 'synchronous'}${parent ? '' : ' · caller not instrumented'}` : '', fromDot: row.kind === 'call' && !parent, tone: row.kind === 'call' || completion === 'returned' ? 'local' : completion === 'threw' ? 'error' : 'neutral', title: row.kind === 'call' ? `Local call from ${OWNER_LABELS[ownerOf(caller)]} ${callerName} to ${OWNER_LABELS[entity.owner]} ${entity.component}.${entity.method}, handler, ${entity.invocation?.dispatch || 'synchronous'}. Span ${entity.spanId}. Select invocation.` : `${label} to ${callerName}; elapsed includes nested HTTP and waiting. Span ${entity.spanId}. Select invocation.` });
     }
   }
   for (const bar of bars.filter((b) => b.kind === 'handler')) {
     const parentBar = bar.operation.parentScope === 'local' ? barMap.get(bar.operation.parentId) : null; if (!parentBar || bar.collapsed) continue;
     const start = rowFor(bar.entityId, ['call'])?.y ?? bar.y;
     const stop = Math.min(bar.y + bar.height, parentBar.y + parentBar.height);
-    if (stop > start) waitSegments.push({ entityId: bar.entityId, callerId: parentBar.entityId, x: parentBar.x, y: start, width: parentBar.width, height: stop - start, label: `waiting for ${bar.operation.method || bar.operation.name}` });
+    if (stop > start) waitSegments.push({ entityId: bar.entityId, callerId: parentBar.entityId, x: parentBar.x, y: start, width: parentBar.width, height: stop - start, label: `${bar.operation.invocation?.dispatch === 'awaited' ? 'awaiting settlement of' : 'waiting for'} ${bar.operation.method || bar.operation.name}` });
   }
   for (const exchange of selectedExchanges) {
     const start = rowFor(exchange.id, ['request']), end = rowFor(exchange.id, ['terminal']);

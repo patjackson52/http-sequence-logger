@@ -206,8 +206,8 @@ export function validateEvents(parsedEvents, initial = {}) {
         if (parent.event_type !== 'operation.started' || stable(parent.data.origin) !== stable(start.data.invocation.caller)) error(start, 'handler caller must match its parent operation actor');
         const parentEnd = spanEnds.get(spanKey(parent.context));
         const handlerEnd = spanEnds.get(key);
-        if (parentEnd && parentEnd.sequence < start.sequence) error(start, 'synchronous handler starts after caller ended');
-        if (parentEnd && handlerEnd && handlerEnd.sequence > parentEnd.sequence) error(handlerEnd, 'synchronous handler completes after caller ended');
+        if (parentEnd && parentEnd.sequence < start.sequence) error(start, `${start.data.invocation.dispatch} handler starts after caller ended`);
+        if (parentEnd && handlerEnd && handlerEnd.sequence > parentEnd.sequence) error(handlerEnd, `${start.data.invocation.dispatch} handler completes after caller ended`);
       }
     }
     if (start.event_type === 'http.request.started' && start.data.attempt.previous_span_id) {

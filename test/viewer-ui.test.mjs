@@ -6,6 +6,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createServer } from 'vite';
 import { importFiles } from '../viewer/src/model.mjs';
+import { layoutSequence } from '../viewer/src/layout.mjs';
 
 // Compile the real JSX through the declared build dependency. No browser, DOM
 // emulator, copied rendering implementation, or outbound request is involved.
@@ -23,6 +24,18 @@ after(async () => { await server?.close(); });
 function fixture(name) {
   const text = readFileSync(new URL(`../examples/${name}.ndjson`, import.meta.url), 'utf8');
   return importFiles([{ name: `${name}.ndjson`, text }]).sessions[0];
+}
+function awaitedFixture(name) {
+  const text = readFileSync(new URL(`../examples/${name}.ndjson`, import.meta.url), 'utf8');
+  const events = text.trim().split('\n').map(JSON.parse).map(event => {
+    event.schema_version = '1.2';
+    if (event.data.producer) event.data.producer.platform = 'web';
+    if (event.data.invocation) event.data.invocation.dispatch = 'awaited';
+    return event;
+  });
+  const imported = importFiles([{ name: 'awaited.ndjson', text: events.map(JSON.stringify).join('\n') + '\n' }]);
+  assert.equal(imported.valid, true);
+  return imported.sessions[0];
 }
 function render(item, session) {
   return renderToStaticMarkup(React.createElement(Inspector, {
@@ -76,6 +89,41 @@ test('a thrown handler keeps the successful caller outcome visible', () => {
   assert.match(html, /↯ Threw/);
   assert.match(html, /caller&#x27;s own outcome is success/);
   assert.match(html, /exception unwound to/);
+});
+
+test('awaited handlers display settlement consistently in diagram and inspector without a blocked-thread claim', () => {
+  for (const [fixtureName, badge, arrow] of [['handler-no-http', 'Resolved', 'resolved'], ['handler-throw', 'Rejected', 'rejected']]) {
+    const session = awaitedFixture(fixtureName), item = session.handlers[0];
+    const html = render(item, session), layout = layoutSequence(session);
+    assert.match(html, new RegExp(`↩ ${badge}|↯ ${badge}`));
+    assert.match(html, /Promise settlement does not indicate that a business result was accepted/);
+    assert.match(html, /Other JavaScript can run while the caller awaits/);
+    assert.doesNotMatch(html, /exception unwound|↩ Returned|↯ Threw/);
+    if (badge === 'Rejected') {
+      assert.match(html, /awaited handler rejected for/);
+      assert.match(html, /caller&#x27;s own outcome is success/);
+    }
+    assert.match(layout.localArrows.find(item => item.kind === 'return').label, new RegExp(arrow));
+    assert.match(layout.waitSegments[0].label, /awaiting settlement of/);
+  }
+});
+
+test('stopped awaited handler displays unknown settlement without inventing a resolved return', () => {
+  const session = awaitedFixture('handler-stopped'), item = session.handlers[0];
+  const html = render(item, session);
+  assert.match(html, /The handler settlement was not observed/);
+  assert.match(html, /Observation stopped/);
+  assert.doesNotMatch(html, /↩ Resolved|↩ Returned/);
+  assert.equal(layoutSequence(session).localArrows.filter(item => item.kind === 'return').length, 0);
+});
+
+test('partial handler capture without its invocation start remains inspectable', () => {
+  const text = readFileSync(new URL('../examples/handler-throw.ndjson', import.meta.url), 'utf8');
+  const events = text.trim().split('\n').map(JSON.parse).filter(event => !event.data.invocation);
+  const session = importFiles([{ name: 'partial.ndjson', text: events.map(JSON.stringify).join('\n') + '\n' }]).sessions[0];
+  const html = render(session.handlers[0], session);
+  assert.match(html, /dispatch not recorded/);
+  assert.match(html, /Caller not recorded|Not recorded/);
 });
 
 test('HTTP 200 inspection exposes body-read timeout and separate application failure', () => {

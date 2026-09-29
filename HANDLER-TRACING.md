@@ -62,7 +62,7 @@ On method exit, the same span emits `operation.ended.data`:
 
 The enclosing SDK operation stays open during the synchronous handler. A known handler completion must precede its known caller completion. Nested HTTP requests use the handler context as their parent and retain their actual app executor. If a handler launches asynchronous work and returns early, that HTTP span may outlive the handler. Its causal parent does not extend the method's lifetime. The caller operation represents one invocation, not every thread inside the SDK.
 
-A recording uses one exact schema version throughout. The Kotlin recorder now writes **1.1**. The validator reads both **1.0** and **1.1**; older 1.0 files retain their original interpretation. Handler fields and unknown operation outcomes are rejected in 1.0. A generic 1.0 method block lacks an explicit handler caller/return boundary: a viewer must not invent that metadata.
+A recording uses one exact schema version throughout. The Kotlin recorder now writes **1.1**. The validator reads **1.0**, **1.1** and **1.2**; older 1.0 files retain their original interpretation. Handler fields and unknown operation outcomes are rejected in 1.0. A generic 1.0 method block lacks an explicit handler caller/return boundary: a viewer must not invent that metadata.
 
 ## Kotlin SDK integration
 
@@ -89,7 +89,7 @@ val task = session.invokeHandler(
 
 For manually managed observation use `Session.startHandler(...)` and the returned handle's `returned()`, `threw(error)`, `cancelled(error?)`, or `stopObservation(reason)`. Exactly one terminal event is retained. A method scope ending due to recording shutdown emits observation-stopped rather than an invented return. Calls made after recording has ended can still execute application code; no new records are written.
 
-The current invocation dispatch is **synchronous**. Do not wrap an asynchronous enqueue operation and call its later completion a synchronous method return. A future async handoff/suspend-resume design needs explicit dispatch and continuation events; the GUI must not guess those from timestamps, thread IDs, or HTTP completion. Explicit immutable contexts already allow nested HTTP work on a different thread.
+The Kotlin helper uses **synchronous** dispatch. The browser SDK adds **awaited** dispatch in format 1.2 through `invokeAsyncHandler`: it invokes once and awaits the returned value, recording fulfillment/rejection with the original resolved value or rejected object. It returns a wrapper Promise, so Promise identity is not preserved by this explicitly async helper. The synchronous helper retains immediate Promise identity and does not extend the invocation to settlement. The caller stays open while awaiting, but other JavaScript can run. Neither API implements ambient async context propagation or generic suspend/resume tracking. Pass the provided immutable context to nested requests explicitly.
 
 ## GUI requirements
 
@@ -106,4 +106,8 @@ The current invocation dispatch is **synchronous**. Do not wrap an asynchronous 
 
 - [Live successful capture](samples/live/successful-sign-in.ndjson): handler calls JSONPlaceholder, returns, then `DemoAuthSdk.acceptTask` executes.
 - [Handler with HTTP](examples/handler-http.ndjson), [no HTTP](examples/handler-no-http.ndjson), [throw caught by SDK](examples/handler-throw.ndjson), [cancellation](examples/handler-cancelled.ndjson), [stopped observation](examples/handler-stopped.ndjson), [missing end](examples/handler-interrupted.ndjson): deterministic fixtures.
-- [Claude design-spec update prompt](docs/claude-handler-design-prompt.md): ready to paste into the design task. The web sequence viewer itself is not implemented in this repository yet.
+- [Claude design-spec update prompt](docs/claude-handler-design-prompt.md): ready to paste into the design task. The implemented [web sequence viewer](viewer/README.md) supports these boundaries and awaited browser handlers.
+
+## Browser implementation
+
+Read [browser integration](docs/integration/WEB.md) for the implemented JS/TypeScript API. The runnable [browser sample](web-sample/) demonstrates SDK Fetch → awaited integrator XHR handler → SDK Fetch with token-expiry recovery across two local origins. The shared viewer labels awaited call/settlement distinctly from synchronous return/throw and renders both old and new recordings.

@@ -74,7 +74,7 @@ const definitions = {
   sessionStart: object({
     name: text, id_source: choices('provided', 'generated'),
     producer: object({
-      platform: choices('android', 'ios'), app_id: text, app_version: text,
+      platform: choices('android', 'ios', 'web'), app_id: text, app_version: text,
       os_version: text, sdk_version: text,
     }),
     adapters: array(object({ adapter: ref('adapter'), capabilities: ref('capabilities') })),
@@ -88,7 +88,7 @@ const definitions = {
   }),
   sessionEnd: object({ reason: choices('completed', 'stopped'), dropped_events: count }),
   operationStart: object({ name: text, origin: ref('actor'),
-    invocation: object({ kind: { const: 'handler' }, dispatch: { const: 'synchronous' }, caller: ref('actor') }),
+    invocation: object({ kind: { const: 'handler' }, dispatch: choices('synchronous', 'awaited'), caller: ref('actor') }),
   }, ['name', 'origin']),
   operationEnd: object({
     outcome: choices('success', 'error', 'cancelled', 'unknown'), duration_ns: ref('ns'), error: nullable(ref('error')),
@@ -166,11 +166,11 @@ const events = [
 ];
 const schema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
-  $id: 'urn:mobile-network-log:event:1.1',
-  title: 'Mobile network log event, draft contracts 1.0 and 1.1',
+  $id: 'urn:mobile-network-log:event:1.2',
+  title: 'Network log event, draft contracts 1.0, 1.1 and 1.2',
   description: 'One NDJSON record. See CONTRACT.md for cross-event and capture semantics. Custom format, not OTLP JSON.',
   ...object({
-    schema_version: choices('1.0', '1.1'),
+    schema_version: choices('1.0', '1.1', '1.2'),
     event_type: { enum: events.map(([name]) => name) },
     event_id: ref('id'), session_namespace: ref('id'), session_id: ref('id'), recording_id: ref('id'),
     sequence: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
@@ -179,6 +179,12 @@ const schema = {
   }, ['schema_version', 'event_type', 'event_id', 'session_namespace', 'session_id', 'recording_id', 'sequence', 'timestamp', 'monotonic_ns', 'data']),
   // 1.0 remains strict: handler fields and unknown operation outcomes are new in 1.1.
   allOf: [{
+    if: { properties: { schema_version: choices('1.0', '1.1') } },
+    then: { allOf: [
+      { if: { properties: { event_type: { const: 'session.started' } } }, then: { properties: { data: { properties: { producer: { properties: { platform: choices('android', 'ios') } } } } } } },
+      { if: { properties: { event_type: { const: 'operation.started' } } }, then: { properties: { data: { properties: { invocation: { properties: { dispatch: { const: 'synchronous' } } } } } } } },
+    ] },
+  }, {
     if: { properties: { schema_version: { const: '1.0' } } },
     then: { allOf: [
       { if: { properties: { event_type: { const: 'operation.started' } } }, then: { properties: { data: { properties: { invocation: false } } } } },
