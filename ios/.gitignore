@@ -1,0 +1,6 @@
+.build/
+.swiftpm/
+.local/
+DerivedData/
+*.xcresult/
+NetworkLogTransferDemo.xcodeproj/

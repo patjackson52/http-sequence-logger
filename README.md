@@ -1,8 +1,20 @@
 # HTTP sequence logger
 
-Draft **1.1** capture format (reader also accepts **1.0**) for Android and iOS development SDKs and a local-file sequence viewer. This repository contains the shared contract, a working Kotlin Android recorder, a small auth-style SDK, and a runnable Android sample. The web sequence viewer and iOS implementation remain future work.
+Draft **1.1** capture format (reader also accepts **1.0**) for mobile development SDKs. Includes a Kotlin Android recorder and auth sample, a Swift transfer package and manually instrumented iOS demo, a local desktop collector, and an interactive web sequence viewer.
 
 Repository: [patjackson52/http-sequence-logger](https://github.com/patjackson52/http-sequence-logger) · [MIT license](LICENSE).
+
+## Stream logs into the viewer
+
+See [device transfer and pairing](docs/transfer/README.md) for Android ADB, iOS Simulator, paired Wi-Fi HTTPS, and offline file import. The collector persists NDJSON and streams updates to the viewer without a hosted backend.
+
+```sh
+npm ci
+npm run build:viewer
+npm run collector
+```
+
+Open the printed viewer link. [Web viewer guide](viewer/README.md) · [Swift transport and iOS demo](ios/README.md).
 
 ## Run the Android sample
 
@@ -12,6 +24,7 @@ See [Android setup and integration](android/README.md). The MIT-licensed sample 
 - [Recovered live capture](samples/live/recovered-sign-in.ndjson): 9 requests with an expected 401 followed by refresh/retry.
 - [Both sessions in one file](samples/live/multi-session.ndjson).
 - [End-to-end verification](E2E.md).
+- [Native captures delivered through the collector](samples/transfer/README.md): Android recovery and iOS HTTP/TLS/offline recovery.
 - [SDK → app handler → SDK tracing](HANDLER-TRACING.md): local calls, nested HTTP, explicit return/throw/cancel, and incomplete observation.
 - [Claude design-spec update prompt](docs/claude-handler-design-prompt.md).
 

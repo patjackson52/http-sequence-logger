@@ -1,6 +1,8 @@
 package dev.networklog.app
 
 import android.app.Activity
+import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -22,21 +24,39 @@ private object Runs {
     var result = "Use the public demo account. No setup required."
     var file: File? = null
     var listener: (() -> Unit)? = null
+    var transferStatus = "Local capture only · collector not paired"
+    private var retained = emptyList<FileHttpEventSink>()
+    private fun transferDiagnostic(message: String) { main.post { transferStatus = message; notifyUi() } }
+    fun resume(context: Context) = worker.execute {
+        retained.forEach { it.close() }
+        retained = DebugTransfer.resumePending(context, File(context.filesDir, "captures"), diagnostic = ::transferDiagnostic)
+        val paired = runCatching { DebugTransfer.readConnection(context) != null }.getOrDefault(false)
+        main.post { transferStatus = if (paired) "Collector paired · captures upload automatically" else "Local capture only · collector not paired"; notifyUi() }
+    }
+    fun pair(context: Context, json: String?) = worker.execute {
+        try {
+            retained.forEach { it.close() }; retained = emptyList()
+            if (json == null) DebugTransfer.removeConnection(context) else DebugTransfer.saveConnection(context, json)
+            resume(context)
+        } catch (_: Exception) { transferDiagnostic("Pairing failed · check the collector connection JSON") }
+    }
     fun notifyUi() { main.post { listener?.invoke() } }
-    fun run(directory: File, appId: String, sessionId: String?, recovery: Boolean) {
+    fun run(context: Context, directory: File, appId: String, sessionId: String?, recovery: Boolean) {
         if (busy) return
         busy = true; title = "Running sign in"; result = "Contacting three public services…"; steps = emptyList(); file = null; notifyUi()
         worker.execute {
             val capture = File(directory, "capture-${System.currentTimeMillis()}.ndjson")
             try {
-                NdjsonFileSink(capture).use { sink ->
+                DebugTransfer.open(context, capture, ::transferDiagnostic).use { sink ->
                     val logger = NetworkLog(sink, appId)
-                    val response = SampleFlow.run(logger, sessionId, recovery) { step -> main.post { steps = steps + step; notifyUi() } }
-                    main.post { title = "Sign in complete"; result = "Hello, ${response.name}.\nTask: ${response.task}\nSession: ${response.sessionId}" }
+                    try {
+                        val response = SampleFlow.run(logger, sessionId, recovery) { step -> main.post { steps = steps + step; notifyUi() } }
+                        main.post { title = "Sign in complete"; result = "Hello, ${response.name}.\nTask: ${response.task}\nSession: ${response.sessionId}" }
+                    } finally { sink.awaitUploaded(2_000) }
                 }
             } catch (error: Exception) {
                 main.post { title = "Run did not complete"; result = "${error.javaClass.simpleName}: ${error.message}\nPartial capture is available for inspection." }
-            } finally { main.post { busy = false; file = capture; notifyUi() } }
+            } finally { main.post { busy = false; file = capture; notifyUi() }; resume(context) }
         }
     }
 }
@@ -49,6 +69,8 @@ class MainActivity : Activity() {
     private lateinit var recovery: Button
     private lateinit var export: Button
     private lateinit var session: EditText
+    private lateinit var transfer: TextView
+    private lateinit var pair: Button
     private val ink = Color.rgb(24, 40, 51)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,16 +105,33 @@ class MainActivity : Activity() {
                 }, 10)
             }; content.addView(this)
         }
+        transfer = label("", 12f)
+        pair = Button(this).apply {
+            text = "Pair desktop collector"; isAllCaps = false
+            setOnClickListener {
+                val input = EditText(this@MainActivity).apply {
+                    hint = "Paste collector connection JSON"; minLines = 3; maxLines = 6
+                    inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                }
+                AlertDialog.Builder(this@MainActivity).setTitle("Pair desktop collector")
+                    .setMessage("Use the connection JSON from your local collector. Capture export stays available.")
+                    .setView(input).setPositiveButton("Pair") { _, _ -> Runs.pair(applicationContext, input.text.toString()) }
+                    .setNeutralButton("Disconnect") { _, _ -> Runs.pair(applicationContext, null) }
+                    .setNegativeButton("Cancel", null).show()
+            }; content.addView(this)
+        }
         label("DEVELOPMENT DEMO", 11f, Color.rgb(34, 112, 85))
-        label("Public synthetic account • demonstration challenge\nNo phone verification or OAuth security claim.\nCredentials and tokens are redacted before writing.\nLogs stay on this device until you export them.", 12f)
+        label("Public synthetic account • demonstration challenge\nNo phone verification or OAuth security claim.\nCredentials and tokens are redacted before writing.\nCaptures stay local unless you pair a collector or export.", 12f)
+        Runs.resume(applicationContext)
     }
-    private fun begin(recover: Boolean) = Runs.run(File(filesDir, "captures"), packageName,
+    private fun begin(recover: Boolean) = Runs.run(applicationContext, File(filesDir, "captures"), packageName,
         session.text.toString().takeIf { it.isNotEmpty() }, recover)
     override fun onStart() { super.onStart(); Runs.listener = { render() }; render() }
     override fun onStop() { Runs.listener = null; super.onStop() }
     override fun onSaveInstanceState(outState: Bundle) { outState.putString("session", session.text.toString()); super.onSaveInstanceState(outState) }
     private fun render() {
         state.text = Runs.title; detail.text = Runs.result
+        transfer.text = Runs.transferStatus; pair.isEnabled = !Runs.busy
         run.isEnabled = !Runs.busy; recovery.isEnabled = !Runs.busy; session.isEnabled = !Runs.busy
         export.isEnabled = Runs.file != null && !Runs.busy
         timeline.removeAllViews()

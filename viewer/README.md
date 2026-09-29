@@ -20,6 +20,10 @@ npm run preview:viewer
 
 The static output is `viewer/dist/`. Serve this directory over HTTP; direct `file://` loading is not supported because the importer uses a module worker. No server backend, account, or dashboard is needed. Bundled fonts and samples are served from the same origin. Imported files remain in memory and are cleared on refresh; no persistence or upload is performed. A strict content-security policy is included in `index.html`.
 
+## Live device captures
+
+Run `npm run build:viewer` and `npm run collector`, then open the printed viewer link. Android ADB pairing, iOS Simulator and Wi-Fi HTTPS setup are in the [transfer guide](../docs/transfer/README.md). The collector feeds durable NDJSON into the same validation/diagram pipeline. Live updates preserve selected sessions, filters, collapsed blocks and inspector state. Connection loss is separate from request outcomes; reconnect retrieves missing events. Save capture downloads the persisted file. Refreshing clears the in-memory browser pairing, so reopen the printed link.
+
 ## Reading a capture
 
 - Sessions group the exact namespace and session ID. A session can contain multiple independent recording periods; select a recording or show them in file order. Schema version is visible per recording.

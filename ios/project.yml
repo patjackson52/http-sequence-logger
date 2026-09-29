@@ -1,0 +1,57 @@
+name: NetworkLogTransferDemo
+options:
+  bundleIdPrefix: com.example.networklog
+  deploymentTarget:
+    iOS: '15.0'
+packages:
+  NetworkLogTransfer:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    CODE_SIGNING_ALLOWED: NO
+    TARGETED_DEVICE_FAMILY: '1,2'
+targets:
+  NetworkLogTransferDemo:
+    type: application
+    platform: iOS
+    sources: [Demo]
+    dependencies:
+      - package: NetworkLogTransfer
+    info:
+      path: .local/DemoInfo.plist
+      properties:
+        CFBundleDisplayName: Network Log Demo
+        UILaunchScreen: {}
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Transfer development captures to a paired local collector.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.networklog.demo
+  NetworkLogTransferTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/NetworkLogTransferTests
+        excludes: [Fixtures]
+      - path: IntegrationTests
+      - path: Tests/NetworkLogTransferTests/Fixtures
+        buildPhase: resources
+      - path: .local/IntegrationConfig.json
+        buildPhase: resources
+    dependencies:
+      - target: NetworkLogTransferDemo
+      - package: NetworkLogTransfer
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.networklog.tests
+schemes:
+  NetworkLogTransferDemo:
+    build:
+      targets:
+        NetworkLogTransferDemo: all
+    test:
+      targets: [NetworkLogTransferTests]
+      gatherCoverageData: false

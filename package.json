@@ -10,7 +10,8 @@
     "test": "node --test test/*.test.mjs",
     "viewer": "vite --config viewer/vite.config.mjs",
     "build:viewer": "vite build --config viewer/vite.config.mjs",
-    "preview:viewer": "vite preview --config viewer/vite.config.mjs"
+    "preview:viewer": "vite preview --config viewer/vite.config.mjs",
+    "collector": "node collector/cli.mjs"
   },
   "engines": {
     "node": ">=22"
