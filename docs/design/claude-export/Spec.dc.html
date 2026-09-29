@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <style>body{margin:0;background:#f4f6f8;font-family:'Source Sans 3',system-ui,sans-serif;color:#1b2430}a{color:#1b6f8f}a:hover{color:#15586f}</style>
+</helmet>
+<div style="max-width:880px;margin:0 auto;padding:40px 24px 80px;display:flex;flex-direction:column;gap:32px;font-size:13.5px;line-height:1.55">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <h1 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em">Network Log Lab — component &amp; style specification</h1>
+    <p style="margin:0;color:#5b6673;text-wrap:pretty">Companion to the prototype (<a href="Network%20Log%20Lab.dc.html">Network Log Lab.dc.html</a>) and the mockup sheet (<a href="Mockups.dc.html">Mockups.dc.html</a>). §1–6 describe what the prototype builds today. §7–15 (this revision) extend the design to SDK → app handler invocations and the return of control, following log-model draft 1.1. They are design specification only: the web viewer has not been updated to render them, and the native logger is not claimed to capture anything beyond the model in §7.</p>
+    <div style="background:#e3f1f6;border:1px solid #bcd9e5;border-radius:8px;padding:10px 12px;font-size:12.5px;color:#15586f"><b>Source of truth.</b> §7–15 follow <span style="font-family:'Source Code Pro',monospace">patjackson52/http-sequence-logger</span>: HANDLER-TRACING.md, CONTRACT.md (format 1.1 draft), <span style="font-family:'Source Code Pro',monospace">examples/handler-*.ndjson</span>, <span style="font-family:'Source Code Pro',monospace">samples/live/successful-sign-in.ndjson</span> and <span style="font-family:'Source Code Pro',monospace">DemoAuthSdk.kt</span>. Fixture files are copied into this project unchanged. Where the repository names differ from the prototype's synthetic <span style="font-family:'Source Code Pro',monospace">v: 1</span> vocabulary, the repository wins.</div>
+  </header>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">1 · Foundations</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">
+      <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:12px"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600;margin-bottom:6px">Type</div>Body: Source Sans 3 — 13 px UI, 12.5 px dense rows, 14 px titles, 11 px uppercase section labels (.06em).<br>Mono: Source Code Pro — methods, paths, IDs, headers, payloads, lane origins; 11–12.5 px.</div>
+      <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:12px"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600;margin-bottom:6px">Surfaces</div>
+        <div style="display:flex;flex-direction:column;gap:4px;font-family:'Source Code Pro',monospace;font-size:11.5px">
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:16px;height:16px;border-radius:4px;background:#f4f6f8;border:1px solid #d9dee5"></span>#f4f6f8 app background</div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:16px;height:16px;border-radius:4px;background:#fafbfc;border:1px solid #d9dee5"></span>#fafbfc panels / diagram</div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:16px;height:16px;border-radius:4px;background:#f1f4f7;border:1px solid #d9dee5"></span>#f1f4f7 mobile-client band</div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:16px;height:16px;border-radius:4px;background:#fff;border:1px solid #d9dee5"></span>#ffffff inspector, toolbars</div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:16px;height:16px;border-radius:4px;background:#e1e6eb"></span>#e1e6eb dividers · #d9dee5 control borders</div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:16px;height:16px;border-radius:4px;background:#1b2430"></span>#1b2430 text · #5b6673 secondary · #8a94a0 “not recorded”</div>
+        </div></div>
+      <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:12px"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600;margin-bottom:6px">Accent &amp; status (always paired with a glyph and a word)</div>
+        <div style="display:flex;flex-direction:column;gap:4px;font-family:'Source Code Pro',monospace;font-size:11.5px">
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:16px;height:16px;border-radius:4px;background:#1b6f8f"></span>#1b6f8f accent — selection, focus ring, active filter · tint #e3f1f6</div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:16px;height:16px;border-radius:4px;background:#1f7a4d"></span>#1f7a4d ✓ success · tint #e4f3ea</div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:16px;height:16px;border-radius:4px;background:#b9382c"></span>#b9382c ✕ HTTP error · ⚠ transport failure · ◷ timeout · ↯ threw · tint #fbe8e5</div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:16px;height:16px;border-radius:4px;background:#8a5a00"></span>#8a5a00 ? unknown · … unfinished · redacted/truncated/partial · tint #fff3d6</div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:16px;height:16px;border-radius:4px;background:#5b6673"></span>#5b6673 ⊘ cancelled · 3xx · neutral</div>
+          <div style="display:flex;gap:8px;align-items:center"><span style="width:16px;height:16px;border-radius:4px;background:#4f4a8a"></span>#4f4a8a local call / return (new, §9) · tint #ecebf6 · always with an open arrowhead and the word “call” or “returned”</div>
+        </div></div>
+      <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:12px"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600;margin-bottom:6px">Spacing &amp; shape</div>4 px grid. Radii: 6 px controls, 8 px cards/rows, 999 px chips, 3 px activation bars. Desktop controls 28–36 px tall; every mobile target ≥ 44 px. Focus: 2 px accent outline, 2 px offset, visible on every control and on every diagram element (arrows, bars, lane headers are focusable).</div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">2 · Sequence diagram grammar (custom SVG + HTML label layer)</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px">
+      <b>Lanes</b><span>Left to right: App code, SDK (both inside the “Mobile client” band), then one lane per origin (scheme + host + non-default port) in order of first contact. Header shows the friendly host; the full origin is in the tooltip and accessible name. Lane width 164 px desktop / 136 px mobile, tweakable. Component expansion of the two code lanes: §8.</span>
+      <b>Request arrow</b><span>Solid line, client → server, 1.5 px, filled arrowhead; label <span style="font-family:'Source Code Pro',monospace">METHOD /path?query</span> in 600 weight, suffix “· manual” or “· retry of rN” when the log says so.</span>
+      <b>Response arrow</b><span>Server → client at header arrival. Label “✓ 200 OK · 182 ms” (time to headers). Dashed with “↓ … headers only” when the transfer later failed, so header arrival is never read as completion.</span>
+      <b>Outcome marker</b><span>Dashed server → client line with glyph: ◷ body read timed out, ⚠ transport failure, ⊘ cancelled, ? observation stopped (unknown), … recording interrupted (unfinished). A request with only a request arrow and an open server bar is still in flight at the end of the file.</span>
+      <b>Method blocks</b><span>14 px activation bars on the owner lane from operation start to operation end; nested operations offset 3 px per depth. Dashed outline when the end was not recorded. Label + component; “[−]/[+]” shows collapse state; collapsed blocks list “n requests hidden”. Bar and selected exchange share the accent stroke.</span>
+      <b>Local call / return</b><span>New in this revision; full grammar in §9. Open arrowhead, #4f4a8a, between the two code lanes only. Never carries a status code or payload preview.</span>
+      <b>Server bars</b><span>8 px outline on the server lane from request to response/outcome; dashed and unfilled when the response never came.</span>
+      <b>Time</b><span>Vertical axis is event order with fixed row heights (36/34/30/12 px). Gaps &gt; 1.5 s insert a dotted “≈ 10.0 s elapsed (compressed)” row. Recording periods start with a banner; interrupted ones are amber.</span>
+      <b>Selection</b><span>Accent 2.5 px stroke + 10 % accent hit-area fill, related operation bars in accent. ↑/↓ (or j/k) move through visible exchanges, Enter opens the inspector, Esc closes it and keeps the selection and scroll position.</span>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">3 · Components</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px">
+      <b>Header</b><span>46 px. Nav toggle, wordmark, file name (mono), session count, diagnostics pill (opens the import screen), “Import…”.</span>
+      <b>Session navigator</b><span>236 px, collapsible. Row = name, ID (mono), outcome summary with glyph, start time, recording count, “incomplete” flag. Recording-period switcher appears only for multi-recording sessions and states that clocks are independent.</span>
+      <b>Toolbar</b><span>Session title + meta, search (mono input), owner segmented (All/App/SDK), outcome segmented (Any/Success/Failed/Incomplete). Second row: origin chips (mono host, full origin on hover/focus), “Clear filters”, shown/total, collapse/expand all methods. Kind segmented (All / HTTP only / Local calls only) and separate counts: §12.</span>
+      <b>Inspector</b><span>420 px, resizable 320–680 px via the 6 px handle; tablet: 440 px overlay drawer; mobile: full-screen dialog with ← back. Header: method + path, ID · origin · owner, “← prior” (selection history). Status row: outcome badge, <span style="font-family:'Source Code Pro',monospace">HTTP 200 OK</span>, duration. Amber note explains any non-obvious semantics (200 then body failure, status 0, stopped observation). Tabs for an HTTP exchange: Request, Response, Timing, Attribution, Raw events. Tabs for a local invocation: §11.</span>
+      <b>Payload block</b><span>Section label with state (Captured / Partial / Truncated / Redacted / Unavailable / Not recorded / Not applicable) and byte counts (“1.2 KB (512 B captured)”). Buttons: Pretty/Raw (only when JSON parses), Copy, Expand/Collapse. Collapsed shows a 160-char preview. Notes explain limits without suggesting hidden bytes are recoverable.</span>
+      <b>Key/value tables</b><span>Query parameters and headers are ordered lists, repeats preserved; values containing [REDACTED] are amber.</span>
+      <b>Mobile shell</b><span>56 px bar: session button (opens bottom sheet), search toggle, filter button with active count. Segmented Sequence/List. List row = glyph, METHOD path, origin · owner, status, duration; 56 px tall, left accent when selected. Local invocations appear as list rows too (§12).</span>
+      <b>Import screen</b><span>Drop zone with file input, “Open sample”, “Open malformed sample”; file card with size/lines/events/sessions and a diagnostics list (error = line skipped, warning = event kept with a caveat, info = interrupted recording); session table with Open. Schema-version column per recording (1.0 / 1.1): §7.</span>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">4 · Responsive layout</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px">
+      <b>≥ 1100 px</b><span>Navigator · diagram · inline inspector. With both panels open at 1440 px the diagram keeps ~770 px; the inspector can be dragged narrower and the navigator collapsed to recover width.</span>
+      <b>720–1099 px</b><span>Navigator stays inline; the inspector becomes an overlay drawer so the diagram keeps its width. No hover-only features anywhere: tooltips also have focusable owners.</span>
+      <b>&lt; 720 px</b><span>Mobile shell. Lanes keep 136 px and pan horizontally with the header pinned; six origins are eight lanes ≈ 1120 px, never squeezed. Details open full-screen; the diagram scroll container stays mounted underneath, so scroll and selection survive. Sessions and filters are bottom sheets reachable with one thumb.</span>
+      <b>Override</b><span>The <span style="font-family:'Source Code Pro',monospace">viewport</span> tweak forces desktop or mobile regardless of width (used for the mockup frames).</span>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">5 · Architecture (prototype)</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px;font-size:13px">
+      <span style="font-family:'Source Code Pro',monospace">nll-data.js</span><span>Synthetic NDJSON fixtures (generated line by line), <span style="font-family:'Source Code Pro',monospace">parseNdjson()</span> → events + diagnostics, <span style="font-family:'Source Code Pro',monospace">reconstruct()</span> → sessions / recordings / operations / exchanges. Pure; never evaluates content or touches the network. Its fixtures use the prototype's own <span style="font-family:'Source Code Pro',monospace">v: 1</span> vocabulary (<span style="font-family:'Source Code Pro',monospace">operation.start / parentOpId</span>), not draft 1.1; the mapping is given in §7.</span>
+      <span style="font-family:'Source Code Pro',monospace">nll-layout.js</span><span><span style="font-family:'Source Code Pro',monospace">layoutSequence(session, {hidden, collapsed, laneWidth, recordingId})</span> → lanes, rows, arrows, bars. Deterministic; independent of parsing. §9 adds <span style="font-family:'Source Code Pro',monospace">localArrows</span> and <span style="font-family:'Source Code Pro',monospace">waitSegments</span> to the output shape (proposed).</span>
+      <span style="font-family:'Source Code Pro',monospace">Network Log Lab.dc.html</span><span>React state + view-model; composes <span style="font-family:'Source Code Pro',monospace">NLL Sequence</span> (SVG shapes + HTML labels) and <span style="font-family:'Source Code Pro',monospace">NLL Inspector</span>.</span>
+      <span>Types</span><span>The prototype runs as plain JavaScript so it opens with no build step; the TypeScript shapes it follows are declared as <span style="font-family:'Source Code Pro',monospace">tsType</span> annotations on the component props (<span style="font-family:'Source Code Pro',monospace">SequenceLayoutView</span>, <span style="font-family:'Source Code Pro',monospace">InspectorViewModel</span>, <span style="font-family:'Source Code Pro',monospace">InspectorTab</span>). Porting to .tsx is mechanical.</span>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">6 · What is real, mocked, or not implemented</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px">
+      <b style="color:#1f7a4d">Working</b><span>Import of local NDJSON (drop or picker) with validation diagnostics; sample and malformed samples; session and recording-period switching; sequence layout; selection by click and keyboard; method collapse/expand; owner / outcome / origin filters; path and component search; all five inspector views; payload expand, pretty/raw, copy URL / body / sanitized JSON; mobile sequence, list, sheets, full-screen inspector; selection history (“← prior”); resizable inspector.</span>
+      <b style="color:#8a5a00">Mocked</b><span>All log content is synthetic. Copy uses the clipboard API where available and only reports “Copied” otherwise. Redaction is whatever the file contains; the tool adds none and removes none.</span>
+      <b style="color:#8a5a00">Specified, not built</b><span>Everything in §7–15: draft 1.1 import, handler lanes, local call/return arrows, waiting segments, invocation inspector, kind filter and separate counts, handler acceptance tests. The current prototype renders 1.1 handler spans as generic method blocks only, and renders no call/return arrows.</span>
+      <b style="color:#b9382c">Not implemented</b><span>Server-log merging and trace correlation (IDs are displayed only). Export to Mermaid/PlantUML. Persisting imported files between reloads. Multi-select or comparing sessions. Tablet-specific navigator drawer. Any asynchronous-continuation rendering (§14, proposed).</span>
+    </div>
+  </section>
+
+  <div style="border-top:2px solid #d9dee5;padding-top:24px;display:flex;flex-direction:column;gap:6px">
+    <div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600">Revision — handler invocations</div>
+    <p style="margin:0;color:#5b6673;text-wrap:pretty">Scenario: the app passes a handler to <span style="font-family:'Source Code Pro',monospace">DemoAuthSdk.authenticate(handler)</span>. While <span style="font-family:'Source Code Pro',monospace">authenticate</span> runs it invokes <span style="font-family:'Source Code Pro',monospace">CustomerTaskHandler.loadTask()</span> synchronously; the handler may call <span style="font-family:'Source Code Pro',monospace">GET https://jsonplaceholder.typicode.com/todos/1</span> with the customer's own HTTP client, then returns; <span style="font-family:'Source Code Pro',monospace">DemoAuthSdk.acceptTask</span> runs; <span style="font-family:'Source Code Pro',monospace">authenticate</span> ends. Ownership changes and method boundaries must be visible with zero HTTP. Servers (dummyjson.com, httpbin.org, jsonplaceholder.typicode.com) are public demo services.</p>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">7 · Information model — draft 1.1 handler spans</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px">
+      <b>Envelope</b><span style="font-family:'Source Code Pro',monospace;font-size:12px">schema_version="1.1" · event_type · event_id · session_namespace · session_id · recording_id · sequence · timestamp · monotonic_ns (decimal string) · data · context{trace_id, span_id, parent_span_id, parent_scope} on span events · optional extensions</span>
+      <b>Vocabulary</b><span>Session grouping key is <span style="font-family:'Source Code Pro',monospace;font-size:12px">(session_namespace, session_id)</span>; each recording keeps its own sequence and monotonic clock. HTTP events are <span style="font-family:'Source Code Pro',monospace;font-size:12px">http.request.started · http.response.headers · http.body.captured · http.trailers · http.ended · http.metrics</span>; HTTP outcomes are <span style="font-family:'Source Code Pro',monospace;font-size:12px">success · http_error · transport_error · timeout · cancelled · unknown</span> (the prototype's “transport_failure” maps to transport_error). Owners are <span style="font-family:'Source Code Pro',monospace;font-size:12px">integrator · sdk · system · unknown</span>; the “App code” lane is owner=integrator.</span>
+      <b>Handler start</b><span><span style="font-family:'Source Code Pro',monospace;font-size:12px">event_type="operation.started"</span>, data: <span style="font-family:'Source Code Pro',monospace;font-size:12px">name</span>, <span style="font-family:'Source Code Pro',monospace;font-size:12px">origin{owner, component, method}</span> (the callee), <span style="font-family:'Source Code Pro',monospace;font-size:12px">invocation{kind:"handler", dispatch:"synchronous", caller{owner, component, method}}</span>. <span style="font-family:'Source Code Pro',monospace;font-size:12px">caller</span> is the immediate caller, not the business initiator. Each invocation has its own <span style="font-family:'Source Code Pro',monospace;font-size:12px">span_id</span>; <span style="font-family:'Source Code Pro',monospace;font-size:12px">parent_span_id</span> is the calling SDK operation when it was instrumented.</span>
+      <b>Handler end</b><span><span style="font-family:'Source Code Pro',monospace;font-size:12px">event_type="operation.ended"</span> with the <em>same</em> <span style="font-family:'Source Code Pro',monospace;font-size:12px">context.span_id</span>; data: <span style="font-family:'Source Code Pro',monospace;font-size:12px">outcome · completion · duration_ns · error</span> (sanitized; <span style="font-family:'Source Code Pro',monospace;font-size:12px">stage="unknown"</span> does not make it a network error). Pairing is by span identity only — never by order, name or timestamp.</span>
+      <b>Child HTTP</b><span>A request whose <span style="font-family:'Source Code Pro',monospace;font-size:12px">context.parent_span_id</span> equals the handler <span style="font-family:'Source Code Pro',monospace;font-size:12px">span_id</span> is causally nested under it. HTTP origin keeps its own initiator and executor actors; the SDK having called the handler never makes it the executor.</span>
+      <b>Not captured</b><span>Handler arguments and return values are never captured. If a field is surfaced it reads exactly “Not captured” (grey #8a94a0), distinct from “unknown” (amber) and from an empty value (“—”).</span>
+      <b>Versions</b><span>Importer accepts 1.0 and 1.1; one recording has exactly one version; recordings in a file may differ. Handler fields exist only in 1.1. A 1.0 or 1.1 span without <span style="font-family:'Source Code Pro',monospace;font-size:12px">invocation.kind="handler"</span> is a generic method block and is never retro-labelled as a handoff. The import screen shows the version per recording; the recording banner in the diagram appends “· schema 1.0” or “· schema 1.1”.</span>
+      <b>Authority</b><span>IDs and explicit parent/caller fields are authoritative. Layout never infers causality from adjacent timestamps or shared hostnames. Ordering within a recording uses <span style="font-family:'Source Code Pro',monospace;font-size:12px">sequence</span>, then <span style="font-family:'Source Code Pro',monospace;font-size:12px">monotonic_ns</span>; recordings keep separate clocks (§12).</span>
+    </div>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600">completion → outcome → visual</div>
+      <div style="display:grid;grid-template-columns:max-content max-content minmax(0,1fr);gap:6px 14px;font-size:12.5px">
+        <b>completion</b><b>outcome</b><b>Rendering</b>
+        <span style="font-family:'Source Code Pro',monospace">returned</span><span style="font-family:'Source Code Pro',monospace">success</span><span>Fixture: handler-http, handler-no-http, live sample. Dashed return arrow app → caller, open head, “↩ returned · 125 ms”. Business value may still be false/rejected; the label never says “ok”.</span>
+        <span style="font-family:'Source Code Pro',monospace">threw</span><span style="font-family:'Source Code Pro',monospace">error</span><span>Fixture: handler-throw (error.type HandlerError, stage unknown). Dashed return arrow in #b9382c, “↯ threw · HandlerError · 40 ms”. Block outline #b9382c. The enclosing SDK span keeps its own outcome; no session-level failure is derived.</span>
+        <span style="font-family:'Source Code Pro',monospace">cancelled</span><span style="font-family:'Source Code Pro',monospace">cancelled</span><span>Fixture: handler-cancelled (error=null). Dashed return arrow in #5b6673, “⊘ cancelled · 40 ms”. Distinct from returned.</span>
+        <span style="font-family:'Source Code Pro',monospace">observation_stopped</span><span style="font-family:'Source Code Pro',monospace">unknown</span><span>Fixture: handler-stopped (reason capture_disabled). <b>No return arrow.</b> Block gets a dashed amber outline; an amber tick on the app lane at the stop point reads “? observation stopped · ‹extensions["capture.observation_stop_reason"]›”.</span>
+        <span style="font-family:'Source Code Pro',monospace">(no operation.ended)</span><span style="font-family:'Source Code Pro',monospace">unfinished</span><span>Fixture: handler-interrupted. <b>No return arrow, no end.</b> Block runs dashed to the bottom of its recording with “… no operation.ended”. No end time or duration is shown.</span>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;font-size:12.5px"><b>Prototype mapping (proposed, not built).</b> <span style="font-family:'Source Code Pro',monospace">reconstruct()</span> gains on each operation: <span style="font-family:'Source Code Pro',monospace">spanId, parentSpanId, traceId, invocation{kind, dispatch, caller} | null, completion, stopReason</span>. 1.0 events map as today with <span style="font-family:'Source Code Pro',monospace">invocation = null</span>. A handler whose <span style="font-family:'Source Code Pro',monospace">parent_span_id</span> is absent or unknown sets <span style="font-family:'Source Code Pro',monospace">parentMissing</span> and keeps the explicit <span style="font-family:'Source Code Pro',monospace">invocation.caller</span> label for the arrow's origin lane.</div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">8 · Participants</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px">
+      <b>Code lanes</b><span>Two lifelines inside the Mobile-client band: <b>App code</b> (owner = integrator) and <b>SDK</b> (owner = sdk). They are participants, not destinations: no origin chip, never counted in “origins”, never a target of an HTTP arrow. Header line 1 is the owner label; line 2 (mono, 10.5 px) lists the components seen on that lane, e.g. “CustomerTaskHandler · SampleFlow”.</span>
+      <b>Server lanes</b><span>Unchanged: one lane per origin in order of first contact, discovered from HTTP events only. A handler with zero HTTP adds no lane. A handler's child HTTP to a new host adds that host as usual.</span>
+      <b>Component expansion</b><span>Lane header “[+] components” splits a code lane into one sub-lane per component (max 4 visible, the rest grouped as “n more”), still inside the band with the owner label spanning them. Sub-lanes are 120 px, share the owner tint, and collapse back with “[−]”. Expansion is per owner and persists per session. Bars and local arrows move to the component sub-lane; HTTP arrows keep originating from the component sub-lane of their initiator.</span>
+      <b>Two SDK components</b><span>Collapsed: bars share the SDK lane and differ by the component line under the method label (“acceptTask · DemoAuthSdk” vs “flush · DemoAuthTelemetry”). Expanded: separate sub-lanes.</span>
+      <b>Repeated calls</b><span>Same component + method invoked n times: each block is labelled “loadTask() #k”; the span id appears only in the inspector (Attribution) and the accessible name, never on the canvas. Numbering is per recording, in <span style="font-family:'Source Code Pro',monospace">sequence</span> order.</span>
+      <b>Nested calls</b><span>A handler that calls back into the SDK produces an app → SDK call arrow and an SDK block at depth + 1 (3 px offset, as for nested operations). Depth follows <span style="font-family:'Source Code Pro',monospace">parent_span_id</span> only.</span>
+      <b>Same-role calls</b><span>SDK → SDK or app → app invocations (caller.owner = origin.owner) draw a self-call: a 12 px loop on the right side of the lane with the same open head, block at depth + 1. Never rendered as a cross-lane arrow.</span>
+      <b>Uninstrumented caller</b><span>If <span style="font-family:'Source Code Pro',monospace">parent_span_id</span> is missing or does not resolve, the call arrow still starts on the lane of <span style="font-family:'Source Code Pro',monospace">invocation.caller.owner</span>, from a 6 px hollow dot instead of a bar, labelled “caller not instrumented”; the caller name comes from the label and is shown in the inspector. No SDK bar is invented.</span>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">9 · Invocation grammar and layout rules</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px">
+      <b>Call arrow</b><span>At <span style="font-family:'Source Code Pro',monospace">operation.started</span>: solid 1.5 px #4f4a8a from the caller bar edge to the callee lane, <b>open</b> (stroke-only) arrowhead. Label mono 600: “call · loadTask()”; sub-label sans 10 px: “handler · synchronous”. HTTP arrows keep filled heads and #1b2430 — the two are distinguishable in greyscale.</span>
+      <b>Handler block</b><span>14 px bar on the callee lane, fill #ecebf6, stroke #4f4a8a 1.5 px, from the call row to the completion row. Label “loadTask() · handler”, sub “CustomerTaskHandler ← DemoAuthSdk.authenticate”. It is a method block: collapsible, listing “n requests hidden” when collapsed.</span>
+      <b>Return / unwind</b><span>At <span style="font-family:'Source Code Pro',monospace">operation.ended</span> with matching span: dashed (4 3) 1.5 px arrow from the callee bar back to the <em>caller's</em> lane and bar (resolved by <span style="font-family:'Source Code Pro',monospace">parent_span_id</span>, else the caller label's owner lane), open head; colour and glyph per the §7 table. Duration label = <span style="font-family:'Source Code Pro',monospace">duration_ns</span> formatted, described in tooltips and the inspector as “elapsed, includes nested HTTP and waiting”. Never “CPU” or “exclusive”.</span>
+      <b>Waiting segment</b><span>The caller bar stays open for the whole handler. Its overlap with the handler block is overlaid with a 45° hatch in #4f4a8a at 45 % and an italic 9.5 px label “waiting for loadTask”. The hatch is scoped to that one bar; other SDK bars (e.g. concurrent telemetry) render normally so no “whole SDK paused” reading is possible.</span>
+      <b>Resumption</b><span>Work after the return (acceptTask) is an ordinary nested SDK block below the return row; the caller bar continues until its own <span style="font-family:'Source Code Pro',monospace">operation.ended</span>, labelled at the bottom “authenticate → returned · success”.</span>
+      <b>Child HTTP</b><span>Requests with <span style="font-family:'Source Code Pro',monospace">parent_span_id</span> = handler span sit inside the block rows; arrows start on the App-code lane (initiator = integrator) and end on the server lane, with the full request/response/outcome grammar of §2. Owner filter “SDK” hides them; owner filter “App” shows them even while the SDK caller is hidden.</span>
+      <b>HTTP outliving the handler</b><span>If the handler's <span style="font-family:'Source Code Pro',monospace">operation.ended</span> precedes the request's completion, the return arrow is drawn at its observed row, the block ends there, and the request's response/outcome rows continue below on the App-code lane. The exchange carries the “returned before completion” flag (existing <span style="font-family:'Source Code Pro',monospace">returnedEarly</span>) and the inspector's Children list marks it “completed after return”. The causal link is the ID, so filtering or collapsing the handler still hides/shows the request with it.</span>
+      <b>One selection</b><span>Call arrow, block, return arrow and the waiting hatch share one <span style="font-family:'Source Code Pro',monospace">invocationId</span> (= span_id). Clicking any of them selects the invocation; all four take the accent stroke, the caller bar takes the related-bar accent.</span>
+      <b>Row kinds (layout)</b><span>Add <span style="font-family:'Source Code Pro',monospace">call</span> (36 px, coincides with opstart of a handler span) and <span style="font-family:'Source Code Pro',monospace">return</span> (30 px, coincides with opend). Priority order within one timestamp: rec, opstart/call, req, res, end, return/opend. Output adds <span style="font-family:'Source Code Pro',monospace">localArrows[]</span> and <span style="font-family:'Source Code Pro',monospace">waitSegments[]</span>; <span style="font-family:'Source Code Pro',monospace">bars[]</span> gain <span style="font-family:'Source Code Pro',monospace">kind: 'method' | 'handler'</span>.</span>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">10 · Annotated sequence examples</h2>
+    <p style="margin:0;color:#5b6673;font-size:12.5px;text-wrap:pretty">Rows and lane positions are illustrative layout. (a)–(d) quote observed events from the repository fixtures (copied into <span style="font-family:'Source Code Pro',monospace">samples/</span> and <span style="font-family:'Source Code Pro',monospace">examples/</span>); Span, trace and event ids are not drawn in the diagram; they live in the inspector's Attribution tab (§11) and are quoted in the prose under each example. (e) and (f) have no fixture yet and use invented ids marked ‹…›. Filled arrowheads = HTTP; open arrowheads = local call/return; hatch = caller waiting.</p>
+
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-weight:700">(a) Handler with HTTP and normal return — <span style="font-family:'Source Code Pro',monospace;font-weight:400">samples/live/successful-sign-in.ndjson</span></div>
+      <svg viewBox="0 0 700 320" style="width:100%;max-width:700px;display:block;background:#fafbfc;border:1px solid #e1e6eb;border-radius:6px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:10.5px">
+        <defs>
+          <marker id="mH" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#1b2430"></path></marker>
+          <marker id="mOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#1f7a4d"></path></marker>
+          <marker id="mL" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M1 1L10 6L1 11" fill="none" stroke="#4f4a8a" stroke-width="1.5"></path></marker>
+          <marker id="mErr" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M1 1L10 6L1 11" fill="none" stroke="#b9382c" stroke-width="1.5"></path></marker>
+          <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#4f4a8a" stroke-width="1.5" opacity=".45"></line></pattern>
+        </defs>
+        <rect x="20" y="0" width="400" height="320" fill="#f1f4f7"></rect>
+        <text x="220" y="10" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="8.5" font-weight="600" fill="#5b6673" letter-spacing=".08em">MOBILE CLIENT</text>
+        <line x1="90" y1="34" x2="90" y2="320" stroke="#d5dbe2"></line><line x1="330" y1="34" x2="330" y2="320" stroke="#d5dbe2"></line><line x1="490" y1="34" x2="490" y2="320" stroke="#d5dbe2"></line><line x1="630" y1="34" x2="630" y2="320" stroke="#d5dbe2"></line>
+        <text x="90" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">App code</text><text x="90" y="31" text-anchor="middle" font-size="8.5" fill="#7a8592">CustomerTaskHandler</text>
+        <text x="330" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">SDK</text><text x="330" y="31" text-anchor="middle" font-size="8.5" fill="#7a8592">DemoAuthSdk</text>
+        <text x="490" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">dummyjson.com</text>
+        <text x="630" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">jsonplaceholder…</text><text x="630" y="31" text-anchor="middle" font-size="8.5" fill="#7a8592">typicode.com</text>
+        <line x1="0" y1="36" x2="700" y2="36" stroke="#e1e6eb"></line>
+        <rect x="323" y="46" width="14" height="238" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect>
+        <text x="342" y="56" font-weight="600">authenticate(handler)</text>
+        <line x1="337" y1="88" x2="482" y2="88" stroke="#1b2430" stroke-width="1.5" marker-end="url(#mH)"></line><text x="346" y="84" font-weight="600">GET /auth/me</text>
+        <rect x="486" y="88" width="8" height="18" fill="#fff" stroke="#5b6673"></rect>
+        <line x1="482" y1="106" x2="337" y2="106" stroke="#1f7a4d" stroke-width="1.5" marker-end="url(#mOk)"></line><text x="346" y="117" fill="#1f7a4d">✓ 200 OK · 111 ms</text>
+        <line x1="323" y1="128" x2="104" y2="128" stroke="#4f4a8a" stroke-width="1.5" marker-end="url(#mL)"></line><text x="110" y="124" fill="#4f4a8a" font-weight="600">call · loadTask()</text>
+        <rect x="83" y="120" width="14" height="106" rx="3" fill="#ecebf6" stroke="#4f4a8a" stroke-width="1.5"></rect>
+        <rect x="323" y="120" width="14" height="106" fill="url(#hatch)"></rect><text x="342" y="150" font-family="Source Sans 3,sans-serif" font-size="9.5" font-style="italic" fill="#4f4a8a">waiting for loadTask</text>
+        <text x="102" y="144" font-weight="600" fill="#4f4a8a">loadTask() · handler</text><text x="102" y="155" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#6b7580">CustomerTaskHandler ← authenticate</text>
+        <line x1="97" y1="174" x2="622" y2="174" stroke="#1b2430" stroke-width="1.5" marker-end="url(#mH)"></line><text x="110" y="170" font-weight="600">GET /todos/1 · CustomerTaskClient</text>
+        <rect x="626" y="174" width="8" height="22" fill="#fff" stroke="#5b6673"></rect>
+        <line x1="622" y1="196" x2="97" y2="196" stroke="#1f7a4d" stroke-width="1.5" marker-end="url(#mOk)"></line><text x="110" y="208" fill="#1f7a4d">✓ 200 OK · 1.53 s</text>
+        <line x1="97" y1="222" x2="318" y2="222" stroke="#4f4a8a" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#mL)"></line><text x="106" y="236" fill="#4f4a8a" font-weight="600">↩ returned · 1.54 s</text>
+        <rect x="326" y="244" width="14" height="22" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect><text x="346" y="254" font-weight="600">acceptTask() · 0.1 ms</text><text x="346" y="265" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#6b7580">DemoAuthSdk · after return</text>
+        <text x="342" y="296" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#1f7a4d">authenticate → returned · success</text>
+        <g font-family="Source Sans 3,sans-serif" font-size="9" font-weight="700" fill="#fff">
+          <circle cx="680" cy="128" r="7" fill="#1b2430"></circle><text x="680" y="131" text-anchor="middle">1</text>
+          <circle cx="60" cy="176" r="7" fill="#1b2430"></circle><text x="60" y="179" text-anchor="middle">2</text>
+          <circle cx="680" cy="150" r="7" fill="#1b2430"></circle><text x="680" y="153" text-anchor="middle">3</text>
+          <circle cx="680" cy="184" r="7" fill="#1b2430"></circle><text x="680" y="187" text-anchor="middle">4</text>
+          <circle cx="680" cy="222" r="7" fill="#1b2430"></circle><text x="680" y="225" text-anchor="middle">5</text>
+          <circle cx="680" cy="255" r="7" fill="#1b2430"></circle><text x="680" y="258" text-anchor="middle">6</text>
+        </g>
+      </svg>
+      <ol style="margin:0;padding-left:20px;font-size:12.5px;display:flex;flex-direction:column;gap:2px">
+        <li>seq 34 <span style="font-family:'Source Code Pro',monospace">operation.started</span> · name CustomerTaskHandler.loadTask · invocation.kind=handler · dispatch=synchronous · caller {sdk, DemoAuthSdk, authenticate} → call arrow SDK → App code (open head).</li>
+        <li>Handler block on App code for span <span style="font-family:'Source Code Pro',monospace">8a602b6741ec4af6</span>; parent_span_id = <span style="font-family:'Source Code Pro',monospace">52ec31780ff84e42</span> (DemoAuthSdk.authenticate).</li>
+        <li>Caller bar stays open; only the authenticate bar is hatched “waiting”.</li>
+        <li>seq 35 child request span <span style="font-family:'Source Code Pro',monospace">0a2529d0b88240df</span>, parent 8a602b67…; initiator {integrator, CustomerTaskHandler, loadTask}, executor {integrator, CustomerTaskClient, loadTask}, adapter customer.manual. Arrow starts on App code, not SDK; 200 after 1.53 s, duration_ns 1535868209.</li>
+        <li>seq 40 <span style="font-family:'Source Code Pro',monospace">operation.ended</span> for 8a602b67… · completion=returned · outcome=success · duration_ns=1536452834 → dashed return to the caller bar. Return value: not captured.</li>
+        <li>seq 41–42 DemoAuthSdk.acceptTask (span ae94dca7…, 0.1 ms) is ordinary SDK work after the return; seq 43 closes authenticate (success, 5.24 s), then DemoAuthSdk.completeDemo posts the receipt to httpbin (omitted here).</li>
+      </ol>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-weight:700">(b) Handler with no HTTP — <span style="font-family:'Source Code Pro',monospace;font-weight:400">examples/handler-no-http.ndjson</span></div>
+      <svg viewBox="0 0 700 236" style="width:100%;max-width:700px;display:block;background:#fafbfc;border:1px solid #e1e6eb;border-radius:6px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:10.5px">
+        <rect x="20" y="0" width="400" height="236" fill="#f1f4f7"></rect>
+        <line x1="90" y1="34" x2="90" y2="236" stroke="#d5dbe2"></line><line x1="330" y1="34" x2="330" y2="236" stroke="#d5dbe2"></line>
+        <text x="90" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">App code</text><text x="90" y="31" text-anchor="middle" font-size="8.5" fill="#7a8592">Checkout · CustomerTaskHandler</text>
+        <text x="330" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">SDK</text><text x="330" y="31" text-anchor="middle" font-size="8.5" fill="#7a8592">VerificationClient</text>
+        <text x="560" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="9.5" font-style="italic" fill="#8a94a0">no server origins in this recording</text>
+        <line x1="0" y1="36" x2="700" y2="36" stroke="#e1e6eb"></line>
+        <rect x="83" y="46" width="14" height="170" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect>
+        <text x="102" y="56" font-weight="600">submit()</text>
+        <rect x="323" y="62" width="14" height="140" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect>
+        <text x="342" y="72" font-weight="600">verify()</text>
+        <line x1="323" y1="96" x2="104" y2="96" stroke="#4f4a8a" stroke-width="1.5" marker-end="url(#mL)"></line><text x="110" y="92" fill="#4f4a8a" font-weight="600">call · loadTask()</text>
+        <rect x="323" y="88" width="14" height="52" fill="url(#hatch)"></rect>
+        <rect x="86" y="88" width="14" height="52" rx="3" fill="#ecebf6" stroke="#4f4a8a" stroke-width="1.5"></rect>
+        <text x="106" y="112" font-weight="600" fill="#4f4a8a">loadTask() · handler</text>
+        <line x1="100" y1="140" x2="318" y2="140" stroke="#4f4a8a" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#mL)"></line><text x="110" y="154" fill="#4f4a8a" font-weight="600">↩ returned · 40 ms</text>
+        <rect x="326" y="158" width="14" height="16" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect><text x="346" y="170" font-weight="600">acceptTask() · 2 ms</text>
+        <text x="342" y="196" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#1f7a4d">verify → success · 48 ms</text>
+        <text x="102" y="228" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#1f7a4d">submit → success · 50 ms</text>
+      </svg>
+      <p style="margin:0;font-size:12.5px">Observed: seq 4 <span style="font-family:'Source Code Pro',monospace">operation.started</span> span <span style="font-family:'Source Code Pro',monospace">3089d3ab5b1043cb</span>, parent <span style="font-family:'Source Code Pro',monospace">b3a19248756a167b</span> (VerificationClient.verify), invocation.kind=handler, dispatch=synchronous; seq 5 <span style="font-family:'Source Code Pro',monospace">operation.ended</span> same span, completion=returned, outcome=success, duration_ns=40000000; seq 6–7 VerificationClient.acceptTask (2 ms); seq 8 verify ends success. The recording has no HTTP event, so no server lane exists; call, block and return are still first-class rows, list items and a “1 handler call” count.</p>
+    </div>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-weight:700">(c) Handler throws · SDK catches and continues — <span style="font-family:'Source Code Pro',monospace;font-weight:400">examples/handler-throw.ndjson</span></div>
+      <svg viewBox="0 0 700 236" style="width:100%;max-width:700px;display:block;background:#fafbfc;border:1px solid #e1e6eb;border-radius:6px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:10.5px">
+        <rect x="20" y="0" width="400" height="236" fill="#f1f4f7"></rect>
+        <line x1="90" y1="34" x2="90" y2="236" stroke="#d5dbe2"></line><line x1="330" y1="34" x2="330" y2="236" stroke="#d5dbe2"></line>
+        <text x="90" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">App code</text><text x="90" y="31" text-anchor="middle" font-size="8.5" fill="#7a8592">Checkout · CustomerTaskHandler</text>
+        <text x="330" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">SDK</text><text x="330" y="31" text-anchor="middle" font-size="8.5" fill="#7a8592">VerificationClient</text>
+        <text x="560" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="9.5" font-style="italic" fill="#8a94a0">no server origins in this recording</text>
+        <line x1="0" y1="36" x2="700" y2="36" stroke="#e1e6eb"></line>
+        <rect x="83" y="46" width="14" height="170" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect>
+        <text x="102" y="56" font-weight="600">submit()</text>
+        <rect x="323" y="62" width="14" height="140" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect>
+        <text x="342" y="72" font-weight="600">verify()</text>
+        <line x1="323" y1="96" x2="104" y2="96" stroke="#4f4a8a" stroke-width="1.5" marker-end="url(#mL)"></line><text x="110" y="92" fill="#4f4a8a" font-weight="600">call · loadTask()</text>
+        <rect x="323" y="88" width="14" height="52" fill="url(#hatch)"></rect>
+        <rect x="86" y="88" width="14" height="52" rx="3" fill="#fbe8e5" stroke="#b9382c" stroke-width="1.5"></rect>
+        <text x="106" y="112" font-weight="600" fill="#b9382c">loadTask() · handler</text>
+        <line x1="100" y1="140" x2="318" y2="140" stroke="#b9382c" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#mErr)"></line><text x="110" y="154" fill="#b9382c" font-weight="600">↯ threw · HandlerError · 40 ms</text>
+        <text x="110" y="166" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#6b7580">stage=unknown · sanitized</text>
+        <rect x="326" y="158" width="14" height="16" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect><text x="346" y="170" font-weight="600">acceptTask() · 2 ms</text><text x="346" y="181" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#6b7580">caller caught and continued</text>
+        <text x="342" y="196" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#1f7a4d">verify → success · 48 ms</text>
+        <text x="102" y="228" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#1f7a4d">submit → success · 50 ms</text>
+      </svg>
+      <p style="margin:0;font-size:12.5px">Observed: seq 5 <span style="font-family:'Source Code Pro',monospace">operation.ended</span> span <span style="font-family:'Source Code Pro',monospace">faf5d59cdf623ec0</span>, completion=threw, outcome=error, error {type: HandlerError, message: “Handler rejected task”, stage: unknown}. The unwind arrow points at the caller bar resolved by parent_span_id. The caller (seq 8) and root (seq 9) both end with outcome=success, so the session summary reports no failed session; the “Failed” outcome filter contains only the handler row. stage=unknown is displayed as a method-error stage, never as a transport classification.</p>
+    </div>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-weight:700">(d) Stopped observation and missing end</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px"><div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:6px"><div style="font-size:12px;font-weight:600;color:#5b6673">Stopped observation — examples/handler-stopped.ndjson</div>
+        <svg viewBox="0 0 400 236" style="width:100%;max-width:400px;display:block;background:#fafbfc;border:1px solid #e1e6eb;border-radius:6px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:10px">
+          <rect x="10" y="0" width="320" height="236" fill="#f1f4f7"></rect>
+          <line x1="70" y1="34" x2="70" y2="236" stroke="#d5dbe2"></line><line x1="230" y1="34" x2="230" y2="236" stroke="#d5dbe2"></line>
+          <text x="70" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">App code</text><text x="70" y="31" text-anchor="middle" font-size="8" fill="#7a8592">CustomerTaskHandler</text>
+          <text x="230" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">SDK</text><text x="230" y="31" text-anchor="middle" font-size="8" fill="#7a8592">VerificationClient</text>
+          <line x1="0" y1="36" x2="400" y2="36" stroke="#e1e6eb"></line>
+          <rect x="63" y="46" width="14" height="180" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect><text x="82" y="56" font-weight="600">submit()</text>
+          <rect x="223" y="62" width="14" height="128" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect><text x="242" y="72" font-weight="600">verify()</text>
+          <line x1="223" y1="96" x2="84" y2="96" stroke="#4f4a8a" stroke-width="1.5" marker-end="url(#mL)"></line><text x="90" y="92" fill="#4f4a8a" font-weight="600">call · loadTask()</text>
+          <rect x="223" y="88" width="14" height="52" fill="url(#hatch)"></rect>
+          <rect x="66" y="88" width="14" height="52" rx="3" fill="#fff3d6" stroke="#8a5a00" stroke-width="1.5" stroke-dasharray="4 3"></rect>
+          <text x="86" y="112" font-weight="600" fill="#8a5a00">loadTask()</text>
+          <line x1="56" y1="140" x2="84" y2="140" stroke="#8a5a00" stroke-width="2"></line>
+          <text x="86" y="156" fill="#8a5a00" font-weight="600">? observation_stopped</text><text x="86" y="167" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#8a5a00">reason: capture_disabled</text>
+          <text x="86" y="180" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#6b7580">no return arrow · duration “—”</text>
+          <text x="242" y="204" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#1f7a4d">verify → success · 48 ms</text>
+        </svg></div><div style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:6px"><div style="font-size:12px;font-weight:600;color:#5b6673">Missing end — examples/handler-interrupted.ndjson</div>
+        <svg viewBox="0 0 400 236" style="width:100%;max-width:400px;display:block;background:#fafbfc;border:1px solid #e1e6eb;border-radius:6px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:10px">
+          <rect x="10" y="0" width="320" height="236" fill="#f1f4f7"></rect>
+          <line x1="70" y1="34" x2="70" y2="236" stroke="#d5dbe2"></line><line x1="230" y1="34" x2="230" y2="236" stroke="#d5dbe2"></line>
+          <text x="70" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">App code</text><text x="70" y="31" text-anchor="middle" font-size="8" fill="#7a8592">CustomerTaskHandler</text>
+          <text x="230" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">SDK</text><text x="230" y="31" text-anchor="middle" font-size="8" fill="#7a8592">VerificationClient</text>
+          <line x1="0" y1="36" x2="400" y2="36" stroke="#e1e6eb"></line>
+          <rect x="63" y="46" width="14" height="180" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect><text x="82" y="56" font-weight="600">submit()</text>
+          <rect x="223" y="62" width="14" height="128" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect><text x="242" y="72" font-weight="600">verify()</text>
+          <line x1="223" y1="96" x2="84" y2="96" stroke="#4f4a8a" stroke-width="1.5" marker-end="url(#mL)"></line><text x="90" y="92" fill="#4f4a8a" font-weight="600">call · loadTask()</text>
+          <rect x="223" y="88" width="14" height="102" fill="url(#hatch)"></rect>
+          <rect x="66" y="88" width="14" height="148" rx="3" fill="none" stroke="#8a5a00" stroke-width="1.5" stroke-dasharray="4 3"></rect>
+          <text x="86" y="112" font-weight="600" fill="#8a5a00">loadTask()</text>
+          <text x="86" y="150" fill="#8a5a00">… no operation.ended</text>
+          <text x="86" y="161" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#6b7580">open to end of recording</text>
+          <text x="242" y="204" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#1f7a4d">verify → success · 48 ms</text>
+          <text x="242" y="216" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#8a5a00">⚠ caller ended, child open</text>
+        </svg></div></div>
+      <p style="margin:0;font-size:12.5px"><b>Stopped:</b> seq 5 <span style="font-family:'Source Code Pro',monospace">operation.ended</span> span <span style="font-family:'Source Code Pro',monospace">0a9e7758ffe44c6c</span>, completion=observation_stopped, outcome=unknown, error=null, <span style="font-family:'Source Code Pro',monospace">extensions["capture.observation_stop_reason"]="capture_disabled"</span>. The block ends at the observed stop row with an amber tick on the App lane; nothing crosses back to the SDK; duration_ns (40000000) is shown in the inspector as “observed interval”, never as a method duration. <b>Missing end:</b> span <span style="font-family:'Source Code Pro',monospace">963c8758b88f877a</span> has a started event and no ended event while its caller (seq 5) and root (seq 6) end with success. The block stays open and dashed to the end of the recording, and the importer raises the CONTRACT “incomplete data” warning on the caller: known caller completion with an unknown child exit. No end time, duration or return arrow is invented in either case. The cancelled fixture (<span style="font-family:'Source Code Pro',monospace">handler-cancelled.ndjson</span>, span deea4089…, completion=cancelled) renders like (b) with a grey dashed “⊘ cancelled · 40 ms” return.</p>
+    </div>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-weight:700">(e) Repeated and nested handler calls — <span style="font-weight:400;color:#8a5a00">illustrative, no fixture</span></div>
+      <svg viewBox="0 0 700 300" style="width:100%;max-width:700px;display:block;background:#fafbfc;border:1px solid #e1e6eb;border-radius:6px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:10.5px">
+        <rect x="20" y="0" width="400" height="300" fill="#f1f4f7"></rect>
+        <line x1="90" y1="34" x2="90" y2="300" stroke="#d5dbe2"></line><line x1="330" y1="34" x2="330" y2="300" stroke="#d5dbe2"></line><line x1="490" y1="34" x2="490" y2="300" stroke="#d5dbe2"></line>
+        <text x="90" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">App code</text><text x="330" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">SDK</text><text x="330" y="31" text-anchor="middle" font-size="8.5" fill="#7a8592">DemoAuthSdk · DemoAuthTokenStore</text><text x="490" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">dummyjson.com</text>
+        <line x1="0" y1="36" x2="700" y2="36" stroke="#e1e6eb"></line>
+        <rect x="323" y="46" width="14" height="236" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect>
+        <text x="342" y="56" font-weight="600">authenticate(handler)</text>
+        <line x1="323" y1="74" x2="104" y2="74" stroke="#4f4a8a" stroke-width="1.5" marker-end="url(#mL)"></line><text x="110" y="70" fill="#4f4a8a" font-weight="600">call · loadTask() #1</text>
+        <rect x="83" y="66" width="14" height="34" rx="3" fill="#ecebf6" stroke="#4f4a8a" stroke-width="1.5"></rect><rect x="323" y="66" width="14" height="34" fill="url(#hatch)"></rect>
+        <text x="102" y="88" fill="#4f4a8a" font-weight="600">loadTask() #1</text>
+        <line x1="97" y1="100" x2="318" y2="100" stroke="#4f4a8a" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#mL)"></line><text x="200" y="110" fill="#4f4a8a">↩ returned · 8 ms</text>
+        <line x1="323" y1="130" x2="104" y2="130" stroke="#4f4a8a" stroke-width="1.5" marker-end="url(#mL)"></line><text x="110" y="126" fill="#4f4a8a" font-weight="600">call · loadTask() #2</text>
+        <rect x="83" y="122" width="14" height="128" rx="3" fill="#ecebf6" stroke="#4f4a8a" stroke-width="1.5"></rect><rect x="323" y="122" width="14" height="128" fill="url(#hatch)"></rect>
+        <text x="102" y="144" fill="#4f4a8a" font-weight="600">loadTask() #2</text>
+        <line x1="97" y1="168" x2="322" y2="168" stroke="#4f4a8a" stroke-width="1.5" marker-end="url(#mL)"></line><text x="106" y="180" fill="#4f4a8a" font-weight="600">call · currentToken()</text>
+        <rect x="329" y="160" width="14" height="60" rx="3" fill="#dfe5ec" stroke="#4f4a8a" stroke-width="1.5"></rect>
+        <text x="348" y="176" font-weight="600">currentToken() · depth 2</text>
+        <line x1="343" y1="196" x2="482" y2="196" stroke="#1b2430" stroke-width="1.5" marker-end="url(#mH)"></line><text x="352" y="191" font-weight="600" font-size="9.5">POST /auth/refresh</text>
+        <rect x="486" y="196" width="8" height="14" fill="#fff" stroke="#5b6673"></rect>
+        <line x1="482" y1="210" x2="343" y2="210" stroke="#1f7a4d" stroke-width="1.5" marker-end="url(#mOk)"></line>
+        <line x1="329" y1="220" x2="104" y2="220" stroke="#4f4a8a" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#mL)"></line><text x="110" y="233" fill="#4f4a8a">↩ returned · 214 ms</text>
+        <line x1="97" y1="250" x2="318" y2="250" stroke="#4f4a8a" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#mL)"></line><text x="110" y="263" fill="#4f4a8a" font-weight="600">↩ returned · 239 ms</text>
+        <text x="342" y="292" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#1f7a4d">authenticate → returned · success</text>
+      </svg>
+      <p style="margin:0;font-size:12.5px">Two invocations of the same method are two blocks with distinct span ids and “#1 / #2” badges; returns pair by span, so #2's return cannot close #1. The nested app → SDK call inside #2 (illustrative <span style="font-family:'Source Code Pro',monospace">DemoAuthTokenStore.currentToken</span>, not in the brief's sample) is an ordinary local call whose callee sits on the SDK lane at depth 2. Its HTTP is SDK-owned because its own HTTP origin says so, not because of nesting. Depth and pairing come only from parent_span_id and span_id; “#k” numbering is per recording, by sequence.</p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-weight:700">(f) HTTP that outlives its handler — <span style="font-weight:400;color:#8a5a00">illustrative, no fixture</span></div>
+      <svg viewBox="0 0 700 250" style="width:100%;max-width:700px;display:block;background:#fafbfc;border:1px solid #e1e6eb;border-radius:6px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:10.5px">
+        <rect x="20" y="0" width="400" height="250" fill="#f1f4f7"></rect>
+        <line x1="90" y1="34" x2="90" y2="250" stroke="#d5dbe2"></line><line x1="330" y1="34" x2="330" y2="250" stroke="#d5dbe2"></line><line x1="490" y1="34" x2="490" y2="250" stroke="#d5dbe2"></line>
+        <text x="90" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">App code</text><text x="330" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">SDK</text><text x="490" y="22" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-size="11" font-weight="600" fill="#1b2430">jsonplaceholder…</text>
+        <line x1="0" y1="36" x2="700" y2="36" stroke="#e1e6eb"></line>
+        <rect x="323" y="46" width="14" height="150" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect>
+        <text x="342" y="56" font-weight="600">authenticate(handler)</text>
+        <line x1="323" y1="76" x2="104" y2="76" stroke="#4f4a8a" stroke-width="1.5" marker-end="url(#mL)"></line><text x="110" y="72" fill="#4f4a8a" font-weight="600">call · loadTask()</text>
+        <rect x="83" y="68" width="14" height="60" rx="3" fill="#ecebf6" stroke="#4f4a8a" stroke-width="1.5"></rect><rect x="323" y="68" width="14" height="60" fill="url(#hatch)"></rect>
+        <text x="102" y="92" fill="#4f4a8a" font-weight="600">loadTask() · handler</text>
+        <line x1="97" y1="104" x2="482" y2="104" stroke="#1b2430" stroke-width="1.5" marker-end="url(#mH)"></line><text x="110" y="115" font-weight="600">GET /todos/1 · app client</text>
+        <rect x="486" y="104" width="8" height="112" fill="#fff" stroke="#5b6673"></rect>
+        <line x1="97" y1="128" x2="318" y2="128" stroke="#4f4a8a" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#mL)"></line><text x="106" y="142" fill="#4f4a8a" font-weight="600">↩ returned · 21 ms</text>
+        <rect x="326" y="152" width="14" height="20" rx="3" fill="#dfe5ec" stroke="#5b6673"></rect><text x="346" y="165" font-weight="600">acceptTask()</text>
+        <text x="342" y="190" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#1f7a4d">authenticate → success</text>
+        <line x1="482" y1="216" x2="97" y2="216" stroke="#1f7a4d" stroke-width="1.5" marker-end="url(#mOk)"></line><text x="110" y="230" fill="#1f7a4d">✓ 200 OK · 231 ms · after loadTask returned</text>
+        <text x="110" y="241" font-family="Source Sans 3,sans-serif" font-size="9.5" fill="#6b7580">still attributed to App code · causal parent kept · not a resumption of the handler</text>
+      </svg>
+      <p style="margin:0;font-size:12.5px">The handler's completion is drawn where the log observed it (completion=returned, 21 ms — the method returned, not the request). The request keeps its causal parent and its App-code attribution; its response lands on the App lane after the block has ended and after the SDK caller has finished. No arrow, block or label suggests the handler resumed; that would require §14's telemetry.</p>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">11 · Inspector — local invocation</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px">
+      <b>Header</b><span>“↦ loadTask()” (mono) · “CustomerTaskHandler · handler · App code” · “← prior”. No METHOD/path, no origin chip.</span>
+      <b>Status row</b><span>Outcome badge from §7 (✓ returned / ↯ threw / ⊘ cancelled / ? observation stopped / … unfinished) · “dispatch: synchronous” · elapsed “125 ms (includes nested HTTP and waiting)” or “—”. Amber note when completion ≠ returned, e.g. “The exception unwound to DemoAuthSdk.authenticate, which completed with success.”</span>
+      <b>Tab · Invocation</b><span>Callee: owner, component, method. Caller: owner, component, method, and “caller span: ‹…a1f3› (instrumented)” or “caller span: not resolved · label only”. Kind, dispatch. Arguments: “Not captured”. Return value: “Not captured”. Business result: “Not captured”.</span>
+      <b>Tab · Timing</b><span>Observed start (timestamp + monotonic_ns + sequence), observed end (same, or “not observed”), duration_ns, waiting overlap with the caller (“caller authenticate waited 125 ms”), recording id and schema version. Clock caveat repeated for multi-recording sessions.</span>
+      <b>Tab · Attribution</b><span>trace_id, span_id, parent_span_id, parent_scope, session_namespace, session_id, recording_id, event_ids of started/ended. Copy buttons per ID. “parent_span_id: — (missing)” when absent — empty, not “unknown”.</span>
+      <b>Tab · Outcome</b><span>completion, outcome, sanitized error (type, message if present, stage — with a note “stage=unknown is not a network classification”), <span style="font-family:'Source Code Pro',monospace">capture.observation_stop_reason</span> when present. Fields absent from the log show “—”; fields the logger never records show “Not captured”; observed-but-indeterminate values show “unknown” in amber.</span>
+      <b>Tab · Children</b><span>Ordered list of exchanges with parent_span_id = this span: glyph, METHOD path, origin, initiator/executor owner, status, duration, “completed after return” flag. Clicking opens that exchange's HTTP inspector (all existing tabs) and pushes to “← prior”. Nested invocations listed the same way with “↦”.</span>
+      <b>Tab · Raw events</b><span>The two (or one) NDJSON lines verbatim, line numbers, copy.</span>
+      <b>From HTTP</b><span>An HTTP exchange's Attribution tab gains “Inside invocation: ↦ loadTask() (handler, App code) → open”, so navigation works both ways.</span>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">12 · Controls, counts, ordering</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px">
+      <b>Default</b><span>Local calls are in the sequence by default; nothing is hidden on first open.</span>
+      <b>Kind filter</b><span>Segmented “All · HTTP only · Local calls only” next to the owner segmented. “Local calls only” keeps method blocks and call/return arrows and hides HTTP rows (server lanes stay, greyed, so the layout does not jump).</span>
+      <b>Ancestry indicator</b><span>In “HTTP only” mode every hidden invocation that contains visible HTTP collapses to a 4 px #4f4a8a rule on its lane spanning its rows, with a pill “↦ inside loadTask() · handler” at its top. Clicking the pill selects the invocation; clearing the filter restores it. Handlers with no HTTP collapse to the pill alone.</span>
+      <b>Collapse</b><span>Handler blocks obey the existing [−]/[+]; collapsed handler reads “n requests · m calls hidden”. “Collapse all methods” includes handlers.</span>
+      <b>Counts</b><span>Toolbar shows “12 requests · 3 handler calls · 1 other call” as separate numbers; the navigator row shows “12 req · 3 ↦”. Origins count excludes code lanes. Outcome summary counts HTTP outcomes and invocation outcomes separately, using the CONTRACT summary counters <span style="font-family:'Source Code Pro',monospace">handler_calls · unfinished_handler_calls · unknown_handler_outcomes</span> (“3 handler calls · 1 unfinished · 1 unknown”).</span>
+      <b>Search</b><span>Matches invocation name, component, method, span id, caller component/method.</span>
+      <b>Ordering</b><span>Within a recording: <span style="font-family:'Source Code Pro',monospace">sequence</span>, then <span style="font-family:'Source Code Pro',monospace">monotonic_ns</span>, then file line. Recordings are laid out one after another with their banners; their clocks are never compared, so no gap row is inserted across a recording boundary. Wall-clock proximity never creates parent/child or caller relationships.</span>
+      <b>Concurrency</b><span>Overlapping HTTP and independent SDK work interleave by event order; each bar is scoped to its span, so a waiting hatch on authenticate coexists with a normal telemetry <span style="font-family:'Source Code Pro',monospace">flush()</span> bar beside it (depth offsets keep them apart).</span>
+      <b>Scale</b><span>Hundreds of invocations: labels drop the component line under 30 px of row height, “#k” badges stay; collapse-all keeps a single row per top-level operation; List view pages at 200 rows.</span>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">13 · Accessibility and keyboard</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px;font-size:13px">
+      <b>Call arrow</b><span style="font-family:'Source Code Pro',monospace;font-size:12px">"Local call from SDK DemoAuthSdk.authenticate to App code CustomerTaskHandler.loadTask, handler, synchronous. Select invocation."</span>
+      <b>Block</b><span style="font-family:'Source Code Pro',monospace;font-size:12px">"Handler loadTask on App code, invocation 2 of 3, 125 milliseconds elapsed, returned. Contains 1 request. Expanded."</span>
+      <b>Return</b><span style="font-family:'Source Code Pro',monospace;font-size:12px">"Returned to SDK DemoAuthSdk.authenticate after 125 milliseconds." · "Threw IllegalStateException to …" · "Cancelled after …" · (no element for stopped/missing; the block label carries "observation stopped, exit not observed" / "no end recorded")</span>
+      <b>Waiting</b><span style="font-family:'Source Code Pro',monospace;font-size:12px">"authenticate waiting for loadTask" — presentational (aria-hidden); the information is in the block and caller labels.</span>
+      <b>Keys</b><span>↑/↓ (j/k) traverse visible rows including calls and returns in layout order; ← / → jump between an invocation and its caller / first child; Enter opens the inspector; Esc closes; “[” / “]” collapse / expand the focused block; “h” toggles HTTP-only. All arrows, blocks, pills and lane headers are in tab order with a 2 px accent focus ring.</span>
+      <b>Colour</b><span>Local vs HTTP is encoded three ways: colour, arrowhead shape (open/filled), and the words “call”/“returned” vs METHOD. Outcome states always carry glyph + word. Hatch is decorative and duplicated by the “waiting” label.</span>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">14 · Scope — synchronous now, asynchronous proposed</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:8px;font-size:13px">
+      <div><b>Implemented in this design:</b> <span style="font-family:'Source Code Pro',monospace">dispatch="synchronous"</span> method calls whose return is the caller's resumption. A return arrow means the callee's method exit was observed on the caller's stack.</div>
+      <div><b>Not equated with a synchronous return:</b> a method that returns after enqueueing work, a coroutine suspension and later resumption, or a callback/Future completing later. Under draft 1.1 these all produce completion=returned at method exit and are drawn as such — the viewer must not draw a second “continuation” arrow or extend the block.</div>
+      <div style="background:#fff3d6;border:1px solid #e8d7a8;border-radius:6px;padding:10px 12px;color:#5a4300"><b>Proposed (not in 1.1, not designed here):</b> async continuation rendering would require, at minimum: <span style="font-family:'Source Code Pro',monospace">invocation.dispatch ∈ {"async_enqueue","coroutine"}</span>; <span style="font-family:'Source Code Pro',monospace">operation.suspended</span> / <span style="font-family:'Source Code Pro',monospace">operation.resumed</span> events carrying the same span_id and a <span style="font-family:'Source Code Pro',monospace">continuation_id</span>; a <span style="font-family:'Source Code Pro',monospace">completion="delivered"</span> variant with the delivering thread/dispatcher; and explicit <span style="font-family:'Source Code Pro',monospace">links[]</span> from the completion event to the originating span. Visual candidates (segmented blocks, a dotted “awaiting” lifeline) are deferred until that telemetry exists.</div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font-size:15px;font-weight:700">15 · Acceptance criteria (testable)</h2>
+    <div style="background:#fff;border:1px solid #e1e6eb;border-radius:8px;padding:14px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 14px;font-size:12.5px">
+      <b>H-1</b><span>Given examples/handler-no-http.ndjson, the sequence shows one call arrow SDK → App code, one handler block, and one return arrow App code → SDK; no server lane is added and the HTTP count is unchanged while the handler count increments by 1.</span>
+      <b>H-2</b><span>Given samples/live/successful-sign-in.ndjson, the GET /todos/1 arrow (span 0a2529d0…) starts on the App-code lane, its Attribution shows initiator CustomerTaskHandler.loadTask and executor CustomerTaskClient.loadTask, both integrator, and filtering owner=SDK hides it while owner=App shows it.</span>
+      <b>H-3</b><span>Given a handler whose parent_span_id resolves to DemoAuthSdk.authenticate while another SDK span (e.g. flush) is open concurrently, the return arrow terminates on the authenticate bar, and only that bar carries the waiting hatch.</span>
+      <b>H-4</b><span>Given two operation.ended events with different span_ids arriving out of order, each pairs with its own started event; swapping their timestamps changes nothing but row order.</span>
+      <b>H-5</b><span>Given examples/handler-stopped.ndjson (completion=observation_stopped), no return arrow exists; the block outline is dashed amber; the inspector shows outcome=unknown and the stop reason verbatim; duration shows “—”.</span>
+      <b>H-6</b><span>Given examples/handler-interrupted.ndjson (started, no ended; caller ends with success), no return arrow, no end time and no duration are rendered; the block reads “… no operation.ended”.</span>
+      <b>H-7</b><span>Given examples/handler-throw.ndjson (completion=threw inside VerificationClient.verify, which ends with success), the session summary reports zero failed sessions, the handler row is in the “Failed” outcome filter, and the caller row is in “Success”.</span>
+      <b>H-8</b><span>Given a recording with schema_version 1.0 (or a 1.1 span without invocation.kind=handler), no call/return arrows are drawn and the handler count is 0, even when a parent operation exists.</span>
+      <b>H-9</b><span>Given a handler whose parent_span_id is absent, the call arrow starts from a hollow dot on the caller.owner lane labelled “caller not instrumented”, and no caller bar is created.</span>
+      <b>H-10</b><span>Given a recording shaped like example (f) (no fixture yet — one should be added to examples/), the return arrow row precedes the response row; the response arrow ends on App code; the exchange is flagged “completed after return”; collapsing the handler hides the response too.</span>
+      <b>H-11</b><span>Given a recording shaped like example (e) (no fixture yet), blocks are badged #1 and #2 with distinct span ids; the nested SDK block sits at depth 2; its HTTP arrow starts on the SDK lane.</span>
+      <b>H-12</b><span>Clicking the call arrow, the block or the return arrow yields the same selected invocationId and opens the same inspector content.</span>
+      <b>H-13</b><span>In “HTTP only” mode, each hidden invocation containing visible HTTP renders an ancestry pill; clicking it selects the invocation.</span>
+      <b>H-14</b><span>Argument, return-value and business-result fields render the literal text “Not captured” and are never populated from any log field.</span>
+      <b>H-15</b><span>Every existing HTTP inspection behaviour (§3, §6 Working list) passes unchanged on a 1.0 file and on samples/live/successful-sign-in.ndjson (1.1, 9 HTTP exchanges, 1 handler call).</span>
+      <b>H-17</b><span>Given examples/handler-cancelled.ndjson, the return arrow is grey dashed with “⊘ cancelled”, the inspector outcome is cancelled, and the row is excluded from both “Success” and “Failed” filters.</span>
+      <b>H-16</b><span>Keyboard: from a selected call arrow, → moves focus to the block, → again to the first child request, ← returns; Enter opens the inspector at the Invocation tab.</span>
+    </div>
+  </section>
+</div>
+</x-dc>
+</body>
+</html>

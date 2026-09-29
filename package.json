@@ -1,14 +1,30 @@
 {
-  "name": "mobile-network-log-contract",
+  "name": "http-sequence-logger",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Draft cross-platform network capture contract and reference fixtures",
+  "description": "Structured mobile HTTP and handler logging with a local sequence viewer",
   "scripts": {
-    "generate": "node scripts/build-schema.mjs && node scripts/build-examples.mjs",
+    "generate": "node scripts/build-schema.mjs && node scripts/build-validator.mjs && node scripts/build-examples.mjs",
     "validate": "node validate.mjs examples/*.ndjson",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "viewer": "vite --config viewer/vite.config.mjs",
+    "build:viewer": "vite build --config viewer/vite.config.mjs",
+    "preview:viewer": "vite preview --config viewer/vite.config.mjs"
   },
-  "engines": { "node": ">=22" },
-  "dependencies": { "ajv": "8.20.0", "ajv-formats": "3.0.1" }
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@fontsource/source-code-pro": "5.3.0",
+    "@fontsource/source-sans-3": "5.3.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.1.1",
+    "vite": "8.3.1"
+  }
 }

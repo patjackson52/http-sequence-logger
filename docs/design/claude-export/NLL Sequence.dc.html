@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div tabIndex="0" role="group" aria-label="Sequence diagram. Use arrow keys to move between exchanges, Enter to open details, Escape to close." onKeyDown="{{ onKeyDown }}" style="position:relative;min-width:{{ lay.width }}px;outline:none;font-family:'Source Sans 3',system-ui,sans-serif">
+  <div style="position:sticky;top:0;z-index:2;height:54px;background:rgba(250,251,252,.97);border-bottom:1px solid #e1e6eb">
+    <div style="position:absolute;left:{{ lay.clientGroup.x }}px;width:{{ lay.clientGroup.w }}px;top:5px;height:14px;font-size:10px;line-height:14px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#5b6673;text-align:center">Mobile client</div>
+    <sc-for list="{{ lay.lanes }}" as="l" hint-placeholder-count="4">
+      <div title="{{ l.title }}" tabIndex="0" aria-label="{{ l.aria }}" style="position:absolute;left:{{ l.left }}px;width:{{ lay.laneW }}px;top:21px;text-align:center;padding:0 6px;box-sizing:border-box;border-radius:4px">
+        <div style="font-size:12.5px;font-weight:600;color:#1b2430;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:{{ l.font }}">{{ l.label }}</div>
+        <div style="font-size:10.5px;color:#7a8592;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Source Code Pro',ui-monospace,monospace">{{ l.sub }}</div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="position:relative;width:{{ lay.width }}px;height:{{ lay.height }}px">
+    <svg width="{{ lay.width }}" height="{{ lay.height }}" style="display:block;position:absolute;left:0;top:0">
+      <rect x="{{ lay.clientGroup.x }}" y="0" width="{{ lay.clientGroup.w }}" height="{{ lay.height }}" style="fill:#f1f4f7"></rect>
+      <sc-for list="{{ lay.lanes }}" as="l" hint-placeholder-count="4">
+        <line x1="{{ l.x }}" x2="{{ l.x }}" y1="0" y2="{{ lay.height }}" style="stroke:#d5dbe2;stroke-width:1"></line>
+      </sc-for>
+      <sc-for list="{{ lay.recs }}" as="r" hint-placeholder-count="0">
+        <rect x="0" y="{{ r.top }}" width="{{ lay.width }}" height="28" style="fill:{{ r.fill }}"></rect>
+      </sc-for>
+      <sc-for list="{{ lay.gaps }}" as="g" hint-placeholder-count="0">
+        <line x1="8" x2="{{ lay.width }}" y1="{{ g.y }}" y2="{{ g.y }}" style="stroke:#c9d1da;stroke-dasharray:2 4"></line>
+      </sc-for>
+      <sc-for list="{{ lay.serverBars }}" as="s" hint-placeholder-count="0">
+        <rect x="{{ s.x }}" y="{{ s.y }}" width="8" height="{{ s.h }}" style="fill:{{ s.fill }};stroke:{{ s.stroke }};stroke-width:1;stroke-dasharray:{{ s.dash }}"></rect>
+      </sc-for>
+      <sc-for list="{{ lay.bars }}" as="b" hint-placeholder-count="2">
+        <g role="button" tabIndex="0" aria-label="{{ b.aria }}" onClick="{{ b.onClick }}" onKeyDown="{{ b.onKeyDown }}" style="cursor:pointer">
+          <rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="3" style="fill:{{ b.fill }};stroke:{{ b.stroke }};stroke-width:{{ b.sw }};stroke-dasharray:{{ b.dash }}"></rect>
+          <rect x="{{ b.labelX }}" y="{{ b.hitY }}" width="{{ b.hitW }}" height="28" style="fill:transparent"></rect>
+        </g>
+      </sc-for>
+      <defs><pattern id="nll-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:#4f4a8a;stroke-width:1.5;opacity:.4"></line></pattern></defs>
+      <sc-for list="{{ lay.waits }}" as="w" hint-placeholder-count="0">
+        <rect x="{{ w.x }}" y="{{ w.y }}" width="{{ w.w }}" height="{{ w.h }}" style="fill:url(#nll-hatch);pointer-events:none"></rect>
+      </sc-for>
+      <sc-for list="{{ lay.arrows }}" as="a" hint-placeholder-count="6">
+        <g role="button" tabIndex="0" aria-label="{{ a.aria }}" aria-pressed="{{ a.selected }}" onClick="{{ a.onClick }}" onKeyDown="{{ a.onKeyDown }}" style="cursor:pointer">
+          <rect x="{{ a.hitX }}" y="{{ a.hitY }}" width="{{ a.hitW }}" height="30" rx="4" style="fill:{{ a.hitFill }}"></rect>
+          <line x1="{{ a.x1 }}" x2="{{ a.x2 }}" y1="{{ a.y }}" y2="{{ a.y }}" style="stroke:{{ a.color }};stroke-width:{{ a.sw }};stroke-dasharray:{{ a.dash }}"></line>
+          <polygon points="{{ a.head }}" style="fill:{{ a.color }}"></polygon>
+        </g>
+      </sc-for>
+      <sc-for list="{{ lay.localArrows }}" as="a" hint-placeholder-count="0">
+        <g role="button" tabIndex="0" aria-label="{{ a.aria }}" aria-pressed="{{ a.selected }}" onClick="{{ a.onClick }}" onKeyDown="{{ a.onKeyDown }}" style="cursor:pointer">
+          <rect x="{{ a.hitX }}" y="{{ a.hitY }}" width="{{ a.hitW }}" height="26" rx="4" style="fill:{{ a.hitFill }}"></rect>
+          <line x1="{{ a.x1 }}" x2="{{ a.x2 }}" y1="{{ a.y }}" y2="{{ a.y }}" style="stroke:{{ a.color }};stroke-width:{{ a.sw }};stroke-dasharray:{{ a.dash }}"></line>
+          <polyline points="{{ a.head }}" style="fill:none;stroke:{{ a.color }};stroke-width:{{ a.sw }};stroke-linejoin:round"></polyline>
+          <circle cx="{{ a.x1 }}" cy="{{ a.y }}" r="{{ a.dotR }}" style="fill:#fafbfc;stroke:{{ a.color }};stroke-width:1.5"></circle>
+        </g>
+      </sc-for>
+    </svg>
+    <div aria-hidden="true" style="position:absolute;inset:0;pointer-events:none;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11px;line-height:14px;white-space:nowrap">
+      <sc-for list="{{ lay.recs }}" as="r" hint-placeholder-count="0">
+        <div style="position:absolute;left:12px;top:{{ r.textTop }}px;display:flex;gap:10px;align-items:baseline"><span style="font-weight:600;color:#3b4650">{{ r.label }}</span><span style="font-family:'Source Sans 3',system-ui,sans-serif;font-size:10.5px;color:{{ r.subColor }}">{{ r.sub }}</span></div>
+      </sc-for>
+      <sc-for list="{{ lay.gaps }}" as="g" hint-placeholder-count="0">
+        <div style="position:absolute;left:{{ lay.gapX }}px;top:{{ g.textTop }}px;font-family:'Source Sans 3',system-ui,sans-serif;font-size:10.5px;color:#6b7580;background:#fafbfc;padding:0 4px">{{ g.label }}</div>
+      </sc-for>
+      <sc-for list="{{ lay.bars }}" as="b" hint-placeholder-count="2">
+        <div style="position:absolute;left:{{ b.labelX }}px;top:{{ b.textTop }}px;display:flex;flex-direction:column;align-items:flex-start">
+          <div style="font-size:11.5px;font-weight:600;color:{{ b.textColor }};background:#f1f4f7;padding:0 3px">{{ b.text }} <span style="color:#1b6f8f;font-weight:700">{{ b.toggle }}</span></div>
+          <div style="font-size:10px;line-height:12px;color:#6b7580;background:#f1f4f7;padding:0 3px;max-width:{{ b.maxW }}px;overflow:hidden;text-overflow:ellipsis;font-family:'Source Sans 3',system-ui,sans-serif">{{ b.component }}</div>
+        </div>
+      </sc-for>
+      <sc-for list="{{ lay.collapsedRows }}" as="c" hint-placeholder-count="0">
+        <div style="position:absolute;left:{{ c.x }}px;top:{{ c.textTop }}px;font-family:'Source Sans 3',system-ui,sans-serif;font-size:10.5px;font-style:italic;color:#6b7580;background:#f1f4f7;padding:0 3px">{{ c.label }}</div>
+      </sc-for>
+      <sc-for list="{{ lay.arrows }}" as="a" hint-placeholder-count="6">
+        <div style="position:absolute;left:{{ a.labelX }}px;top:{{ a.textTop }}px;font-weight:{{ a.weight }};color:{{ a.textColor }};background:{{ a.halo }};padding:0 3px;border-radius:2px">{{ a.text }}</div>
+      </sc-for>
+      <sc-for list="{{ lay.waits }}" as="w" hint-placeholder-count="0">
+        <div style="position:absolute;left:{{ w.labelX }}px;top:{{ w.textTop }}px;font-family:'Source Sans 3',system-ui,sans-serif;font-size:10px;font-style:italic;color:#4f4a8a;background:#f1f4f7;padding:0 3px">{{ w.label }}</div>
+      </sc-for>
+      <sc-for list="{{ lay.localArrows }}" as="a" hint-placeholder-count="0">
+        <div style="position:absolute;left:{{ a.labelX }}px;top:{{ a.textTop }}px;display:flex;gap:6px;align-items:baseline;background:#f1f4f7;padding:0 3px;border-radius:2px"><span style="font-weight:{{ a.weight }};color:{{ a.textColor }}">{{ a.text }}</span><span style="font-family:'Source Sans 3',system-ui,sans-serif;font-size:10px;color:#6b7580">{{ a.sub }}</span></div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:900,&quot;height&quot;:600},&quot;lay&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;SequenceLayoutView&quot;,&quot;default&quot;:null},&quot;onKeyDown&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(e: KeyboardEvent) =&gt; void&quot;,&quot;default&quot;:null}}"></script>
+</body>
+</html>

@@ -300,4 +300,73 @@ for (const mode of ['http', 'no-http', 'throw', 'cancelled', 'stopped', 'interru
     expected(mode === 'http' ? 1 : 0, 0, { handler_calls: 1, unfinished_handler_calls: mode === 'interrupted' ? 1 : 0, unknown_handler_outcomes: mode === 'stopped' ? 1 : 0 }));
 }
 
+// These acceptance captures use the actual 1.1 vocabulary, not prototype IDs.
+{
+  const name = 'handler-http-outlives-return';
+  const r = recording(name);
+  const sdkStart = r.events.find(e => e.event_type === 'operation.started' && e.data.origin.owner === 'sdk');
+  const handler = actor('integrator', 'CustomerTaskHandler', 'loadTask');
+  const ctx = { ...sdkStart.context, span_id: hex(`${name}/handler`, 16), parent_span_id: sdkStart.context.span_id, parent_scope: 'local' };
+  r.emit('operation.started', 5, { name: 'CustomerTaskHandler.loadTask', origin: handler,
+    invocation: { kind: 'handler', dispatch: 'synchronous', caller: sdk } }, ctx);
+  const request = r.request('streaming-task', 10, { method: 'GET', url: 'https://tasks.example/todos/1', payload: null });
+  request.ctx.parent_span_id = ctx.span_id;
+  r.events.find(e => e.event_type === 'http.request.started').data.origin = { initiator: handler, executor: handler, callsite: null };
+  request.respond(20, 200, null, { deferBody: true });
+  // The handler returns its stream to application code; subsequent body delivery
+  // is still causally linked to the handler, without extending its method span.
+  r.emit('operation.ended', 25, { outcome: 'success', completion: 'returned', duration_ns: '20000000', error: null }, ctx);
+  const resumed = { ...ctx, span_id: hex(`${name}/resume`, 16), parent_span_id: sdkStart.context.span_id };
+  r.emit('operation.started', 26, { name: 'VerificationClient.acceptTask', origin: actor('sdk', 'VerificationClient', 'acceptTask') }, resumed);
+  r.emit('operation.ended', 28, { outcome: 'success', duration_ns: '2000000', error: null }, resumed);
+  r.emit('http.body.captured', 40, { direction: 'response', body: body({ title: 'Read after handler return' }) }, request.ctx);
+  request.finish(45);
+  r.finish(50);
+  r.events.forEach(e => { e.schema_version = '1.1'; });
+  save(name, r, 'Handler returns at 25 ms; SDK resumes immediately while its app-owned HTTP child finishes reading at 45 ms. The method boundary is not stretched to the request end.',
+    expected(1, 0, { handler_calls: 1, unfinished_handler_calls: 0, unknown_handler_outcomes: 0 }));
+}
+{
+  const name = 'handler-repeated-nested';
+  const r = recording(name, { methodOperations: false });
+  const rootCtx = { trace_id: hex(`trace-${name}`, 32), span_id: hex(`${name}/sdk-root`, 16), parent_span_id: null, parent_scope: 'none' };
+  r.emit('operation.started', 2, { name: 'VerificationClient.verify', origin: sdk }, rootCtx);
+  const handler = actor('integrator', 'CustomerTaskHandler', 'loadTask');
+  const tokenStore = actor('sdk', 'DemoAuthTokenStore', 'currentToken');
+  const beginHandler = (label, ms, caller, callee, parent) => {
+    const ctx = { ...parent, span_id: hex(`${name}/${label}`, 16), parent_span_id: parent.span_id, parent_scope: 'local' };
+    r.emit('operation.started', ms, { name: `${callee.component}.${callee.method}`, origin: callee,
+      invocation: { kind: 'handler', dispatch: 'synchronous', caller } }, ctx);
+    return { ctx, returned: (end) => r.emit('operation.ended', end, { outcome: 'success', completion: 'returned', duration_ns: String((end - ms) * 1_000_000), error: null }, ctx) };
+  };
+  const childRequest = (label, ms, url, parent, executor) => {
+    const request = r.request(label, ms, { method: 'GET', url, payload: null });
+    request.ctx.parent_span_id = parent.span_id;
+    request.ctx.parent_scope = 'local';
+    r.events.find(e => e.event_type === 'http.request.started' && e.context.span_id === request.ctx.span_id).data.origin = { initiator: executor, executor, callsite: null };
+    return request;
+  };
+  const first = beginHandler('load-task-1', 5, sdk, handler, rootCtx);
+  const firstTask = childRequest('first-task', 10, 'https://tasks.example/todos/1', first.ctx, handler);
+  firstTask.respond(20, 200, { title: 'First invocation' }); firstTask.finish(22);
+  first.returned(25);
+  const second = beginHandler('load-task-2', 30, sdk, handler, rootCtx);
+  // The second app handler calls back into an SDK component synchronously.
+  const nested = beginHandler('current-token', 40, handler, tokenStore, second.ctx);
+  const token = childRequest('token-metadata', 45, 'https://auth.example/token-metadata', nested.ctx, tokenStore);
+  token.respond(55, 200, { active: true, scope: 'tasks:read' }); token.finish(57);
+  nested.returned(60);
+  const secondTask = childRequest('second-task', 65, 'https://tasks.example/todos/2', second.ctx, handler);
+  secondTask.respond(75, 200, { title: 'Second invocation' }); secondTask.finish(77);
+  second.returned(80);
+  const resumeCtx = { ...rootCtx, span_id: hex(`${name}/resume`, 16), parent_span_id: rootCtx.span_id, parent_scope: 'local' };
+  r.emit('operation.started', 82, { name: 'VerificationClient.acceptTask', origin: actor('sdk', 'VerificationClient', 'acceptTask') }, resumeCtx);
+  r.emit('operation.ended', 84, { outcome: 'success', duration_ns: '2000000', error: null }, resumeCtx);
+  r.emit('operation.ended', 90, { outcome: 'success', duration_ns: '88000000', error: null }, rootCtx);
+  r.finish(90);
+  r.events.forEach(e => { e.schema_version = '1.1'; });
+  save(name, r, 'Two distinct CustomerTaskHandler.loadTask invocations (#1/#2); the second calls DemoAuthTokenStore.currentToken on the SDK at depth 2. App and SDK HTTP ownership follows each request origin.',
+    expected(3, 0, { handler_calls: 3, unfinished_handler_calls: 0, unknown_handler_outcomes: 0 }));
+}
+
 writeFileSync(new URL('../examples/manifest.json', import.meta.url), `${JSON.stringify({ synthetic: true, captures }, null, 2)}\n`);

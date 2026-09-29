@@ -304,6 +304,38 @@
         "unfinished_handler_calls": 1,
         "unknown_handler_outcomes": 0
       }
+    },
+    {
+      "file": "handler-http-outlives-return.ndjson",
+      "description": "Handler returns at 25 ms; SDK resumes immediately while its app-owned HTTP child finishes reading at 45 ms. The method boundary is not stretched to the request end.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0,
+        "handler_calls": 1,
+        "unfinished_handler_calls": 0,
+        "unknown_handler_outcomes": 0
+      }
+    },
+    {
+      "file": "handler-repeated-nested.ndjson",
+      "description": "Two distinct CustomerTaskHandler.loadTask invocations (#1/#2); the second calls DemoAuthTokenStore.currentToken on the SDK at depth 2. App and SDK HTTP ownership follows each request origin.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 3,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0,
+        "handler_calls": 3,
+        "unfinished_handler_calls": 0,
+        "unknown_handler_outcomes": 0
+      }
     }
   ]
 }

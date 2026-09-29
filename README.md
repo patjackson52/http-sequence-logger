@@ -81,3 +81,7 @@ npm test
 The tests check generated-file reproducibility, all reference examples, import recovery, and rejection of contradictory records. Modify the authoring sources and regenerate; do not edit generated files independently.
 
 Version `1.1` adds explicit handler calls and returns to the draft format; version `1.0` remains readable. The Kotlin SDK is a working development prototype, not a published production release. Dependencies and lockfile are scoped to this package, independent of the surrounding application.
+
+## Interactive viewer
+
+Run `npm ci && npm run viewer`, then open http://127.0.0.1:4173. Import NDJSON or open a bundled sample to inspect HTTP exchanges and SDK/app handler calls. See [viewer setup and controls](viewer/README.md), [design provenance](docs/design/README.md), and [verification evidence](docs/VIEWER-REVIEW.md).
