@@ -1,6 +1,6 @@
 # Network Log Lab
 
-A local browser viewer for the SDK's schema 1.0 and 1.1 NDJSON. It follows the [imported Claude design](../docs/design/README.md), including SDK → app handler → SDK control flow.
+A local browser viewer for the SDK's schema 1.0, 1.1 and 1.2 NDJSON. It follows the [imported Claude design](../docs/design/README.md), including SDK → app handler → SDK control flow.
 
 Agents integrating a mobile app should start with the [integration guide](../docs/integration/README.md). Keep this viewer on the desktop; the [transport map](../docs/integration/TRANSPORT.md) distinguishes live collector port 4319 from file-import development/preview port 4173.
 
@@ -36,6 +36,18 @@ Run `npm run build:viewer` and `npm run collector`, then open the printed viewer
 - Search paths, method/component names, caller names or span IDs. Filter by execution owner, outcome, origin, or HTTP/local calls. HTTP-only mode preserves handler ancestry. Collapse individual methods or all methods. Mobile has horizontally pannable Sequence and paginated List views, session/filter sheets and a full-screen details dialog.
 - Arrow keys or j/k select sequence rows; Enter inspects; Escape closes details. Left/right navigate caller and children; brackets collapse/expand a selected method; h toggles HTTP-only. Resize the desktop inspector by dragging its divider or using left/right on the focused divider.
 
+## Share a sequence as SVG
+
+Choose a session, apply any filters, expand component lanes or collapse methods, and select an item to highlight it. Click **Download SVG** beside the Sequence/List controls. The downloaded image includes the session title, client and server lane headings, recording bands, method/handler blocks, arrows, status, timing labels and visible payload snippets.
+
+The export uses the current sequence layout, including the selected recording, filters, collapsed methods, expanded components and selection highlight. It contains the **full diagram**, including rows and lanes outside the scroll viewport. Downloading from List view exports that same sequence. An empty filter result disables the button. Live captures export a snapshot of the events currently loaded; download again for later updates.
+
+Filters, navigation, inspector details, focus/hover effects and expand/collapse buttons are excluded. Hidden child events remain hidden, with their static count retained. This is an image, not an NDJSON export; use **Save capture** in a live collector session to retain the underlying events.
+
+SVG uses native vector shapes and escaped text with system font fallbacks. It has no scripts, HTML overlays, external resources or embedded source logs, so it can be opened independently or embedded as an image in documentation. Exact glyphs and text widths can vary with installed fonts; long labels are ellipsized. It retains the capture's existing redaction and the currently visible snippets. It does not perform additional redaction.
+
+For a GitHub README, commit the SVG and use a relative image link such as `![Sign-in sequence](docs/sign-in-sequence.svg)`. Keep the file beside the documentation when sharing elsewhere.
+
 ## Import behavior and limits
 
 The shared contract validator is compiled into a CSP-safe standalone schema validator at build time. Parsing/validation runs in a browser worker. Each file preserves its own final-line recovery semantics. Overlapping exports deduplicate identical event IDs and preserve source attribution; contradictory duplicates are diagnosed. Malformed/schema-invalid lines are skipped, semantic contradictions are flagged, and partial recordings remain inspectable. Orphan observations remain visible without invented request starts or owners.
@@ -49,6 +61,8 @@ The viewer displays the capture's existing redaction; it does not apply another 
 ```sh
 npm test
 npm run build:viewer
+# Real SVG downloads, offline rendering and desktop/mobile controls; requires Chrome:
+npm run check:svg-export
 # Optional fresh native run; requires Android SDK + emulator:
 JAVA_HOME=/path/to/jdk17 ANDROID_SERIAL=emulator-5554 scripts/run-android-e2e.sh
 ```

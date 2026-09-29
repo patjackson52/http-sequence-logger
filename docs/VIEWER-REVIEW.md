@@ -44,6 +44,16 @@ Five independent UI regression tests render the actual Inspector JSX through Vit
 
 ## Browser verification
 
+### SVG export
+
+`npm run check:svg-export` builds the production viewer and tests actual downloads in an isolated Chrome profile. The 2026-09-29 run used Chrome 154.0.8037.58 and passed 12 downloads: a selected handler with expanded component lanes, the same sequence from List view, collapsed handler, HTTP-only ancestry, multiple servers, narrowed search, a second session, all recordings, one recording, a body timeout, mobile layout and hostile capture text. An empty search disables download. The selected SVG was also opened as a standalone file and embedded as an image with the browser offline; both rendered, with text inside the image bounds. Screenshots were visually compared with the live diagram.
+
+The renderer consumes the live sequence's layout, so export follows session/recording selection, filters, collapse state, component lanes and item highlights. It adds a session title and lane headings and includes offscreen rows. Interactive controls, inspector data and hidden events are omitted. Native shapes/text keep the image self-contained; capture strings are XML-escaped and invalid XML characters replaced. Unit tests also cover every reference session, no fabricated handler return, successful headers followed by body failure, origin filtering and safe Unicode filenames.
+
+`npm test` passes **214 tests** after this feature; the production viewer build passes. A strict console check also found inlined font subsets blocked by the existing CSP; the build now emits local font files instead of data URLs. Downloaded SVGs, standalone/embedded screenshots and the browser report are in ignored `artifacts/svg-export/`. This run checks Chrome; other browsers and document editors were not exercised. System font differences and very large diagrams remain portability/performance limits.
+
+### Original viewer checks
+
 The production bundle was served locally at `http://127.0.0.1:4173` and exercised in the owner's Chrome session on 2026-09-29 UTC. Desktop verification used 1440 × 1000; mobile used 390 × 844.
 
 | Check | Observed result |

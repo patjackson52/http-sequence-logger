@@ -1,6 +1,7 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { filterSessionItems } from './model.mjs';
 import { layoutSequence, OWNER_LABELS, durationLabel } from './layout.mjs';
+import { sequenceSVG, svgFilename } from './export-svg.mjs';
 import './sequence.css';
 
 const COLORS = { neutral: '#5b6673', ok: '#1f7a4d', error: '#b9382c', warning: '#8a5a00', local: '#4f4a8a' };
@@ -20,13 +21,14 @@ function Arrow({ arrow, local, selected, register, onSelect }) {
   </g>;
 }
 
-export default function Sequence({ session, filters = {}, collapsed = EMPTY_SET, expandedOwners = EMPTY_SET, selectedId = null, onSelect, onToggleCollapse, onToggleOwner, onClose, onToggleHttpOnly }) {
+export default function Sequence({ exportRef, session, filters = {}, collapsed = EMPTY_SET, expandedOwners = EMPTY_SET, selectedId = null, onSelect, onToggleCollapse, onToggleOwner, onClose, onToggleHttpOnly }) {
   const refs = useRef(new Map());
   const [mobile, setMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 719px)').matches);
   useEffect(() => { const query = window.matchMedia('(max-width: 719px)'); const change = () => setMobile(query.matches); query.addEventListener('change', change); return () => query.removeEventListener('change', change); }, []);
   const prefix = useId().replace(/:/g, '');
   const projection = useMemo(() => filterSessionItems(session, filters), [session, filters]);
   const layout = useMemo(() => layoutSequence(session, { visibleIds: projection.visibleIds, kind: filters.kind, recordingId: filters.recordingId, collapsed, expandedOwners, laneWidth: mobile ? 136 : 164 }), [session, projection, filters.kind, filters.recordingId, collapsed, expandedOwners, mobile]);
+  useImperativeHandle(exportRef, () => ({ exportSVG: () => ({ svg: sequenceSVG(layout, { name: session.name, selectedId }), filename: svgFilename(session.name) }) }), [layout, session.name, selectedId]);
   const register = (key, element) => { if (element) refs.current.set(key, element); else refs.current.delete(key); };
   const selectAndFocus = (item) => { if (!item) return; onSelect?.(item.id, { open: false }); const element = refs.current.get(item.key); element?.focus({ preventScroll: true }); element?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); };
   const onKeyDown = (event) => {
