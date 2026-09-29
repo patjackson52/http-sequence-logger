@@ -2,6 +2,8 @@
 
 This Swift package implements the [transfer protocol](../docs/transfer/PROTOCOL.md) for already-sanitized schema 1.0/1.1 NDJSON. It includes a runnable iOS application and native URLSession integration tests. It is a transfer sink, not an automatic URLSession interceptor or a complete capture SDK.
 
+For an existing application, use the [agent-oriented iOS integration guide](../docs/integration/IOS.md): local-package installation, capture-producer responsibilities, production exclusion, exact file paths and retrieval. The GitHub repository URL cannot be added as a root remote Swift package; `Package.swift` lives in `ios/`.
+
 Requires Swift 6 and iOS 15+ (macOS 12+ for package tests). Add `ios/` as a local Swift package to your **development app target** and import `NetworkLogTransfer` inside `#if DEBUG`.
 
 ## Keep production free of development logging

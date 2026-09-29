@@ -30,9 +30,9 @@ Identical duplicate IDs (ignoring JSON key order) are accepted without duplicate
 
 ## Collector and viewer
 
-The collector's loopback HTTP listener serves the built viewer. Its separate browser token allows read access, export, and viewing connection configuration; the device token only permits upload. The CLI opens the viewer with the browser token in the URL fragment, which the viewer removes and keeps only in session memory. Requests use Authorization headers. An optional HTTPS LAN listener permits authenticated device ingestion only, never unauthenticated capture browsing. Host and Origin checks protect the loopback HTTP listener; no permissive CORS headers are sent.
+The collector's loopback HTTP listener serves the built viewer. Its separate browser token allows read access, export, and viewing connection configuration; the device token only permits upload. The CLI prints a viewer link with the browser token in the URL fragment, which the viewer removes and keeps only in session memory. Requests use Authorization headers. An optional HTTPS LAN listener permits authenticated device ingestion only, never unauthenticated capture browsing. Host and Origin checks protect the loopback HTTP listener; no permissive CORS headers are sent.
 
-`GET /api/v1/health` identifies a collector, without secrets. Browser-authenticated routes:
+`GET /api/v1/health` identifies a collector on the loopback listener, without secrets; it is unavailable on the upload-only LAN listener. Browser-authenticated loopback routes:
 
 - `GET /api/v1/events?after=<cursor>` returns `{collector_id,cursor,lines:[string],has_more}` in bounded pages. Cursors are collector-global journal positions, not source timestamps.
 - `GET /api/v1/stream` sends SSE `ready`/`changed` notifications with `{collector_id,cursor}` and heartbeat comments. Reconnect and read events after the browser's last cursor. Snapshot/event download closes the subscribe/fetch race.

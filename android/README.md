@@ -2,6 +2,8 @@
 
 This runnable sample integrates the draft 1.1 recorder with native `HttpURLConnection`, a small demo auth SDK, customer-owned networking code, and optional durable transfer to the local web collector. Source is MIT licensed. Android API 26+; no Java source/API examples are maintained.
 
+To integrate a customer's existing application, start with the [agent-oriented source-install and wiring guide](../docs/integration/ANDROID.md). This page primarily runs and explains the repository sample.
+
 ## Modules
 
 - `logger-api`: small Kotlin interfaces, lazy capture descriptors, and `NoOpLogger`, with no recorder or I/O dependencies.

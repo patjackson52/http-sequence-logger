@@ -2,6 +2,8 @@
 
 Use a **local desktop collector** as the common bridge. The SDK writes sanitized NDJSON locally first, then optionally delivers acknowledged batches over HTTP. The collector saves the capture and notifies the browser over server-sent events (SSE). No account, hosted service, or dashboard is required.
 
+For customer-app integration, use the [agent entry point](../integration/README.md) and [connection, storage, retrieval and troubleshooting map](../integration/TRANSPORT.md). Platform code must supply capture observations; pairing alone does not instrument HTTP clients.
+
 | Path | Recommended use | Integration |
 | --- | --- | --- |
 | Android USB / emulator | Default development workflow | `adb reverse` + HTTP sink; collector can configure both automatically |

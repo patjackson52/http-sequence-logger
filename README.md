@@ -4,6 +4,8 @@ Draft **1.1** capture format (reader also accepts **1.0**) for mobile developmen
 
 Repository: [patjackson52/http-sequence-logger](https://github.com/patjackson52/http-sequence-logger) · [MIT license](LICENSE).
 
+**Integrating an existing app with a coding agent?** Start at [AGENTS.md](AGENTS.md) and the [integration guide](docs/integration/README.md), or copy the [agent prompt](docs/integration/AGENT-PROMPT.md). They cover Android/iOS installation, implemented SDK capabilities, JSON specs, device file locations, pairing, the viewer, and production isolation.
+
 ## Stream logs into the viewer
 
 See [device transfer and pairing](docs/transfer/README.md) for Android ADB, iOS Simulator, paired Wi-Fi HTTPS, and offline file import. The collector persists NDJSON and streams updates to the viewer without a hosted backend.
@@ -42,7 +44,7 @@ See [Android setup and integration](android/README.md). The MIT-licensed sample 
 
 ## Validate locally
 
-Use Node.js 22 or later from this directory:
+Use Node.js 22.12 or later from this directory:
 
 ```sh
 npm ci

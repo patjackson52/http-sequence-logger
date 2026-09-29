@@ -1,0 +1,2 @@
+-keep,allowshrinking class dev.networklog.logger.** { *; }
+-checkdiscard class dev.networklog.logger.**

@@ -2,6 +2,8 @@
 
 A local browser viewer for the SDK's schema 1.0 and 1.1 NDJSON. It follows the [imported Claude design](../docs/design/README.md), including SDK → app handler → SDK control flow.
 
+Agents integrating a mobile app should start with the [integration guide](../docs/integration/README.md). Keep this viewer on the desktop; the [transport map](../docs/integration/TRANSPORT.md) distinguishes live collector port 4319 from file-import development/preview port 4173.
+
 From the repository root, with Node 22.12+:
 
 ```sh

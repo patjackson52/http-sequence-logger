@@ -157,4 +157,4 @@ For async `data(for:)`, begin before awaiting, record the returned pair on succe
 - [manual-observation-stopped.ndjson](examples/manual-observation-stopped.ndjson) retains a known HTTP status without claiming completion.
 - [stream-read-timeout.ndjson](examples/stream-read-timeout.ndjson) retains a late read failure after the calling method returns at headers.
 
-The schema and fixtures establish representability. The Kotlin implementation is tested on an Android emulator, including a real manually recorded customer request; see [E2E.md](E2E.md). iOS implementation, broader native coverage, and release qualification remain future work.
+The schema and fixtures establish representability. The Kotlin implementation is tested on an Android emulator, including a real manually recorded customer request; see [E2E.md](E2E.md). The [Swift transfer package and limited manual demo](ios/README.md) are implemented and simulator-tested; a general Swift capture SDK and the proposed Swift capture APIs above remain future work. For existing-app installation and customer-specific acceptance checks, use the [integration guide](docs/integration/README.md).
