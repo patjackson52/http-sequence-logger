@@ -29,7 +29,7 @@ class TransferFlowTest {
         FileHttpEventSink(file, connection).use { sink ->
             val logger = NetworkLog(sink, context.packageName)
             if (InstrumentationRegistry.getArguments().getString("transferLiveFlow") == "true") {
-                assertEquals("Emily", SampleFlow.run(logger, "android-transfer-live", recovery = true).name)
+                assertEquals("Emily", SampleFlow.run(RecordingLogger(logger), "android-transfer-live", recovery = true).name)
             } else {
                 val session = logger.startSession("Android transfer instrumentation", "android-transfer-probe")
                 session.invokeHandler("Probe.handler", Actor("sdk", "TransferProbe"), Actor("integrator", "ProbeHandler")) { }

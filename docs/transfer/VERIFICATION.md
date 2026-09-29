@@ -23,7 +23,7 @@ Raw local evidence is under ignored `artifacts/transfer/android-*.txt`; [Android
 
 ## iOS
 
-The Swift package passes **14 macOS unit tests and 20 app-hosted iOS XCTest tests** on the iPhone 16e Simulator (iOS 26.3.1). The native demo records a real URLSession health request manually, preserving request/response timing and body state, then transfers its seven event lines. Integration coverage includes HTTP, paired HTTPS, mismatched pin retention, refusal to follow a 307 redirect, a chunked ACK exceeding the 512 KiB limit, and automatic recovery from an actual refused connection when a forwarding listener becomes available. Reopening the acknowledged spool has zero pending bytes. This is native simulator execution, not a desktop replay presented as an iOS capture.
+The Swift package passes **14 macOS unit tests and 20 app-hosted iOS XCTest tests** on the iPhone 16e Simulator (iOS 26.3.1). The native demo records a real URLSession health request manually, preserving request/response timing and body state, then transfers its seven event lines. Integration coverage includes HTTP, paired HTTPS, mismatched pin retention, refusal to follow a 307 redirect, a chunked ACK exceeding the 2 MiB limit, and automatic recovery from an actual refused connection when a forwarding listener becomes available. Reopening the acknowledged spool has zero pending bytes. This is native simulator execution, not a desktop replay presented as an iOS capture.
 
 [Swift guide](../../ios/README.md) gives reproducible test commands and precise API/platform scope. The iOS package transfers sanitized events; automatic URLSession interception and a complete Swift capture recorder remain outside this implementation.
 

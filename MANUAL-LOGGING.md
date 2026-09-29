@@ -2,6 +2,8 @@
 
 Customers must be able to add logging to existing networking code without replacing the client, installing a tracing framework, or implementing a native interceptor. This is a normative requirement. A runnable Kotlin prototype now implements the core API: see [Android integration and current boundaries](android/README.md) and [the customer-owned sample request](android/app/src/main/kotlin/dev/networklog/app/SampleFlow.kt). The broader API sketches below include planned capabilities; Swift remains a design only.
 
+For Kotlin call sites shared with production, depend on `logger-api`, supply lazy header/body lambdas, and inject `RecordingLogger` only in debug or `NoOpLogger` in release. See the [runnable integration pattern and binary checks](android/RELEASE.md). The direct recorder and API sketches below do not replace that build boundary. The implemented Swift transfer sink/manual demo is described in [iOS setup](ios/README.md); the general Swift capture SDK remains a design.
+
 ## Minimum integration
 
 The normal integration is two calls around the existing request:

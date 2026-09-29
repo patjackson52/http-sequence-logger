@@ -189,7 +189,7 @@ class FileHttpEventSink private constructor(
         return Batch(output.toByteArray(), ids, offset, end, identity, hashPrefix(end))
     }
     private fun validAck(bytes: ByteArray, ids: List<String>): Boolean = try {
-        require(bytes.size <= 512 * 1024)
+        require(bytes.size <= MAX_ACK_BYTES)
         val ack = JSONObject(bytes.toString(Charsets.UTF_8))
         require(ack.get("version") == 1 && ack.getString("collector_id") == pairing.collectorId)
         require(ack.getInt("accepted") >= 0 && ack.getInt("duplicates") >= 0)

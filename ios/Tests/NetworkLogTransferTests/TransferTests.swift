@@ -7,6 +7,7 @@ private actor FakeTransport: BatchTransport {
     enum Response: Sendable { case ack, status(Int), wrongCollector, partial, offline }
     var responses: [Response]
     var batches: [Data] = []
+    var acknowledgementSizes: [Int] = []
     let collectorID: String
     init(_ responses: [Response] = [.ack], collectorID: String = "collector-test") {
         self.responses = responses
@@ -24,13 +25,16 @@ private actor FakeTransport: BatchTransport {
         if case .partial = response { ackIDs = [] }
         var collector = collectorID
         if case .wrongCollector = response { collector = "other-collector" }
-        return UploadResponse(status: 200, body: try JSONSerialization.data(withJSONObject: [
+        let acknowledgement = try JSONSerialization.data(withJSONObject: [
             "version": 1, "collector_id": collector, "acknowledged_event_ids": ackIDs
-        ]))
+        ])
+        acknowledgementSizes.append(acknowledgement.count)
+        return UploadResponse(status: 200, body: acknowledgement)
     }
     nonisolated func close() {}
     func count() -> Int { batches.count }
     func delivered() -> [Data] { batches }
+    func acknowledgementByteCounts() -> [Int] { acknowledgementSizes }
 }
 
 final class TransferTests: XCTestCase, @unchecked Sendable {
@@ -77,6 +81,33 @@ final class TransferTests: XCTestCase, @unchecked Sendable {
         let count = await transport.count()
         XCTAssertEqual(status.pendingBytes, 0)
         XCTAssertEqual(count, 0)
+        await reopened.close()
+    }
+
+    func testValidUnicodeIDsAcceptACKLargerThan512KiBAndPersistCursor() async throws {
+        let dir = directory(); defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let lines = (0..<300).map { line("\($0)-" + String(repeating: "😀", count: 450)) }
+        let data = Data((lines.joined(separator: "\n") + "\n").utf8)
+        XCTAssertLessThan(data.count, 1024 * 1024)
+        let source = dir.appendingPathComponent("source.ndjson")
+        try data.write(to: source)
+        let transport = FakeTransport()
+        let transfer = try sink(dir.appendingPathComponent("spool"), transport: transport)
+        // File relay queues the entire batch without yielding to the automatic-flush timer.
+        let relayed = try await transfer.relaySanitizedFile(source)
+        XCTAssertEqual(relayed, 300)
+        let result = await transfer.flush()
+        let sizes = await transport.acknowledgementByteCounts()
+        XCTAssertEqual(sizes.count, 1)
+        XCTAssertGreaterThan(try XCTUnwrap(sizes.first), 512 * 1024)
+        XCTAssertLessThan(try XCTUnwrap(sizes.first), TransferProtocolLimits.maximumAcknowledgementBytes)
+        XCTAssertEqual(result.state, .idle)
+        XCTAssertEqual(result.pendingBytes, 0)
+        await transfer.close()
+        let reopened = try sink(dir.appendingPathComponent("spool"), transport: FakeTransport())
+        let restored = await reopened.status()
+        XCTAssertEqual(restored.pendingBytes, 0)
         await reopened.close()
     }
 

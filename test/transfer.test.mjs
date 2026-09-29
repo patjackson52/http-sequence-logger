@@ -7,6 +7,7 @@ import {
   appendFileSync,
   rmSync,
   writeFileSync,
+  unlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -292,4 +293,37 @@ test("HTTPS listener offers paired ingestion only and refuses browser capture re
   assert.equal(await request("/api/v1/pairing"), 404);
   assert.equal(await request("/"), 404);
   assert.match(c.connections[1].certificate_sha256, /^[a-f0-9]{64}$/);
+});
+
+test("failed download does not terminate the collector", async (t) => {
+  const c = await startCollector({ directory: temp(t), port: 0 });
+  t.after(() => c.close());
+  c.ingest(fixture[0] + "\n");
+  unlinkSync(c.store.path);
+  await assert.rejects(async () => {
+    const response = await fetch(c.origin + "/api/v1/download", {
+      headers: { Authorization: `Bearer ${c.browserToken}` },
+    });
+    await response.arrayBuffer();
+  });
+  assert.equal((await fetch(c.origin + "/api/v1/health")).status, 200);
+  assert.throws(() => c.ingest(fixture[1] + "\n"), (error) => error.status === 503);
+});
+test("valid maximum-length ID batch fits the native 2 MiB acknowledgment limit", (t) => {
+  const s = store(t), ended = JSON.parse(fixture.at(-1));
+  for (const character of ["a", "漢"]) {
+    const records = Array.from({ length: 500 }, (_, i) => ({
+      ...ended,
+      sequence: 1,
+      event_id: `${character}-event-${i}`.padEnd(512, character),
+      recording_id: `${character}-record-${i}`.padEnd(512, "r"),
+    }));
+    // Unicode IDs use fewer events when needed to stay within the 1 MiB request bound.
+    while (Buffer.byteLength(records.map(line).join("")) > 1024 * 1024) records.pop();
+    const ack = s.ingest(records.map(line).join("")),
+      size = Buffer.byteLength(JSON.stringify(ack));
+    assert.ok(size > 512 * 1024);
+    assert.ok(size <= 2 * 1024 * 1024);
+    assert.equal(ack.accepted, records.length);
+  }
 });

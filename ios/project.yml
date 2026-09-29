@@ -12,6 +12,18 @@ settings:
     CODE_SIGNING_ALLOWED: NO
     TARGETED_DEVICE_FAMILY: '1,2'
 targets:
+  NetworkLogProductionApp:
+    type: application
+    platform: iOS
+    sources: [Production]
+    info:
+      path: .local/ProductionInfo.plist
+      properties:
+        CFBundleDisplayName: Sample application
+        UILaunchScreen: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.networklog.production
   NetworkLogTransferDemo:
     type: application
     platform: iOS
@@ -39,6 +51,7 @@ targets:
       - path: Tests/NetworkLogTransferTests/Fixtures
         buildPhase: resources
       - path: .local/IntegrationConfig.json
+        optional: true
         buildPhase: resources
     dependencies:
       - target: NetworkLogTransferDemo
@@ -48,10 +61,23 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.example.networklog.tests
 schemes:
+  NetworkLogProductionApp:
+    build:
+      targets:
+        NetworkLogProductionApp: all
+    run:
+      config: Release
+    profile:
+      config: Release
+    archive:
+      config: Release
   NetworkLogTransferDemo:
     build:
       targets:
-        NetworkLogTransferDemo: all
+        NetworkLogTransferDemo: [run, test, analyze]
+    run:
+      config: Debug
     test:
+      config: Debug
       targets: [NetworkLogTransferTests]
       gatherCoverageData: false

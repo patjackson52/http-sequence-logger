@@ -4,9 +4,12 @@ This runnable sample integrates the draft 1.1 recorder with native `HttpURLConne
 
 ## Modules
 
-- `logger`: stack-independent session/request/operation handles, JSON capture policy, NDJSON file sink, durable file/HTTP transfer sink, and optional `LoggingHttpClient` built on native HttpURLConnection.
-- `demo-auth`: `DemoAuthSdk`, which calls two independent origins and labels its own methods as SDK code.
-- `app`: Android UI, an app-owned manually instrumented connection to a third origin, and a device test that executes the same flow as the UI.
+- `logger-api`: small Kotlin interfaces, lazy capture descriptors, and `NoOpLogger`, with no recorder or I/O dependencies.
+- `logger`: debug-only recorder, JSON capture policy, NDJSON file sink, durable file/HTTP transfer sink, and optional `LoggingHttpClient` built on native HttpURLConnection. `RecordingLogger` adapts it to the shared API.
+- `demo-auth`: `DemoAuthSdk` and its own HTTP client, which call two independent origins and depend only on `logger-api`.
+- `app`: debug logging UI and a separate production UI around the same business flow, an app-owned manually instrumented connection to a third origin, and native tests.
+
+Use [debug-only integration and release verification](RELEASE.md) for production setup, lazy manual recording, R8/ProGuard rules, and binary audits. The sample's Release build includes only the API/no-op; recorder code and logging resources are excluded even without shrinking. Both builds apply explicit backup/device-transfer exclusions to app storage.
 
 ## Build and run
 
@@ -38,7 +41,7 @@ adb -s "$ANDROID_SERIAL" reverse tcp:4319 tcp:4319
 
 Use the collector's `http://127.0.0.1:4319` connection JSON with that route. Cleartext transfer is accepted only for loopback destinations; the sample has a debug-only network security configuration for localhost/127.0.0.1/::1. Release resources do not include that exception. LAN pairing uses HTTPS. When the JSON includes `certificate_sha256`, the sender requires the exact DER leaf-certificate SHA-256 fingerprint, current certificate validity, and the platform's hostname verification. No global trust or hostname checks are changed. Redirects are never followed, and the sender uses native HttpURLConnection directly so it cannot recursively record its own uploads.
 
-Applications can choose the transfer sink directly on a worker thread:
+Development source sets can choose the transfer sink directly on a worker thread:
 
 ```kotlin
 val connection = TransferConnection.parse(pastedConnectionJson)
@@ -105,6 +108,8 @@ The sample constructs `DemoAuthSdk` with a `TaskHandler`. Inside `authenticate`,
 See [handler API, format, and GUI mapping](../HANDLER-TRACING.md). The sample now has two additional local progress steps; its HTTP request counts remain 8 and 9.
 
 ## Add logging to a customer's existing client
+
+For code shared with production, use the [small API and lazy metadata suppliers](RELEASE.md#manual-recording-in-shared-code). The direct-recorder example below belongs in debug sources.
 
 ```kotlin
 val sink = NdjsonFileSink(file) // New file; keep open to record multiple sessions.

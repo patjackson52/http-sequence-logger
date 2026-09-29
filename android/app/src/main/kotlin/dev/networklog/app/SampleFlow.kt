@@ -1,7 +1,7 @@
 package dev.networklog.app
 
 import dev.networklog.demoauth.DemoAuthSdk
-import dev.networklog.logger.*
+import dev.networklog.api.*
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -11,7 +11,7 @@ import java.net.URL
 /** Runs entirely on the caller's worker thread. Same flow is exercised by the UI and device test. */
 object SampleFlow {
     data class Result(val name: String, val task: String, val sessionId: String)
-    fun run(logger: NetworkLog, sessionId: String? = null, recovery: Boolean = false, progress: (String) -> Unit = {}): Result {
+    fun run(logger: Logger, sessionId: String? = null, recovery: Boolean = false, progress: (String) -> Unit = {}): Result {
         val session = logger.startSession(if (recovery) "Sign in with 401 recovery" else "Successful sign in", sessionId)
         val operation = session.startOperation("SampleApp.signIn", Actor("integrator", "SampleApp", "signIn"))
         try {
@@ -35,18 +35,22 @@ object SampleFlow {
         val url = "https://jsonplaceholder.typicode.com/todos/1"
         val exchange = session.startRequest("GET", url, parent,
             Actor("integrator", "CustomerTaskHandler", "loadTask"),
-            executor = Actor("integrator", "CustomerTaskClient", "loadTask"), headers = HeaderCapture.partial(emptyList(), "application_configured_only"))
+            executor = Actor("integrator", "CustomerTaskClient", "loadTask"), headers = { HeaderCapture.partial(emptyList(), "application_configured_only") })
         var connection: HttpURLConnection? = null
         var stage = "unknown"
         try {
-            exchange.captureRequestBody(BodyCapture.none())
-            connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            exchange.captureRequestBody { BodyCapture.none() }
+            val activeConnection = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 15_000; readTimeout = 15_000; instanceFollowRedirects = false
             }
-            val status = connection.responseCode
+            connection = activeConnection
+            val status = activeConnection.responseCode
             stage = "read"
-            exchange.receiveResponseHeaders(status, HeaderCapture.fromConnection(connection), connection.url.toString())
-            val stream = if (status >= 400) connection.errorStream else connection.inputStream
+            exchange.receiveResponseHeaders(status, {
+                HeaderCapture.library(activeConnection.headerFields.entries.filter { it.key != null }
+                    .flatMap { entry -> entry.value.orEmpty().map { entry.key!! to it } })
+            }, activeConnection.url.toString())
+            val stream = if (status >= 400) activeConnection.errorStream else activeConnection.inputStream
             val bytes = stream?.use { input ->
                 val out = java.io.ByteArrayOutputStream()
                 val buffer = ByteArray(4096)
@@ -57,8 +61,10 @@ object SampleFlow {
                 }
                 out.toByteArray()
             }
-            exchange.completeResponse(body = bytes?.let { BodyCapture.bytes(it, connection.contentType ?: "application/json") }
-                ?: BodyCapture.unavailable("native_stream_unavailable"))
+            exchange.completeResponse(body = {
+                bytes?.let { BodyCapture.bytes(it, activeConnection.contentType ?: "application/json") }
+                    ?: BodyCapture.unavailable("native_stream_unavailable")
+            })
             check(status == 200) { "Task endpoint HTTP $status" }
             return JSONObject(requireNotNull(bytes).toString(Charsets.UTF_8)).getString("title")
         } catch (error: SocketTimeoutException) { exchange.timeout(error, stage); throw error }

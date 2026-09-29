@@ -1,6 +1,6 @@
 package dev.networklog.demoauth
 
-import dev.networklog.logger.*
+import dev.networklog.api.*
 import org.json.JSONObject
 
 /** Demonstration authentication, NOT OAuth, identity proofing, or a production security decision. */
@@ -10,7 +10,7 @@ class DemoAuthSdk(private val session: Session, private val taskHandler: TaskHan
     fun authenticate(parent: CaptureContext, recoverFrom401: Boolean = false): Identity {
         val actor = Actor("sdk", "DemoAuthSdk", "authenticate")
         val op = session.startOperation("DemoAuthSdk.authenticate", actor, parent)
-        val http = LoggingHttpClient(session, Actor("integrator", "SampleApp", "signIn"), actor, op.context)
+        val http = DemoHttpClient(session, Actor("integrator", "SampleApp", "signIn"), actor, op.context)
         val json = listOf("Content-Type" to "application/json; charset=utf-8")
         fun post(url: String, body: JSONObject) = http.execute("POST", url, json, body.toString().toByteArray()).requireSuccess()
         try {
@@ -55,7 +55,7 @@ class DemoAuthSdk(private val session: Session, private val taskHandler: TaskHan
         val op = session.startOperation("DemoAuthSdk.completeDemo", actor, parent)
         try {
             progress("Echo completion receipt · httpbin")
-            val response = LoggingHttpClient(session, Actor("integrator", "SampleApp", "signIn"), actor, op.context).execute(
+            val response = DemoHttpClient(session, Actor("integrator", "SampleApp", "signIn"), actor, op.context).execute(
                 "POST", "https://httpbin.org/anything/receipt", listOf("Content-Type" to "application/json"),
                 JSONObject().put("challengeId", identity.challengeId).put("completed", true).put("demo", true).toString().toByteArray()
             ).requireSuccess()

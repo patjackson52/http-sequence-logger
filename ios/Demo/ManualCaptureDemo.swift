@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import NetworkLogTransfer
 import Darwin
@@ -134,3 +135,4 @@ import UIKit
         }
     }
 }
+#endif

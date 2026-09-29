@@ -10,7 +10,7 @@ android {
 }
 kotlin { jvmToolchain(17) }
 dependencies {
-    implementation(project(":logger"))
+    api(project(":logger-api"))
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
 }

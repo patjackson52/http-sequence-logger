@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 /// A development collector pairing. Its secret is deliberately omitted from descriptions.
@@ -72,3 +73,4 @@ public struct TransferStatus: Sendable, Equatable {
     public let diagnostic: String?
     public let lastHTTPStatus: Int?
 }
+#endif

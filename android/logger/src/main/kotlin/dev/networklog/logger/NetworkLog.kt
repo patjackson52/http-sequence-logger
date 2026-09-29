@@ -30,6 +30,7 @@ class AndroidCaptureClock : CaptureClock {
     companion object { private val FORMAT = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC) }
 }
 
+@ConsistentCopyVisibility
 data class CaptureContext internal constructor(
     internal val recordingId: String, val traceId: String, val spanId: String, val parentSpanId: String?
 ) {

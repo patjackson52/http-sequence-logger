@@ -44,3 +44,5 @@ A browser disconnect is transport state, not a synthetic HTTP failure or method 
 ## ADB file retrieval
 
 The CLI's optional Android watcher reads NDJSON from the debuggable app's `files/captures/` using `run-as`, tracks file changes, and buffers incomplete UTF-8/NDJSON tails. File replacement or rotation resets the file offset, while collector event-ID deduplication prevents duplicate records. Only validated package/filename arguments reach adb; commands do not parse Logcat. This works with the existing file-only SDK and with the transfer sink, and gives a no-app-change migration path. Device disconnects are retried and are shown as retrieval diagnostics.
+
+ACK bodies are bounded at **2 MiB** by both native senders, including chunked responses. A valid 1 MiB upload with many long or multibyte IDs can exceed 512 KiB in its ACK; do not use a smaller receiver limit. Oversized ACKs retain pending data and are rejected.

@@ -10,7 +10,11 @@ android {
 }
 kotlin { jvmToolchain(17) }
 dependencies {
+    api(project(":logger-api"))
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
 }
+
+// A development-only artifact: accidental release dependencies fail variant resolution.
+androidComponents { beforeVariants(selector().withBuildType("release")) { it.enable = false } }

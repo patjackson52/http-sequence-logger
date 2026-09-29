@@ -35,6 +35,8 @@ See [Android setup and integration](android/README.md). The MIT-licensed sample 
 - [Adapter contract](ADAPTERS.md): native wrappers and the client-independent recording API.
 - [Customer manual logging](MANUAL-LOGGING.md): required public API, defaults, and Kotlin/Swift integration sketches.
 - [Correctness review](REVIEW.md): network, Android, and iOS findings, fixes, and remaining native verification.
+- [Production isolation review](docs/RELEASE-REVIEW.md): multi-agent findings and native/build verification.
+- [Debug-only Kotlin integration](android/RELEASE.md): small production API, manual logging, R8/ProGuard rules, and binary audits.
 - [Example manifest](examples/manifest.json): scenarios, descriptions, and expected summaries.
 - [Multi-session capture](examples/multi-session.ndjson): 14 requests, six origins, two sessions, three recording periods.
 

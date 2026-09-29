@@ -50,7 +50,7 @@ private object Runs {
                 DebugTransfer.open(context, capture, ::transferDiagnostic).use { sink ->
                     val logger = NetworkLog(sink, appId)
                     try {
-                        val response = SampleFlow.run(logger, sessionId, recovery) { step -> main.post { steps = steps + step; notifyUi() } }
+                        val response = SampleFlow.run(RecordingLogger(logger), sessionId, recovery) { step -> main.post { steps = steps + step; notifyUi() } }
                         main.post { title = "Sign in complete"; result = "Hello, ${response.name}.\nTask: ${response.task}\nSession: ${response.sessionId}" }
                     } finally { sink.awaitUploaded(2_000) }
                 }

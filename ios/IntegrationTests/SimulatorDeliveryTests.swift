@@ -76,7 +76,47 @@ final class SimulatorDeliveryTests: XCTestCase, @unchecked Sendable {
         try evidence(result, test: "redirect-blocked")
     }
 
-    @MainActor func testChunkedOversizedACKIsBoundedAndRetainsCapture() async throws {
+    @MainActor func testRealCollectorAcceptsACKLargerThan512KiB() async throws {
+        let config = try configuration()
+        let connection = try pairing(config, name: "loopback")
+        let location = directory("large-ack")
+        try FileManager.default.createDirectory(at: location, withIntermediateDirectories: true)
+        let recordingPrefix = "ios-ack-\(UUID().uuidString.lowercased())"
+        let ids = (0..<300).map { "\(recordingPrefix)-\($0)-" + String(repeating: "😀", count: 450) }
+        let clock = ISO8601DateFormatter()
+        clock.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let timestamp = clock.string(from: Date())
+        var bytes = Data()
+        for (index, id) in ids.enumerated() {
+            // Complete schema-valid records; missing earlier lifecycle observations are permitted.
+            let event: [String: Any] = [
+                "schema_version": "1.0", "event_type": "session.ended", "event_id": id,
+                "session_namespace": "com.example.networklog/development", "session_id": recordingPrefix,
+                "recording_id": "\(recordingPrefix)-\(index)", "sequence": 1,
+                "timestamp": timestamp, "monotonic_ns": "0",
+                "data": ["reason": "completed", "dropped_events": 0]
+            ]
+            bytes.append(try JSONSerialization.data(withJSONObject: event))
+            bytes.append(10)
+        }
+        XCTAssertLessThan(bytes.count, 1024 * 1024)
+        // These required fields alone exceed the former limit; the collector adds recording metadata.
+        let minimumACK = try JSONSerialization.data(withJSONObject: [
+            "version": 1, "collector_id": connection.collectorID, "acknowledged_event_ids": ids
+        ])
+        XCTAssertGreaterThan(minimumACK.count, 512 * 1024)
+        let source = location.appendingPathComponent("large-ack.ndjson")
+        try bytes.write(to: source)
+        let sink = try NDJSONTransferSink(connection: connection, spoolDirectory: location.appendingPathComponent("spool"))
+        let count = try await sink.relaySanitizedFile(source)
+        XCTAssertEqual(count, ids.count)
+        let delivered = await sink.flush()
+        XCTAssertEqual(delivered.state, .idle, "\(delivered.diagnostic ?? "none"); HTTP \(delivered.lastHTTPStatus ?? 0)")
+        XCTAssertEqual(delivered.pendingBytes, 0)
+        await sink.close()
+    }
+
+    @MainActor func testChunkedACKOver2MiBIsBoundedAndRetainsCapture() async throws {
         let config = try configuration()
         var changed = config["loopback"] as! [String: Any]
         changed["endpoint"] = config["ack_limit_endpoint"]

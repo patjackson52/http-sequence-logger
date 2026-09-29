@@ -12,6 +12,8 @@ import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
 import javax.net.ssl.X509TrustManager
 
+internal const val MAX_ACK_BYTES = 2 * 1024 * 1024
+
 internal data class UploadResponse(val status: Int, val body: ByteArray)
 internal interface EventTransport {
     fun upload(body: ByteArray): UploadResponse
@@ -52,7 +54,7 @@ internal class HttpEventTransport(private val pairing: TransferConnection) : Eve
                 while (true) {
                     val count = input.read(buffer)
                     if (count == -1) break
-                    if (result.size() + count > 512 * 1024) throw IOException("Collector acknowledgment exceeds limit")
+                    if (result.size() + count > MAX_ACK_BYTES) throw IOException("Collector acknowledgment exceeds limit")
                     result.write(buffer, 0, count)
                 }
             }

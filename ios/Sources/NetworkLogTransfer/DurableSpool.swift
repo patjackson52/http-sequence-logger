@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import Darwin
 
@@ -147,3 +148,4 @@ private func atomicWrite(_ bytes: Data, to url: URL) throws {
     let directory = Darwin.open(url.deletingLastPathComponent().path, O_RDONLY)
     if directory >= 0 { _ = fsync(directory); Darwin.close(directory) }
 }
+#endif

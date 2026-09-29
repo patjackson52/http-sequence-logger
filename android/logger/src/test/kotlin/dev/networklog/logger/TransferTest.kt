@@ -26,6 +26,30 @@ class TransferTest {
     }
     private fun sender(block: (ByteArray) -> UploadResponse) = object : EventTransport { override fun upload(body: ByteArray) = block(body) }
 
+    @Test fun acceptsLargeValidAckBeyondOldLimitAndRejectsOversizedAck() {
+        val spool = file()
+        val ids = (0 until 500).map { "event-$it-".padEnd(512, 'e') }
+        spool.writeText(ids.joinToString("\n", postfix = "\n") { line(it) })
+        FileHttpEventSink.testing(spool, connection(), sender { bytes ->
+            val result = JSONObject(ack(bytes).body.toString(Charsets.UTF_8))
+            result.put("recordings", JSONArray(ids.map { id -> JSONObject().put("recording_id", id).put("highest_contiguous_sequence", 1) }))
+            val response = result.toString().toByteArray()
+            assertTrue(response.size > 512 * 1024)
+            assertTrue(response.size < MAX_ACK_BYTES)
+            UploadResponse(200, response)
+        }, limits).use { assertTrue(it.awaitUploaded(3_000)); assertEquals(0, it.pendingBytes()) }
+        val oversized = file()
+        val firstAttempt = CountDownLatch(1)
+        FileHttpEventSink.testing(oversized, connection(), sender { bytes ->
+            firstAttempt.countDown()
+            val value = JSONObject(ack(bytes).body.toString(Charsets.UTF_8)).put("padding", "x".repeat(MAX_ACK_BYTES))
+            UploadResponse(200, value.toString().toByteArray())
+        }, limits).use {
+            it.append(line("retained")); assertTrue(firstAttempt.await(2, TimeUnit.SECONDS))
+            assertFalse(it.awaitUploaded(100)); assertTrue(it.pendingBytes() > 0)
+        }
+    }
+
     @Test fun rejectsNonLoopbackHttpAndSecretsInEndpoint() {
         for (endpoint in listOf("http://192.168.1.2:4319", "http://example.com", "https://user:pass@example.com", "https://example.com/?token=secret", "https://example.com/events", "file:///tmp/spool")) {
             try { connection(endpoint = endpoint); fail("configuration should fail") } catch (error: IllegalArgumentException) { assertFalse(error.message!!.contains(endpoint)) }

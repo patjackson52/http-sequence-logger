@@ -19,6 +19,7 @@ data class Actor(val owner: String = "integrator", val component: String = "Cust
     internal fun json() = obj("owner" to owner, "component" to component, "method" to method)
 }
 
+@ConsistentCopyVisibility
 data class HeaderCapture private constructor(
     val entries: List<Pair<String, String>>, val availability: String, val reason: String?
 ) {

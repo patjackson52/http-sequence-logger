@@ -17,8 +17,8 @@ class LiveFlowTest {
         val file = File(context.filesDir, "captures/live-e2e.ndjson")
         NdjsonFileSink(file).use { sink ->
             val logger = NetworkLog(sink, context.packageName)
-            assertEquals("Emily", SampleFlow.run(logger).name)
-            assertEquals("Emily", SampleFlow.run(logger, "demo-reused-session", recovery = true).name)
+            assertEquals("Emily", SampleFlow.run(RecordingLogger(logger)).name)
+            assertEquals("Emily", SampleFlow.run(RecordingLogger(logger), "demo-reused-session", recovery = true).name)
         }
         val lines = file.readLines()
         val events = lines.map(::JSONObject)

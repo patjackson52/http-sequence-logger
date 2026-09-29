@@ -9,6 +9,8 @@ import {
   existsSync,
   truncateSync,
   unlinkSync,
+  statSync,
+  fstatSync,
 } from "node:fs";
 import { resolve } from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -123,6 +125,7 @@ export class CaptureStore {
       if (this.cursor > this.limits.journalEvents)
         throw new Error("Existing journal exceeds event limit");
       this.fd = openSync(this.path, "a");
+      this.diskSize = fstatSync(this.fd).size;
       if (this.recoveredPartial) fsyncSync(this.fd);
     } catch (error) {
       unlinkSync(this.lockPath);
@@ -179,6 +182,23 @@ export class CaptureStore {
         503,
         "Journal write failed; restart the collector after checking storage",
       );
+    // Do not acknowledge writes to an unlinked/replaced journal descriptor.
+    try {
+      const path = statSync(this.path),
+        descriptor = fstatSync(this.fd);
+      if (
+        path.dev !== descriptor.dev ||
+        path.ino !== descriptor.ino ||
+        descriptor.size !== this.diskSize
+      )
+        throw new Error("Journal changed outside collector");
+    } catch {
+      this.poisoned = true;
+      throw new TransferError(
+        503,
+        "Capture journal changed; stop the collector and inspect storage",
+      );
+    }
     if (Buffer.byteLength(text) > this.limits.batchBytes)
       throw new TransferError(413, "Batch exceeds byte limit");
     if (!text.endsWith("\n"))
@@ -233,6 +253,7 @@ export class CaptureStore {
       try {
         appendFileSync(this.fd, pending.map((x) => x.line + "\n").join(""));
         fsyncSync(this.fd);
+        this.diskSize += newBytes;
       } catch {
         this.poisoned = true;
         throw new TransferError(503, "Capture could not be persisted");

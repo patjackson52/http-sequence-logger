@@ -1,4 +1,5 @@
 import http from "node:http";
+import { pipeline } from "node:stream/promises";
 import https from "node:https";
 import { timingSafeEqual, createHash, X509Certificate } from "node:crypto";
 import { readFile, realpath } from "node:fs/promises";
@@ -137,7 +138,7 @@ export async function startCollector({
             "Content-Type": "application/x-ndjson",
             "Content-Disposition": 'attachment; filename="capture.ndjson"',
           });
-          createReadStream(store.path).pipe(res);
+          await pipeline(createReadStream(store.path), res);
           return;
         }
         if (route === "/api/v1/stream") {
@@ -195,6 +196,7 @@ export async function startCollector({
       );
       res.end(req.method === "HEAD" ? undefined : content);
     } catch (error) {
+      if (res.destroyed) return;
       if (res.headersSent) res.destroy();
       else
         reply(res, error.status || 500, {

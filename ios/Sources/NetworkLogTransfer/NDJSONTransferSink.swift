@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 /// Development-only transfer for already-sanitized schema 1.0/1.1 records.
@@ -142,7 +143,7 @@ public actor NDJSONTransferSink {
                 guard !isClosed else { break }
                 lastHTTPStatus = response.status
                 if response.status == 200 {
-                    guard response.body.count <= 512 * 1024,
+                    guard response.body.count <= TransferProtocolLimits.maximumAcknowledgementBytes,
                           let ack = try? JSONDecoder().decode(Acknowledgement.self, from: response.body),
                           ack.version == 1, ack.collector_id == connection.collectorID,
                           Set(batch.ids).isSubset(of: Set(ack.acknowledged_event_ids)) else {
@@ -191,3 +192,4 @@ public actor NDJSONTransferSink {
         await flush()
     }
 }
+#endif

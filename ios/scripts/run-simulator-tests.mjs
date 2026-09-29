@@ -21,7 +21,8 @@ const redirect = http.createServer((_req, res) => { res.writeHead(307, { Locatio
 const redirectPort = await listen(redirect);
 const oversized = http.createServer((_req, res) => {
   res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.write(Buffer.alloc(300000, 32)); res.write(Buffer.alloc(300000, 32)); res.end();
+  // Remain chunked and cross the 2 MiB ACK limit without relying on Content-Length.
+  res.write(Buffer.alloc(1024 * 1024, 32)); res.write(Buffer.alloc(1024 * 1024 + 1, 32)); res.end();
 });
 const ackLimitPort = await listen(oversized);
 const reservation = http.createServer();

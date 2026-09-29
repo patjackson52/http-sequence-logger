@@ -1,9 +1,14 @@
+#if DEBUG
 import Foundation
 import CryptoKit
 import Security
 
 struct UploadResponse: Sendable { let status: Int; let body: Data }
 enum CollectorResponseError: Error { case acknowledgementTooLarge }
+enum TransferProtocolLimits {
+    // ACKs echo event IDs and recording metadata; valid 1 MiB batches can exceed 512 KiB here.
+    static let maximumAcknowledgementBytes = 2 * 1024 * 1024
+}
 protocol BatchTransport: Sendable {
     func upload(_ bytes: Data) async throws -> UploadResponse
     func close()
@@ -42,7 +47,7 @@ final class CollectorTransport: NSObject, BatchTransport, URLSessionTaskDelegate
         // Error pages are never consumed or surfaced as diagnostics. A chunked/misreported ACK
         // cannot bypass this bound: count application bytes while receiving, not just Content-Length.
         guard response.statusCode == 200 else { return UploadResponse(status: response.statusCode, body: Data()) }
-        let maximumACKBytes = 512 * 1024
+        let maximumACKBytes = TransferProtocolLimits.maximumAcknowledgementBytes
         guard response.expectedContentLength <= maximumACKBytes else { throw CollectorResponseError.acknowledgementTooLarge }
         var data = Data()
         data.reserveCapacity(min(maximumACKBytes, max(0, Int(response.expectedContentLength))))
@@ -167,3 +172,4 @@ enum CertificateValidity {
         return date
     }
 }
+#endif

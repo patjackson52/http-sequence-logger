@@ -1,3 +1,8 @@
+#if !DEBUG
+#error("The capture demo is development-only. Archive the NetworkLogProductionApp scheme instead.")
+#endif
+
+#if DEBUG
 import SwiftUI
 import NetworkLogTransfer
 import UIKit
@@ -89,3 +94,4 @@ private struct CaptureShareSheet: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
+#endif
