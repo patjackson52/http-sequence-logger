@@ -142,4 +142,4 @@ Version `1.1` adds explicit synchronous handler calls and returns; `1.2` adds br
 
 ## Interactive viewer
 
-Run `npm ci && npm run viewer`, then open http://127.0.0.1:4173. Import NDJSON or open a bundled sample to inspect HTTP exchanges and SDK/app handler calls. See [viewer setup and controls](viewer/README.md), [design provenance](docs/design/README.md), and [verification evidence](docs/VIEWER-REVIEW.md).
+Run `npm ci && npm run viewer`, then open http://127.0.0.1:4173. Import NDJSON or open a bundled sample to inspect HTTP exchanges and SDK/app handler calls. See [viewer setup and controls](viewer/README.md), [design history](docs/design/README.md), and [verification evidence](docs/VIEWER-REVIEW.md).

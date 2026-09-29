@@ -18,4 +18,4 @@ Checks performed:
 3. The production manifest has zero dependencies and its executable has no transfer/adapter symbols.
 4. Building the development fixture in Release fails with its intended diagnostic.
 
-Reports go to ignored `artifacts/integration-ios/`; compiler output stays in the terminal. Build outputs are ignored under each package's `.build/`. These are macOS host API/build checks. They do **not** prove an iOS customer's target membership, linked frameworks, shipping archive, real request capture, file relay, or physical-device LAN connectivity. Complete the customer's acceptance checks in the integration guide.
+Reports go to ignored `artifacts/integration-ios/`; compiler output stays in the terminal. Build outputs are ignored under each package's `.build/`. These are macOS host API/build checks. They do **not** establish an iOS customer's target membership, linked frameworks, shipping archive, real request capture, file relay, or physical-device LAN connectivity. Complete the customer's acceptance checks in the integration guide.

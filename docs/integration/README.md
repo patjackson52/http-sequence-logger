@@ -35,7 +35,7 @@ Record that full commit in the host's dependency lock record, submodule, or vend
 1. Establish debug/production dependency and source membership before adding call sites. Production retains only an app-owned abstraction, Android `logger-api`, or the browser package's default no-op entry.
 2. Own the recording lifetime and a unique canonical capture path, or a browser database/journal ID with one writer. Pick an app-specific session namespace; accept an existing opaque session/instance ID or generate one when recording starts. Multiple sessions may share a file/journal; each new recording has distinct recording/event IDs.
 3. Instrument one existing app request, then an SDK request and an SDK-supplied app handler. Preserve the application's HTTP and callback behavior. Extend to other clients with the same manual API/format, not another log format.
-4. Validate the local NDJSON before enabling transfer. Configure app-specific redaction, body bounds, backup exclusions, rotation and a local export path. Do not collect passwords/tokens to prove logging works.
+4. Validate the local NDJSON before enabling transfer. Configure app-specific redaction, body bounds, backup exclusions, rotation and a local export path. Do not collect passwords/tokens to demonstrate logging works.
 5. Connect via the [platform transport route](TRANSPORT.md), open the printed viewer link, and inspect the actual capture. Retain local export when delivery is unavailable.
 6. Verify the customer's development and shipping variants and leave a short app-specific integration note with the actual paths, commands and ownership decisions.
 
@@ -45,7 +45,7 @@ An integration is complete when its own app has evidence for these checks:
 
 - Development build succeeds; real app/SDK HTTP requests appear with correct origin lanes, ownership, status, body-capture state, and session grouping. A custom client can add manual observations without switching networking stacks.
 - An SDK → app handler → SDK scenario preserves application behavior and shows a local call/return with nested HTTP. Missing or unobserved exits remain incomplete. If this app has no such handler, record that scope explicitly instead of manufacturing one in its business code.
-- `node validate.mjs <export.ndjson>` passes; warnings are reviewed. Schema validation alone does not prove redaction or correct app behavior: inspect a sanitized sample and compare known request counts/outcomes.
+- `node validate.mjs <export.ndjson>` passes; warnings are reviewed. Schema validation alone does not establish redaction or correct app behavior: inspect a sanitized sample and compare known request counts/outcomes.
 - Collector offline/reconnect or close/reopen retains pending events with unchanged IDs. For browser journals, retry upload explicitly; no background sender is promised. Viewer catches up without duplicate requests; exported canonical logs stay usable without the collector.
 - Shipping artifact contains no recorder/transfer classes, native libraries, pairing/export UI, development resources, or added logging dependencies. Check both the graph and final artifact, including browser chunks/maps/precache; shrinking, `#if DEBUG`, or a runtime frontend flag alone is insufficient. The small shared abstraction is allowed.
 - Existing host tests pass and native request results/errors/cancellation remain unchanged. Report actual commands/devices tested and anything not exercised.

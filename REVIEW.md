@@ -12,13 +12,13 @@ Review scope: shared schema, reference validator, adapter lifecycle, fixtures, a
 | P2 | Inconsistent observed/stored/total body sizes passed validation | Cross-field checks apply to complete and unavailable bodies; known total sizes must agree with completeness claims |
 | P2 | Informational headers could follow the final response | Validator rejects interim responses after a final response |
 | P2 | Android configured header subset appeared complete | Partial header capture preserves known entries and requires an explanation |
-| P2 | Implicit HttpURLConnection execution/POST could produce incorrect metadata | Documented all executing accessors, snapshot-before-connect, inferred effective method, and optional configured-method provenance |
+| P2 | Implicit HttpURLConnection execution/POST could produce incorrect metadata | Documented all executing accessors, snapshot-before-connect, inferred effective method, and optional configured-method source |
 | P2 | Generic monotonic clock could undercount device sleep | Required sleep-inclusive platform clocks and synchronized observation/sequence allocation |
 | P2 | “Refuse duplicate completion” could throw into customer code | Required nonthrowing, thread-safe, first-terminal-wins handles with optional diagnostics |
 | P2 | iOS failed phases required an invented end timestamp | Native timing endpoints can be null, with at least one observed endpoint |
 | P2 | Native transactions lost URL/status association under a logical task | Metrics retain a transaction index plus nullable redacted request/response snapshots |
 
-Optional fidelity improvement: custom clients can preserve exact request targets with provenance, including forms not derivable from an ordinary absolute URL.
+Optional fidelity enhancement: custom clients can preserve exact request targets with source details, including forms not derivable from an ordinary absolute URL.
 
 ## Manual logging requirement
 
@@ -47,7 +47,7 @@ The manual-minimal fixture has a root HTTP span without method operations, omitt
 
 ## Remaining implementation validation
 
-The package contains synthetic records and API/schema contracts. Native wrappers and a viewer still need implementation. Device-level tests must establish that capture preserves networking behavior, native stream semantics, redirects, async cancellation, sleep-inclusive timing, callback counts, and download-file lifetimes. Those properties cannot be proven by JSON validation alone.
+The package contains synthetic records and API/schema contracts. Native wrappers and a viewer still need implementation. Device-level tests must establish that capture preserves networking behavior, native stream semantics, redirects, async cancellation, sleep-inclusive timing, callback counts, and download-file lifetimes. Those properties cannot be established by JSON validation alone.
 
 
 ## Kotlin implementation follow-up

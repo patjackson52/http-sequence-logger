@@ -44,7 +44,7 @@ Use the platform integration guides' external-consumer checks when changing inst
 
 Browser checks: `npm run check:web-types`, `npm run check:web-release`, `npm run check:web-browser` (installed Google Chrome), and `npm run web:sample` at `127.0.0.1:4180` (fixture servers `4181`/`4182`). The release audit checks positive debug controls and all shipping assets/maps. Node tests do not replace exercising the host app in a real browser.
 
-Repository tests prove repository fixtures. To finish a customer integration, validate a capture from that app, inspect HTTP and handler nesting in the viewer, verify offline recovery, and inspect **that app's** shipping artifact/dependency graph. Record unrun checks and concrete environment blockers.
+Repository tests validate repository fixtures. To finish a customer integration, validate a capture from that app, inspect HTTP and handler nesting in the viewer, verify offline recovery, and inspect **that app's** shipping artifact/dependency graph. Record unrun checks and concrete environment blockers.
 
 ## Maintaining this repository
 

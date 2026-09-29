@@ -38,7 +38,7 @@ Run `npm run build:viewer` and `npm run collector`, then open the printed viewer
 
 ## Import behavior and limits
 
-The shared contract validator is compiled into a CSP-safe standalone schema validator at build time. Parsing/validation runs in a browser worker. Each file preserves its own final-line recovery semantics. Overlapping exports deduplicate identical event IDs and preserve provenance; contradictory duplicates are diagnosed. Malformed/schema-invalid lines are skipped, semantic contradictions are flagged, and partial recordings remain inspectable. Orphan observations remain visible without invented request starts or owners.
+The shared contract validator is compiled into a CSP-safe standalone schema validator at build time. Parsing/validation runs in a browser worker. Each file preserves its own final-line recovery semantics. Overlapping exports deduplicate identical event IDs and preserve source attribution; contradictory duplicates are diagnosed. Malformed/schema-invalid lines are skipped, semantic contradictions are flagged, and partial recordings remain inspectable. Orphan observations remain visible without invented request starts or owners.
 
 Limits: **16 MiB/file, 64 MiB/import, 100,000 events**. The intended session size is around 10–20 HTTP requests. List view pages at 200 items; sequence layout is not virtualized, so collapse large sessions. The importer limits are memory guards, not a claim that 100,000-event diagrams remain interactive.
 
@@ -53,6 +53,6 @@ npm run build:viewer
 JAVA_HOME=/path/to/jdk17 ANDROID_SERIAL=emulator-5554 scripts/run-android-e2e.sh
 ```
 
-Import the resulting `artifacts/live/multi-session.ndjson` to inspect the fresh native output. [Review and end-to-end evidence](../docs/VIEWER-REVIEW.md) records the verification. [Design provenance](../docs/design/README.md) documents deliberate resolutions where prototype and contract differ.
+Import the resulting `artifacts/live/multi-session.ndjson` to inspect the fresh native output. [Review and end-to-end evidence](../docs/VIEWER-REVIEW.md) records the verification. [Design history](../docs/design/README.md) documents deliberate resolutions where prototype and contract differ.
 
 Deferred: server-side log merging, asynchronous continuation telemetry, session comparison, persisted imports and Mermaid/PlantUML export. The viewer preserves trace/correlation metadata for that future work without inferring cross-device timing.

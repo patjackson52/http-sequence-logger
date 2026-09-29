@@ -279,7 +279,7 @@ reject('unavailable body counts must still be consistent', (e) => {
 }, /observed_bytes exceeds total_bytes/);
 reject('known status success cannot claim observation_stopped', (e) => { first(e, 'http.ended').data.end_reason = 'observation_stopped'; }, /unknown outcome/);
 reject('partial headers require a reason', (e) => { first(e, 'http.request.started').data.request.headers.reason = null; }, /schema validation/);
-reject('optional exact request target retains provenance', (e) => { first(e, 'http.request.started').data.request.request_target = { value: '*', redacted: false }; }, /schema validation/);
+reject('optional exact request target retains source details', (e) => { first(e, 'http.request.started').data.request.request_target = { value: '*', redacted: false }; }, /schema validation/);
 
 test('manual custom clients can retain OPTIONS asterisk request targets', () => {
   const events = parse('manual-minimal');

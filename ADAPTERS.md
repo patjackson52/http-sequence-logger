@@ -52,7 +52,7 @@ Application-configured request headers are partial (`reason: application_configu
 
 `getInputStream()` can throw for an HTTP error while `getErrorStream()` contains a useful response body. Distinguish this from a connection failure with no response. Header fields remain available through native header APIs. See [Android HttpURLConnection](https://developer.android.com/reference/java/net/HttpURLConnection).
 
-For opaque automatic retries/redirects, advertise logical-call visibility. Record the effective URL when exposed, but do not infer missing intermediary requests. A custom stack with actual attempt callbacks can advertise individual visibility. Do not change automatic redirect/retry behavior just to improve logs.
+For opaque automatic retries/redirects, advertise logical-call visibility. Record the effective URL when exposed, but do not infer missing intermediary requests. A custom stack with actual attempt callbacks can advertise individual visibility. Do not change automatic redirect/retry behavior just to enhance logs.
 
 ## iOS: URLSession/NSURLSession
 
@@ -83,7 +83,7 @@ For completion-handler tasks, obtain response/data observations from that handle
 
 Use controlled local test endpoints when implementations are available. Check successful/error responses, error bodies, empty bodies, binary bytes, repeated query parameters/headers, request cancellation, body read failure, early stream close, redirects, SDK retries, concurrency, and context propagation. Assert application behavior is unchanged alongside validating emitted files against this package.
 
-Record API support and fidelity separately: syntactically valid output alone does not prove that a native adapter observed every request or preserved networking behavior.
+Record API support and fidelity separately: syntactically valid output alone does not establish that a native adapter observed every request or preserved networking behavior.
 
 Android checks should also cover implicit connect, implicit POST, transparent gzip, null-key status lines, skip/mark/reset, sleep-spanning duration, and cancellation/completion races. iOS checks should cover completion handlers with HTTP metadata plus error, AsyncBytes read failure, partial transaction metrics, multiple native transactions, delegate routing, and download-file lifetime. Default/ephemeral redirect callbacks must not be assumed for background sessions.
 

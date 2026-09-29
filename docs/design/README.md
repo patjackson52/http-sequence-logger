@@ -1,4 +1,4 @@
-# Viewer design provenance
+# Viewer design history
 
 The files in `claude-export/` are the unmodified Project HTML archive exported through the owner's Chrome session on 2026-09-28 from [Network Log Lab deliverables review](https://claude.ai/design/p/09dc9ea8-677e-4967-b421-c9b890af09c0?file=Mockups.dc.html). The archive's thumbnail is omitted. These are source design references, not application runtime dependencies. They include the original prototype, component/style specification, mockup sheet, support runtime, and its copied fixtures.
 

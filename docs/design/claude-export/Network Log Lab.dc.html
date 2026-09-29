@@ -458,7 +458,7 @@ class Component extends DCLogic {
     if (x.outcome === 'timeout' && x.status != null) statusNote = `Response headers arrived (${x.status}) but the transfer failed while reading the body: ${x.error || 'timeout'}. Header arrival is not completion; this exchange is a failure.`;
     else if (x.outcome === 'transport_failure') statusNote = `No HTTP response was received. ${x.error || ''}`.trim();
     else if (x.outcome === 'unknown') statusNote = 'Observation was stopped explicitly while this request was in flight. It may have completed afterwards; the log cannot tell.';
-    else if (x.outcome === 'unfinished') statusNote = 'The recording was interrupted (the file ended without recording.stop). An interrupted file does not prove a network failure.';
+    else if (x.outcome === 'unfinished') statusNote = 'The recording was interrupted (the file ended without recording.stop). An interrupted file does not establish a network failure.';
     else if (x.outcome === 'cancelled') statusNote = `Cancelled by the caller${x.error ? ': ' + x.error : ''}.`;
     else if (x.statusInvalid) statusNote = 'The log reported status 0, which is not an HTTP status. Shown as “no response received”.';
     else if (x.outcome === 'http_error') statusNote = `The server answered with ${x.status} ${x.statusText || ''}. Transfer completed; the outcome is an HTTP error.`;

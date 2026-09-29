@@ -26,7 +26,7 @@ test('production preview uses the production directory and no-op entry', () => {
 });
 
 test('aborted fixture POSTs cause no unhandled rejection and both servers remain usable', async () => {
-  // Isolate the process so a regression proves the server crash without taking
+  // Isolate the process so a regression exposes the server crash without taking
   // down the test runner or leaving fixture listeners behind.
   const fixtureURL = new URL('../web-sample/fixture-server.mjs', import.meta.url).href;
   const source = `

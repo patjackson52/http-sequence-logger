@@ -64,7 +64,7 @@ npm run collector -- --lan 192.168.1.25 --dir artifacts/customer-collector
 
 The optional HTTPS listener defaults to `4320` and binds for LAN ingestion. Its certificate is generated with OpenSSL for the specified host and is valid for 30 days. Use **connection-lan.json** on the device. The browser still opens the loopback Viewer link on the desktop. LAN `/`, health, download and browser reads return 404; that is intentional. The LAN listener accepts authenticated uploads only. A changed LAN host or expired certificate requires a fresh collector directory and re-pairing; do not disable hostname/date/pin verification or install a global trust override.
 
-Merge permissions into the development target according to its OS/target SDK; use [platform setup](../transfer/README.md#ios-simulator-and-wi-fi) and its official platform references. Physical-device signing, firewall and permissions must be verified on the chosen device; simulator success does not prove them.
+Merge permissions into the development target according to its OS/target SDK; use [platform setup](../transfer/README.md#ios-simulator-and-wi-fi) and its official platform references. Physical-device signing, firewall and permissions must be verified on the chosen device; simulator success does not establish them.
 
 ## Where every file lives
 

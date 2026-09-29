@@ -93,7 +93,7 @@ This explicitly runs the real recovery SampleFlow, disconnects/reconnects ADB fo
 | Return / accept task | Handler → DemoAuthSdk | Local method return and SDK method | Explicit `returned` boundary, then `acceptTask` |
 | Complete demonstration | DemoAuthSdk | httpbin `/anything/receipt` | Echo a synthetic receipt; no server-side persistence |
 
-The normal run has **8 requests**. Recovery has **9**, with one expected 401 and an overall successful operation. All use HTTPS. This is an auth-style orchestration example, **not OAuth, Prove integration, phone verification, or production identity verification**. The public endpoints do not trust each other or enforce a shared security decision. No real credentials or phone numbers are required. Tokens never go to the echo or task services.
+The normal run has **8 requests**. Recovery has **9**, with one expected 401 and an overall successful operation. All use HTTPS. This is an auth-style orchestration example, **not OAuth, phone verification, or production identity verification**. The public endpoints do not trust each other or enforce a shared security decision. No real credentials or phone numbers are required. Tokens never go to the echo or task services.
 
 The services are free and need no keys or dashboard setup. Their implementations are publicly available:
 

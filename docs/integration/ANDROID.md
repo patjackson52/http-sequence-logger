@@ -160,7 +160,7 @@ npm run collector -- --android CUSTOMER_APPLICATION_ID --device DEVICE_SERIAL --
 
 This writes pairing, establishes ADB reverse, and watches `files/captures/*.ndjson`. The next `DebugTransfer.open` uses the pairing; an already-open local sink remains local. The ADB watcher can still retrieve its complete lines. Open the printed desktop viewer URL. See [transport and retrieval](TRANSPORT.md) for USB, simulator, HTTPS LAN, file export, credential handling, restarts, and connection troubleshooting. Pairing is optional: a sanitized NDJSON file can be imported directly into the viewer.
 
-## 6. Prove the host integration and release boundary
+## 6. Verify the host integration and release boundary
 
 First reproduce the independent consumer fixture from this repository root with JDK 17 and `ANDROID_HOME` configured:
 
@@ -177,7 +177,7 @@ Then verify the actual host:
 2. Retrieve it through the chosen transfer/export path and run `node validate.mjs /absolute/path/capture.ndjson` from this checkout. See [schema and format authority](SPECS.md); do not change emitted JSON to match an obsolete design mockup.
 3. Open it in the viewer. Check the selected session/recording, domains, operation/handler nesting and return, status/error, timing, redaction and inspector details. Verify a timeout/cancellation or incomplete observation without turning it into a fabricated HTTP status.
 4. Build every shipping variant. Run the host's equivalent of `:app:dependencies --configuration releaseRuntimeClasspath`; there must be no recorder module or recorder-only dependency. Adapt names for flavors/custom build types.
-5. Apply [the paired R8 discard assertions and binary audit](../../android/RELEASE.md) to actual shipping APKs, including APKs produced from the app bundle. Keep an unminified production-code fixture when feasible to prove exclusion without optimizer assistance. Debug recorder classes are the positive control; production has no recorder code, pairing UI, capture resources, or development network exceptions.
+5. Apply [the paired R8 discard assertions and binary audit](../../android/RELEASE.md) to actual shipping APKs, including APKs produced from the app bundle. Keep an unminified production-code fixture when feasible to demonstrate exclusion without optimizer assistance. Debug recorder classes are the positive control; production has no recorder code, pairing UI, capture resources, or development network exceptions.
 6. Verify real business requests and customer callbacks still run exactly once with the no-op logger. Do not use `-assumenosideeffects` on methods that invoke application code, broad package keep rules, or runtime `BuildConfig.DEBUG` branches as a substitute for source/dependency separation.
 
 The recorder disables its Release variant. Custom production build types must not fall back to its Debug variant. A custom development type must deliberately opt into recorder dependencies and debug wiring; merely setting `isDebuggable=true` does not add them. Keep the pinned commit, tooling compatibility decisions, file paths, source-set changes, validation result, transfer mode, and shipping-binary evidence in the host's integration notes.

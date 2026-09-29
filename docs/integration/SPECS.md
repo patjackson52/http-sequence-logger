@@ -19,7 +19,7 @@ Captures are **UTF-8 NDJSON**: one JSON event per line, newline-terminated by pr
 | Valid/invalid relationships and cross-event validation | [shared/validate.mjs](../../shared/validate.mjs); command entry [validate.mjs](../../validate.mjs) |
 | Focused synthetic examples | [examples/manifest.json](../../examples/manifest.json), [manual-minimal](../../examples/manual-minimal.ndjson), [handler-http](../../examples/handler-http.ndjson), [stream-read-timeout](../../examples/stream-read-timeout.ndjson) |
 | Actual native captures | [samples/live/manifest.json](../../samples/live/manifest.json), [transfer captures](../../samples/transfer/README.md) |
-| GUI interpretation/design | [viewer/README.md](../../viewer/README.md), [design provenance](../design/README.md); design images do not define runtime APIs |
+| GUI interpretation/design | [viewer/README.md](../../viewer/README.md), [design history](../design/README.md); design images do not define runtime APIs |
 
 The schema accepts event versions `1.0`, `1.1` and `1.2`. Explicit synchronous handler invocation/completion requires `1.1` or later. Browser producers and `dispatch: awaited` require `1.2`. Use one version for **all events in a recording**. Android emits `1.1`; the limited Swift demo emits `1.0`; browser capture emits `1.2`. Proposed metrics, redirect, propagation, or Swift capture APIs in specifications are not necessarily exposed by an SDK. Do not infer implementation from a schema field or a pseudocode snippet.
 
@@ -43,6 +43,6 @@ node validate.mjs /absolute/path/to/customer-capture.ndjson
 
 Exit `0`: no contradictions detected (inspect warnings for missing observations). Exit `1`: invalid capture or unreadable file. Exit `2`: no input file. Multiple filenames are validated separately; the viewer can merge imports and check relationships across them. Do not strip failed events or regenerate IDs merely to make validation pass.
 
-The schema validates individual records; `validate.mjs` adds relationships, lifecycle, byte counts, retry and timing checks. It does not prove that captured facts match actual network activity or that every secret was removed.
+The schema validates individual records; `validate.mjs` adds relationships, lifecycle, byte counts, retry and timing checks. It does not establish that captured facts match actual network activity or that every secret was removed.
 
 For contract maintenance only, edit [scripts/build-schema.mjs](../../scripts/build-schema.mjs), run `npm run generate`, then `npm test`. This regenerates the standalone schema, CSP-safe validator and fixtures. Ordinary app integration consumes the contract unchanged.

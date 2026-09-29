@@ -88,10 +88,10 @@ Response headers are observations, never a successful HTTP terminal boundary. Ke
 | Information | Canonical source |
 | --- | --- |
 | Method | `http.request.started.data.request.method`, preserved as observed |
-| Method provenance | Optional `method_source` (`observed`, `inferred`, `configured`) and `configured_method`; absent source is unspecified |
+| Method source | Optional `method_source` (`observed`, `inferred`, `configured`) and `configured_method`; absent source is unspecified |
 | Initial URL | Request-start `request.url` |
 | Effective response URL | `http.response.headers.data.response.url` |
-| Exact request target | Optional `request.request_target` retains observed/configured target, provenance, and redaction flag, including `*` or authority-form targets |
+| Exact request target | Optional `request.request_target` retains observed/configured target, source details, and redaction flag, including `*` or authority-form targets |
 | Scheme, hostname/domain, port, path, query | Derived with a URL parser from the corresponding URL |
 | Query ordering/repeated keys/escaping | Retained URL; display a name/value array rather than an object |
 | Request/response headers | Respective `headers.entries`, as ordered name/value/redacted entries |

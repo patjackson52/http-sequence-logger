@@ -151,7 +151,7 @@ A URLSession completion handler can include an HTTP response alongside a transpo
 
 For async `data(for:)`, begin before awaiting, record the returned pair on success, and call fail/timeout/cancel in catch while rethrowing the same error. Do not invent a response in catch. For async `bytes(for:)`, receiving the pair only records headers: continue the exchange until iteration ends or throws; a method block can end earlier. For Objective-C, expose equivalent NSObject handles and nonthrowing methods usable from existing completion blocks without a Swift-only task context.
 
-## What the manual examples prove
+## What the manual examples demonstrate
 
 - [manual-minimal.ndjson](examples/manual-minimal.ndjson) passes with no method spans, missing headers/bodies, and an unknown response URL.
 - [manual-observation-stopped.ndjson](examples/manual-observation-stopped.ndjson) retains a known HTTP status without claiming completion.
