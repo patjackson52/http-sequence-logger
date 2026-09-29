@@ -1,0 +1,1456 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mobile-network-log:event:1.0",
+  "title": "Mobile network log event, draft contract 1.0",
+  "description": "One NDJSON record. See CONTRACT.md for cross-event and capture semantics. Custom format, not OTLP JSON.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "event_type": {
+      "enum": [
+        "session.started",
+        "session.ended",
+        "operation.started",
+        "operation.ended",
+        "http.request.started",
+        "http.response.headers",
+        "http.body.captured",
+        "http.ended",
+        "http.trailers",
+        "http.metrics",
+        "capture.gap"
+      ]
+    },
+    "event_id": {
+      "$ref": "#/$defs/id"
+    },
+    "session_namespace": {
+      "$ref": "#/$defs/id"
+    },
+    "session_id": {
+      "$ref": "#/$defs/id"
+    },
+    "recording_id": {
+      "$ref": "#/$defs/id"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3,9}Z$"
+    },
+    "monotonic_ns": {
+      "$ref": "#/$defs/ns"
+    },
+    "context": {
+      "$ref": "#/$defs/context"
+    },
+    "data": {
+      "type": "object"
+    },
+    "extensions": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_-]*\\.[a-zA-Z0-9_.-]+$"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "event_type",
+    "event_id",
+    "session_namespace",
+    "session_id",
+    "recording_id",
+    "sequence",
+    "timestamp",
+    "monotonic_ns",
+    "data"
+  ],
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "event_type": {
+          "const": "session.started"
+        },
+        "data": {
+          "$ref": "#/$defs/sessionStart"
+        },
+        "context": false
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "session.ended"
+        },
+        "data": {
+          "$ref": "#/$defs/sessionEnd"
+        },
+        "context": false
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "operation.started"
+        },
+        "data": {
+          "$ref": "#/$defs/operationStart"
+        }
+      },
+      "required": [
+        "context"
+      ]
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "operation.ended"
+        },
+        "data": {
+          "$ref": "#/$defs/operationEnd"
+        }
+      },
+      "required": [
+        "context"
+      ]
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "http.request.started"
+        },
+        "data": {
+          "$ref": "#/$defs/requestStart"
+        }
+      },
+      "required": [
+        "context"
+      ]
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "http.response.headers"
+        },
+        "data": {
+          "$ref": "#/$defs/responseHeaders"
+        }
+      },
+      "required": [
+        "context"
+      ]
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "http.body.captured"
+        },
+        "data": {
+          "$ref": "#/$defs/bodyCaptured"
+        }
+      },
+      "required": [
+        "context"
+      ]
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "http.ended"
+        },
+        "data": {
+          "$ref": "#/$defs/httpEnd"
+        }
+      },
+      "required": [
+        "context"
+      ]
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "http.trailers"
+        },
+        "data": {
+          "$ref": "#/$defs/trailers"
+        }
+      },
+      "required": [
+        "context"
+      ]
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "http.metrics"
+        },
+        "data": {
+          "$ref": "#/$defs/metrics"
+        }
+      },
+      "required": [
+        "context"
+      ]
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "capture.gap"
+        },
+        "data": {
+          "$ref": "#/$defs/captureGap"
+        },
+        "context": false
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "ns": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "maxLength": 30
+    },
+    "traceId": {
+      "type": "string",
+      "pattern": "^(?!0{32}$)[0-9a-f]{32}$"
+    },
+    "spanId": {
+      "type": "string",
+      "pattern": "^(?!0{16}$)[0-9a-f]{16}$"
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "trace_id": {
+          "$ref": "#/$defs/traceId"
+        },
+        "span_id": {
+          "$ref": "#/$defs/spanId"
+        },
+        "parent_span_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/spanId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent_scope": {
+          "enum": [
+            "none",
+            "local",
+            "remote"
+          ]
+        }
+      },
+      "required": [
+        "trace_id",
+        "span_id",
+        "parent_span_id",
+        "parent_scope"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "parent_scope": {
+                "const": "none"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "parent_span_id": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "parent_span_id": {
+                "$ref": "#/$defs/spanId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "actor": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "enum": [
+            "integrator",
+            "sdk",
+            "system",
+            "unknown"
+          ]
+        },
+        "component": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "owner",
+        "component",
+        "method"
+      ],
+      "additionalProperties": false
+    },
+    "callsite": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "enum": [
+            "explicit",
+            "stack",
+            "inferred"
+          ]
+        },
+        "file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "line": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "function": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "source",
+        "file",
+        "line",
+        "function"
+      ],
+      "additionalProperties": false
+    },
+    "origin": {
+      "type": "object",
+      "properties": {
+        "initiator": {
+          "$ref": "#/$defs/actor"
+        },
+        "executor": {
+          "$ref": "#/$defs/actor"
+        },
+        "callsite": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/callsite"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "initiator",
+        "executor",
+        "callsite"
+      ],
+      "additionalProperties": false
+    },
+    "header": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+        },
+        "value": {
+          "type": "string"
+        },
+        "redacted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "redacted"
+      ],
+      "additionalProperties": false
+    },
+    "headers": {
+      "type": "object",
+      "properties": {
+        "availability": {
+          "enum": [
+            "captured",
+            "partial",
+            "unavailable"
+          ]
+        },
+        "representation": {
+          "enum": [
+            "library",
+            "raw"
+          ]
+        },
+        "order_preserved": {
+          "type": "boolean"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/header"
+          }
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "availability",
+        "representation",
+        "order_preserved",
+        "entries",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "availability": {
+                "const": "unavailable"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "entries": {
+                "maxItems": 0
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "else": {
+            "if": {
+              "properties": {
+                "availability": {
+                  "const": "partial"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "reason": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "body": {
+      "type": "object",
+      "properties": {
+        "availability": {
+          "enum": [
+            "captured",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "representation": {
+          "enum": [
+            "application",
+            "encoded"
+          ]
+        },
+        "media_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "charset": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "content_encoding": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_bytes": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total_bytes": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stored_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "redacted": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "content": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "encoding": {
+                  "enum": [
+                    "utf-8",
+                    "base64"
+                  ]
+                },
+                "data": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "encoding",
+                "data"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "availability",
+        "representation",
+        "media_type",
+        "charset",
+        "content_encoding",
+        "observed_bytes",
+        "total_bytes",
+        "stored_bytes",
+        "truncated",
+        "redacted",
+        "reason",
+        "content"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "availability": {
+                "const": "captured"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "content": {
+                "type": "object"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "content": {
+                "type": "null"
+              },
+              "stored_bytes": {
+                "const": 0
+              },
+              "truncated": {
+                "const": false
+              },
+              "redacted": {
+                "const": false
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "truncated": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "dns",
+            "connect",
+            "tls",
+            "write",
+            "read",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "message",
+        "stage"
+      ],
+      "additionalProperties": false
+    },
+    "request": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://"
+        },
+        "url_redacted": {
+          "type": "boolean"
+        },
+        "headers": {
+          "$ref": "#/$defs/headers"
+        },
+        "method_source": {
+          "enum": [
+            "observed",
+            "inferred",
+            "configured"
+          ]
+        },
+        "configured_method": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_target": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source": {
+                  "enum": [
+                    "observed",
+                    "configured"
+                  ]
+                },
+                "redacted": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "value",
+                "source",
+                "redacted"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "method",
+        "url",
+        "url_redacted",
+        "headers"
+      ],
+      "additionalProperties": false
+    },
+    "response": {
+      "type": "object",
+      "properties": {
+        "status_code": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "status_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https?://"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "url_redacted": {
+          "type": "boolean"
+        },
+        "headers": {
+          "$ref": "#/$defs/headers"
+        }
+      },
+      "required": [
+        "status_code",
+        "status_text",
+        "url",
+        "url_redacted",
+        "headers"
+      ],
+      "additionalProperties": false
+    },
+    "adapter": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "attempts": {
+          "enum": [
+            "individual",
+            "logical"
+          ]
+        },
+        "request_body": {
+          "enum": [
+            "supported",
+            "partial",
+            "unsupported"
+          ]
+        },
+        "response_body": {
+          "enum": [
+            "supported",
+            "partial",
+            "unsupported"
+          ]
+        },
+        "transaction_metrics": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "attempts",
+        "request_body",
+        "response_body",
+        "transaction_metrics"
+      ],
+      "additionalProperties": false
+    },
+    "sessionStart": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "id_source": {
+          "enum": [
+            "provided",
+            "generated"
+          ]
+        },
+        "producer": {
+          "type": "object",
+          "properties": {
+            "platform": {
+              "enum": [
+                "android",
+                "ios"
+              ]
+            },
+            "app_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "app_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "os_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sdk_version": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "platform",
+            "app_id",
+            "app_version",
+            "os_version",
+            "sdk_version"
+          ],
+          "additionalProperties": false
+        },
+        "adapters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "adapter": {
+                "$ref": "#/$defs/adapter"
+              },
+              "capabilities": {
+                "$ref": "#/$defs/capabilities"
+              }
+            },
+            "required": [
+              "adapter",
+              "capabilities"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "capture_policy": {
+          "type": "object",
+          "properties": {
+            "profile": {
+              "const": "development"
+            },
+            "body_limit_bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "redact_headers": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "redact_query_keys": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "redact_body_paths": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "profile",
+            "body_limit_bytes",
+            "redact_headers",
+            "redact_query_keys",
+            "redact_body_paths"
+          ],
+          "additionalProperties": false
+        },
+        "trace_propagation": {
+          "enum": [
+            "disabled",
+            "allowlist"
+          ]
+        },
+        "propagation_origins": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https?://"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "id_source",
+        "producer",
+        "adapters",
+        "capture_policy",
+        "trace_propagation",
+        "propagation_origins"
+      ],
+      "additionalProperties": false
+    },
+    "sessionEnd": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "enum": [
+            "completed",
+            "stopped"
+          ]
+        },
+        "dropped_events": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "reason",
+        "dropped_events"
+      ],
+      "additionalProperties": false
+    },
+    "operationStart": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin": {
+          "$ref": "#/$defs/actor"
+        }
+      },
+      "required": [
+        "name",
+        "origin"
+      ],
+      "additionalProperties": false
+    },
+    "operationEnd": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "enum": [
+            "success",
+            "error",
+            "cancelled"
+          ]
+        },
+        "duration_ns": {
+          "$ref": "#/$defs/ns"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "outcome",
+        "duration_ns",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "requestStart": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin": {
+          "$ref": "#/$defs/origin"
+        },
+        "adapter": {
+          "$ref": "#/$defs/adapter"
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "attempt": {
+          "type": "object",
+          "properties": {
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "visibility": {
+              "enum": [
+                "individual",
+                "logical"
+              ]
+            },
+            "reason": {
+              "enum": [
+                "initial",
+                "retry",
+                "redirect",
+                "auth_challenge"
+              ]
+            },
+            "previous_span_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/spanId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "index",
+            "visibility",
+            "reason",
+            "previous_span_id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "name",
+        "origin",
+        "adapter",
+        "request",
+        "attempt"
+      ],
+      "additionalProperties": false
+    },
+    "responseHeaders": {
+      "type": "object",
+      "properties": {
+        "phase": {
+          "enum": [
+            "informational",
+            "final"
+          ]
+        },
+        "response": {
+          "$ref": "#/$defs/response"
+        }
+      },
+      "required": [
+        "phase",
+        "response"
+      ],
+      "additionalProperties": false
+    },
+    "bodyCaptured": {
+      "type": "object",
+      "properties": {
+        "direction": {
+          "enum": [
+            "request",
+            "response"
+          ]
+        },
+        "body": {
+          "$ref": "#/$defs/body"
+        }
+      },
+      "required": [
+        "direction",
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "trailers": {
+      "type": "object",
+      "properties": {
+        "direction": {
+          "enum": [
+            "request",
+            "response"
+          ]
+        },
+        "headers": {
+          "$ref": "#/$defs/headers"
+        }
+      },
+      "required": [
+        "direction",
+        "headers"
+      ],
+      "additionalProperties": false
+    },
+    "httpEnd": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "enum": [
+            "success",
+            "http_error",
+            "transport_error",
+            "timeout",
+            "cancelled",
+            "unknown"
+          ]
+        },
+        "application_outcome": {
+          "enum": [
+            "success",
+            "error",
+            "unknown"
+          ]
+        },
+        "status_code": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "duration_ns": {
+          "$ref": "#/$defs/ns"
+        },
+        "end_reason": {
+          "enum": [
+            "body_eof",
+            "body_closed",
+            "transport_failure",
+            "cancelled",
+            "observation_stopped"
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "outcome",
+        "application_outcome",
+        "status_code",
+        "duration_ns",
+        "end_reason",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "transaction": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "request": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/request"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "response": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/response"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "index",
+                "request",
+                "response"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "remote_address": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "remote_port": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "connection_reused": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "response_source": {
+          "enum": [
+            "network",
+            "cache",
+            "unknown"
+          ]
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "enum": [
+                  "dns",
+                  "connect",
+                  "tls",
+                  "request_write",
+                  "response_read"
+                ]
+              },
+              "start_timestamp": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3,9}Z$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "end_timestamp": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3,9}Z$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "start_timestamp",
+              "end_timestamp"
+            ],
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "properties": {
+                  "start_timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3,9}Z$"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "end_timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3,9}Z$"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "source",
+        "protocol_version",
+        "transaction",
+        "remote_address",
+        "remote_port",
+        "connection_reused",
+        "response_source",
+        "phases"
+      ],
+      "additionalProperties": false
+    },
+    "captureGap": {
+      "type": "object",
+      "properties": {
+        "dropped_events": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "dropped_events",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

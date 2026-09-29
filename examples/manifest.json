@@ -1,0 +1,213 @@
+{
+  "synthetic": true,
+  "captures": [
+    {
+      "file": "success.ndjson",
+      "description": "Integrator → SDK → API; repeated query keys and repeated redacted Set-Cookie fields remain separate.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "direct-integrator.ndjson",
+      "description": "Generated session ID and custom recorder; the integrator executes the request without an SDK method block.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "http-error.ndjson",
+      "description": "HTTP 400 with a complete JSON error body, including the HttpURLConnection error-stream use case.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 1,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "timeout.ndjson",
+      "description": "No response received: status is null, not zero, and response content is explicitly unavailable.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 1,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "retry.ndjson",
+      "description": "503 → 100 ms backoff → 200; two explicit SDK calls through HttpURLConnection inside one successful operation. Hidden native attempts remain unknown.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 2,
+        "failed_requests": 1,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "concurrent.ndjson",
+      "description": "Two overlapping requests complete in reverse order; late native metrics retain their HTTP span association.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 2,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "cancelled.ndjson",
+      "description": "Caller cancellation has its own outcome and no fabricated HTTP status or transport error.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 0,
+        "cancelled_requests": 1,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "interrupted.ndjson",
+      "description": "Abruptly stopped recording; importer keeps the unfinished request and open method blocks with warnings.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 1,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "redacted-truncated.ndjson",
+      "description": "Redaction and truncation coexist; incomplete JSON remains inspectable as text.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "redirect.ndjson",
+      "description": "Redirect to another origin creates a new participant and attempt; hidden redirect body is explicitly unavailable.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 2,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "multi-session.ndjson",
+      "description": "Two session IDs, three recordings, interleaved producers, six origins, and a resumed caller-supplied session (12 requests in that session).",
+      "expected": {
+        "sessions": 2,
+        "recordings": 3,
+        "requests": 14,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "manual-minimal.ndjson",
+      "description": "Manual begin + completeResponse, no method spans, no fabricated body/header data, and unknown effective response URL.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "manual-observation-stopped.ndjson",
+      "description": "Caller observes HTTP 200 but cannot observe body completion; transfer outcome stays unknown.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 1
+      }
+    },
+    {
+      "file": "stream-read-timeout.ndjson",
+      "description": "Method returns at headers; body iteration later times out. Known HTTP 200 is retained and failed_requests is one.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 1,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "ios-partial-metrics.ndjson",
+      "description": "Native TLS phase has a start but no end after failure; transaction identity/request are preserved.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 1,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    },
+    {
+      "file": "ios-logical-transactions.ndjson",
+      "description": "One observed task and two native transaction snapshots; no retrospective spans or fabricated callback timing.",
+      "expected": {
+        "sessions": 1,
+        "recordings": 1,
+        "requests": 1,
+        "failed_requests": 0,
+        "cancelled_requests": 0,
+        "unfinished_requests": 0,
+        "unknown_outcomes": 0
+      }
+    }
+  ]
+}
