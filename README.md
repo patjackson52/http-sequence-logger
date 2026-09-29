@@ -6,6 +6,36 @@ Repository: [patjackson52/http-sequence-logger](https://github.com/patjackson52/
 
 **Integrating an existing app with a coding agent?** Start at [AGENTS.md](AGENTS.md) and the [integration guide](docs/integration/README.md), or copy the [agent prompt](docs/integration/AGENT-PROMPT.md). They cover Android/iOS/browser installation, implemented capabilities, JSON specs, files and IndexedDB, transfer, the viewer, and production isolation.
 
+## Desktop viewer examples
+
+Actual desktop captures of the viewer, using the included sanitized logs. Each server origin has its own lane; selecting a request or local invocation opens its details. Click an image to view it at full size.
+
+### Multi-server sign-in and session navigation
+
+An Android auth flow separates app and SDK calls across three server origins. The sidebar keeps successful and recovered sign-in sessions together. [Source capture](samples/live/multi-session.ndjson).
+
+[![Desktop sequence viewer showing Android sign-in, app and SDK lanes, three server origins, and multiple sessions](docs/screenshots/desktop-multi-server.png)](docs/screenshots/desktop-multi-server.png)
+
+### SDK → app callback → SDK
+
+The SDK awaits an app-owned handler that makes an HTTP request. The diagram shows the handoff and settlement; the inspector identifies the caller, callee and awaited dispatch. [Source capture](samples/web/browser-auth-recovery.ndjson).
+
+[![Desktop viewer showing an awaited SDK-to-app handler with a nested HTTP request and the invocation inspector](docs/screenshots/desktop-awaited-handler.png)](docs/screenshots/desktop-awaited-handler.png)
+
+### HTTP failure followed by retry
+
+A 503 response and a successful retry remain separate exchanges. The response inspector exposes status, headers and the captured error payload. This is a synthetic contract fixture. [Source capture](examples/retry.ndjson).
+
+[![Desktop viewer showing an HTTP 503 failure followed by a successful retry, with response details open](docs/screenshots/desktop-retry.png)](docs/screenshots/desktop-retry.png)
+
+### Headers received, body read fails
+
+HTTP 200 headers do not establish successful completion: a later body-read timeout is visible in the sequence and inspector. This is a synthetic contract fixture. [Source capture](examples/stream-read-timeout.ndjson).
+
+[![Desktop viewer distinguishing HTTP 200 headers from a later body-read timeout, with terminal error details](docs/screenshots/desktop-body-timeout.png)](docs/screenshots/desktop-body-timeout.png)
+
+[Screenshot sources and refresh command](docs/screenshots/README.md) · [Viewer controls](viewer/README.md)
+
 ## Stream logs into the viewer
 
 See [device transfer and pairing](docs/transfer/README.md) for Android ADB, iOS Simulator, paired Wi-Fi HTTPS, and offline file import. The collector persists NDJSON and streams updates to the viewer without a hosted backend.
