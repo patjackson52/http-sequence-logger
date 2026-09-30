@@ -31,6 +31,8 @@ This repository contains development network logging, device/browser transfer, a
 
 ## Build and verify
 
+For local live viewing, `npm start` builds the viewer and starts the collector at **http://127.0.0.1:4319/**. The ordinary URL auto-connects and survives refresh. `npm run android:live` also builds/installs/pairs/runs the repository sample, preferring a single phone over emulators; specify `-- --device SERIAL` if ambiguous. The viewer surfaces collector/device status and follows new sessions until the user inspects or filters one. For customer apps use `npm run collector -- --android APPLICATION_ID`; source instrumentation remains required. Static `npm run viewer` on 4173 remains file-only. See the transport map before changing origins or authentication.
+
 Use Node **22.12+** for desktop tools; Android baseline is JDK 17, Kotlin 2.2.20, AGP 8.13.2, Gradle 8.14.3, SDK 35/minimum 26. iOS uses Swift 6 and iOS 15+. Commands run from this repository root unless a guide says otherwise.
 
 ```sh

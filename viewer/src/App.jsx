@@ -2,6 +2,7 @@ import React, {useEffect,useMemo,useRef,useState} from 'react';
 import Sequence from './Sequence.jsx';
 import {downloadSVG} from './export-svg.mjs';
 import {CollectorClient} from './collector-client.mjs';
+import LiveConnection from './LiveConnection.jsx';
 import Inspector, {Badge} from './Inspector.jsx';
 import {filterSessionItems,IMPORT_LIMITS} from './model.mjs';
 import {duration,ownerLabel} from './ui.mjs';
@@ -15,6 +16,10 @@ function App(){
  const [navigatorOpen,setNavigatorOpen]=useState(true),[sheet,setSheet]=useState(null),[mobileSearch,setMobileSearch]=useState(false),[view,setView]=useState('sequence'),[page,setPage]=useState(0),[inspectorWidth,setInspectorWidth]=useState(420);
  const [overlay,setOverlay]=useState(()=>window.matchMedia('(max-width:1099px)').matches);
  const [live,setLive]=useState({state:'idle',count:0}),[pairing,setPairing]=useState([]),[pairingOpen,setPairingOpen]=useState(false);
+ const automaticLive=!!document.querySelector('meta[name=network-log-collector][content="1"]');
+ const [device,setDevice]=useState(null),[followLatest,setFollowLatest]=useState(true);
+ const followLatestRef=useRef(true),latestSessionRef=useRef(null);
+ function followNewest(value){followLatestRef.current=value;setFollowLatest(value);if(value&&capture?.sessions.length)changeSession(capture.sessions.at(-1).id,true);}
  const liveRef=useRef(),liveWorkerBusy=useRef(false),pendingLive=useRef(null),liveToken=useRef(null),liveOpened=useRef(false);
  const inspectorRef=useRef(),sequenceRef=useRef();
  const [exportError,setExportError]=useState('');
@@ -24,18 +29,18 @@ function App(){
  const projection=useMemo(()=>session?filterSessionItems(session,filters):null,[session,filters]);
  const all=session?[...session.operations,...session.exchanges]:[],item=all.find(x=>x.id===selectedId);
  const listItems=useMemo(()=>{if(!session||!projection)return [];const visible=[...projection.exchanges,...projection.operations.filter(x=>projection.directIds?.has(x.id))];return visible.filter(x=>!x.ancestorIds.some(id=>collapsed.has(id))).sort((a,b)=>session.recordings.findIndex(r=>r.id===a.recordingId)-session.recordings.findIndex(r=>r.id===b.recordingId)||(a.start?.sequence??a.rawEvents[0]?.sequence)-(b.start?.sequence??b.rawEvents[0]?.sequence));},[session,projection,collapsed]);
- useEffect(()=>{const params=new URLSearchParams(location.hash.slice(1)),token=params.get('collector');if(token){historyReplace();liveToken.current=token;startLive(token);}return()=>{liveRef.current?.stop();workerRef.current?.terminate();};},[]);
+ useEffect(()=>{const params=new URLSearchParams(location.hash.slice(1)),token=params.get('collector');if(token){historyReplace();liveToken.current=token;}if(automaticLive||token)startLive(token);return()=>{liveRef.current?.stop();workerRef.current?.terminate();};},[]);
  function historyReplace(){window.history.replaceState(null,'',location.pathname+location.search);}
  function ingestLive(text){pendingLive.current=text;if(liveWorkerBusy.current)return;flushLive();}
  function flushLive(){const text=pendingLive.current;if(text===null)return;pendingLive.current=null;liveWorkerBusy.current=true;const current=generation.current;
   const worker=new Worker(new URL('./import-worker.mjs',import.meta.url),{type:'module'});workerRef.current=worker;
-  worker.onmessage=({data})=>{worker.terminate();liveWorkerBusy.current=false;if(current!==generation.current)return;if(data.error)setError(data.error);else{setCapture(data.result);setSessionId(old=>data.result.sessions.some(s=>s.id===old)?old:data.result.sessions[0]?.id);if(data.result.sessions.length&&!liveOpened.current){liveOpened.current=true;setScreen('workspace');}}if(pendingLive.current!==null)flushLive();};
+  worker.onmessage=({data})=>{worker.terminate();liveWorkerBusy.current=false;if(current!==generation.current)return;if(data.error)setError(data.error);else{setCapture(data.result);const newest=data.result.sessions.at(-1)?.id;if(followLatestRef.current&&newest!==latestSessionRef.current){setSelectedId(null);setInspectorOpen(false);setHistory([]);setFilters(defaults);setCollapsed(new Set());}latestSessionRef.current=newest;setSessionId(old=>followLatestRef.current?newest:data.result.sessions.some(s=>s.id===old)?old:newest);if(data.result.sessions.length&&!liveOpened.current){liveOpened.current=true;setScreen('workspace');}}if(pendingLive.current!==null)flushLive();};
   worker.onerror=e=>{worker.terminate();liveWorkerBusy.current=false;setError(e.message);};worker.postMessage({id:current,files:[{name:'Live collector capture',text}],limits:{maxFileBytes:64*1024*1024}});
  }
- function startLive(token=liveToken.current){if(!token)return;setBusy(false);liveOpened.current=false;liveRef.current?.stop();++generation.current;workerRef.current?.terminate();liveWorkerBusy.current=false;pendingLive.current=null;setError('');setSessionId(null);setSelectedId(null);setInspectorOpen(false);setFilters(defaults);setCollapsed(new Set());const client=new CollectorClient({token,onCapture:ingestLive,onStatus:setLive,onPairing:setPairing});liveRef.current=client;client.run();}
+ function startLive(token=liveToken.current){if(!automaticLive&&!token)return;setCapture(null);setScreen('import');latestSessionRef.current=null;setBusy(false);liveOpened.current=false;liveRef.current?.stop();++generation.current;workerRef.current?.terminate();liveWorkerBusy.current=false;pendingLive.current=null;setError('');setSessionId(null);setSelectedId(null);setInspectorOpen(false);setFilters(defaults);setCollapsed(new Set());const client=new CollectorClient({token,automatic:automaticLive,onCapture:text=>{if(liveRef.current===client)ingestLive(text);},onStatus:status=>{if(liveRef.current===client)setLive(status);},onPairing:value=>{if(liveRef.current===client)setPairing(value);},onDevice:value=>{if(liveRef.current===client)setDevice(value);},onReset:()=>{if(liveRef.current!==client)return;liveOpened.current=false;latestSessionRef.current=null;++generation.current;workerRef.current?.terminate();liveWorkerBusy.current=false;pendingLive.current=null;setCapture(null);setSessionId(null);setSelectedId(null);setInspectorOpen(false);setHistory([]);setFilters(defaults);setCollapsed(new Set());setDevice(null);setScreen('import');}});liveRef.current=client;client.run();}
  function stopLive(){++generation.current;workerRef.current?.terminate();liveRef.current?.stop();liveRef.current=null;pendingLive.current=null;liveWorkerBusy.current=false;setLive({state:'idle',count:0});}
  async function downloadLive(){try{const blob=await liveRef.current.download(),url=URL.createObjectURL(blob),anchor=document.createElement('a');anchor.href=url;anchor.download='capture.ndjson';anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){setError(e.message);}}
- const liveControls=live.state!=='idle'?<section className="live-panel" inert={overlay&&inspectorOpen&&!!item}><div className="live-actions"><strong role="status">{live.state==='live'?'● Live':live.state==='error'?'Connection needs attention':live.state==='connecting'?'◌ Connecting':'◌ Reconnecting'} · {live.count} events</strong><button onClick={()=>setPairingOpen(!pairingOpen)}>Connect a device</button><button onClick={downloadLive}>Save capture</button><button onClick={()=>{stopLive();setScreen('import');}}>Disconnect</button></div>{live.error&&<p>{live.error}</p>}<p className="muted">{live.count?'Updates preserve your session, filters and selection. Completion not yet observed stays incomplete.':'Waiting for device events. Run the sample after pairing.'}</p>{pairingOpen&&<div className="pairing-options">{pairing.map(c=><div key={c.endpoint}><b>{c.certificate_sha256?'iOS / Wi-Fi · paired HTTPS':'Android ADB / iOS Simulator · loopback'}</b><p>{c.endpoint}</p><button onClick={async()=>{try{await navigator.clipboard.writeText(JSON.stringify(c));setError('');}catch{setError('Clipboard unavailable. Use the collector’s connection JSON file.');}}}>Copy pairing JSON</button></div>)}<p>Paste pairing JSON into the sample app. Android USB can be paired automatically with the collector’s --android and --device options. Pairing grants capture upload access.</p></div>}</section>:liveToken.current?<button onClick={()=>startLive()}>Reconnect to collector</button>:null;
+ const liveControls=<LiveConnection followLatest={followLatest} onFollowLatest={followNewest} live={live} available={automaticLive||!!liveToken.current} device={device} pairing={pairing} pairingOpen={pairingOpen} onTogglePairing={()=>setPairingOpen(!pairingOpen)} onStart={()=>startLive()} onStop={stopLive} onDownload={downloadLive} onError={setError} inert={overlay&&inspectorOpen&&!!item}/>;
  useEffect(()=>{const q=window.matchMedia('(max-width:1099px)');const change=()=>setOverlay(q.matches);q.addEventListener('change',change);return()=>q.removeEventListener('change',change);},[]);
  useEffect(()=>{if(overlay&&inspectorOpen)inspectorRef.current?.querySelector('button')?.focus();},[overlay,inspectorOpen,selectedId]);
  useEffect(()=>{setPage(0);},[filters,sessionId]);
@@ -44,10 +49,10 @@ function App(){
  function openSheet(kind){sheetTrigger.current=document.activeElement;setSheet(kind);}
  function closeSheet(){setSheet(null);requestAnimationFrame(()=>sheetTrigger.current?.isConnected&&sheetTrigger.current.focus());}
  function closeInspector(){setInspectorOpen(false);requestAnimationFrame(()=>focusBeforeInspector.current?.isConnected&&focusBeforeInspector.current.focus());}
- function select(id,options={}){if(options.open===false){setSelectedId(id);return;}if(id!==selectedId&&selectedId)setHistory(h=>[...h,selectedId]);if(!inspectorOpen)focusBeforeInspector.current=document.activeElement;setSelectedId(id);setInspectorOpen(true);}
- function changeSession(id){setSessionId(id);setFilters(defaults);setSelectedId(null);setInspectorOpen(false);setHistory([]);setCollapsed(new Set());closeSheet();setScreen('workspace');}
- function toggleCollapse(id){setCollapsed(old=>{const next=new Set(old);next.has(id)?next.delete(id):next.add(id);return next;});}
- const setFilter=(key,value)=>setFilters(old=>({...old,[key]:value}));
+ function select(id,options={}){followNewest(false);if(options.open===false){setSelectedId(id);return;}if(id!==selectedId&&selectedId)setHistory(h=>[...h,selectedId]);if(!inspectorOpen)focusBeforeInspector.current=document.activeElement;setSelectedId(id);setInspectorOpen(true);}
+ function changeSession(id,following=false){if(!following)followNewest(false);setSessionId(id);setFilters(defaults);setSelectedId(null);setInspectorOpen(false);setHistory([]);setCollapsed(new Set());closeSheet();setScreen('workspace');}
+ function toggleCollapse(id){followNewest(false);setCollapsed(old=>{const next=new Set(old);next.has(id)?next.delete(id):next.add(id);return next;});}
+ const setFilter=(key,value)=>{followNewest(false);setFilters(old=>({...old,[key]:value}));};
  async function parse(files){
   stopLive();const current=++generation.current;setBusy(true);setError('');workerRef.current?.terminate();
   const worker=new Worker(new URL('./import-worker.mjs',import.meta.url),{type:'module'});workerRef.current=worker;

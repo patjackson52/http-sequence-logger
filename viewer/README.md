@@ -24,7 +24,13 @@ The static output is `viewer/dist/`. Serve this directory over HTTP; direct `fil
 
 ## Live device captures
 
-Run `npm run build:viewer` and `npm run collector`, then open the printed viewer link. Android ADB pairing, iOS Simulator and Wi-Fi HTTPS setup are in the [transfer guide](../docs/transfer/README.md). The collector feeds durable NDJSON into the same validation/diagram pipeline. Live updates preserve selected sessions, filters, collapsed blocks and inspector state. Connection loss is separate from request outcomes; reconnect retrieves missing events. Save capture downloads the persisted file. Refreshing clears the in-memory browser pairing, so reopen the printed link.
+Run **`npm start`**, then open **http://127.0.0.1:4319/**. The command builds the viewer and starts the collector; the ordinary URL detects it and connects automatically. Refresh normally. No token URL, browser storage or pasted configuration is needed. **`npm run android:live`** also builds/installs the sample, pairs USB and runs a sign-in on the selected phone. Android ADB, iOS Simulator and Wi-Fi setup are in the [transfer guide](../docs/transfer/README.md).
+
+The live panel distinguishes collector connection, event count and Android device readiness. USB disconnects and reinstalls are retried automatically. A collector restart reconnects; changing its identity clears the old capture before loading the new one. Device upload credentials still stay private and upload authentication is unchanged.
+
+**Follow newest session** is enabled initially. New sessions come into view as events arrive; selecting a session/request, changing filters or collapsing a method stops following so inspection stays in place. Enable it again to return to the newest session. Updates within the selected session preserve its diagram state. **Pause live** or importing a file stops live updates; **Resume live** returns to the collector. **Save capture** downloads the persisted NDJSON.
+
+The file-only Vite viewer at port 4173 remains available via `npm run viewer`; its live link opens the collector at 4319. It never probes unrelated sites or scans local ports. Legacy token links remain accepted, but the collector now prints only its ordinary URL.
 
 ## Reading a capture
 
@@ -63,6 +69,7 @@ npm test
 npm run build:viewer
 # Real SVG downloads, offline rendering and desktop/mobile controls; requires Chrome:
 npm run check:svg-export
+npm run check:live-setup
 # Optional fresh native run; requires Android SDK + emulator:
 JAVA_HOME=/path/to/jdk17 ANDROID_SERIAL=emulator-5554 scripts/run-android-e2e.sh
 ```

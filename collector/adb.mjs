@@ -47,7 +47,15 @@ export function androidBridge({
   return {
     async pair(connection) {
       const port = new URL(connection.endpoint).port;
-      await invoke(["reverse", `tcp:${port}`, `tcp:${port}`]);
+      const route = `tcp:${port}`;
+      const routes = (await invoke(["reverse", "--list"])).stdout.toString("utf8");
+      if (!routes.split(/\r?\n/).some(line => line.trim().split(/\s+/).slice(-2).join(" ") === `${route} ${route}`))
+        await invoke(["reverse", route, route]);
+      const existing = await invoke(["exec-out", "run-as", packageName, "cat", "files/network-log/connection.json"]).catch(() => null);
+      try {
+        const saved = JSON.parse(existing?.stdout.toString("utf8") || "null");
+        if (saved && Object.keys(connection).every(key => saved[key] === connection[key])) return;
+      } catch { /* Replace absent or incomplete development pairing atomically. */ }
       // Controlled shell program; connection JSON travels through stdin, never shell interpolation.
       await new Promise((ok, fail) => {
         const child = execFileCallback(
@@ -60,7 +68,7 @@ export function androidBridge({
             packageName,
             "sh",
             "-c",
-            "'umask 077; mkdir -p files/network-log; cat > files/network-log/connection.json'",
+            "'umask 077; mkdir -p files/network-log; cat > files/network-log/connection-adb.tmp && mv files/network-log/connection-adb.tmp files/network-log/connection.json'",
           ],
           { timeout: 10000 },
           (error) => (error ? fail(error) : ok()),
@@ -69,6 +77,8 @@ export function androidBridge({
       });
     },
     async poll(ingest) {
+      // An installed app may not have captured anything yet.
+      await invoke(["exec-out", "run-as", packageName, "mkdir", "-p", "files/captures"]);
       const { stdout } = await invoke([
         "exec-out",
         "run-as",

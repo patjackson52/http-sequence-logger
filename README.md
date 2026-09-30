@@ -38,15 +38,18 @@ HTTP 200 headers do not establish successful completion: a later body-read timeo
 
 ## Stream logs into the viewer
 
-See [device transfer and pairing](docs/transfer/README.md) for Android ADB, iOS Simulator, paired Wi-Fi HTTPS, and offline file import. The collector persists NDJSON and streams updates to the viewer without a hosted backend.
+For an Android device or emulator, with JDK 17 and Android SDK 35 installed:
 
 ```sh
 npm ci
-npm run build:viewer
-npm run collector
+npm run android:live
 ```
 
-Open the printed viewer link. [Web viewer guide](viewer/README.md) · [Swift transport and iOS demo](ios/README.md).
+This builds the viewer and debug app, selects the connected phone (or sole emulator), installs it, pairs USB, opens the browser, and runs a sign-in. No serial, pairing JSON or special viewer URL is needed for a single phone. Use `-- --device SERIAL` only when device selection is ambiguous; `-- --recovery` runs the 401/refresh scenario. Leave the command running for live updates.
+
+For an already installed app or another producer, run **`npm start`**. It builds and starts the collector, opens [the live viewer](http://127.0.0.1:4319/), and detects the Android sample if present. The plain URL connects automatically and survives refresh. The live panel shows device connection state; USB routing and pairing recover after reconnect/reinstall. File imports pause live updates until **Resume live** is selected.
+
+See [device transfer and pairing](docs/transfer/README.md) for customer apps, iOS Simulator and paired Wi-Fi HTTPS. [Web viewer guide](viewer/README.md) · [Swift transport and iOS demo](ios/README.md).
 
 ## Run the browser sample
 

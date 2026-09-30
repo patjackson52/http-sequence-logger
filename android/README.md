@@ -15,6 +15,17 @@ Use [debug-only integration and release verification](RELEASE.md) for production
 
 ## Build and run
 
+The fastest path, once Node dependencies and Android build tools are installed:
+
+```sh
+npm ci
+npm run android:live
+```
+
+This builds and installs the debug sample, automatically picks the single connected phone (or sole emulator), configures USB streaming, opens http://127.0.0.1:4319/ and runs a sign-in. `-- --recovery` runs the 401 scenario; `-- --no-run` opens the app without starting a flow; `-- --no-open` skips opening a browser. With multiple phones, supply `-- --device SERIAL`. The process keeps the collector running until Ctrl+C. Repeated runs reuse the collector in the same directory; `--dir` and `--port` are optional overrides, not required setup.
+
+The debug activity consumes a `networklog.run` intent extra once, so rotation does not restart the flow. Release code does not include that launcher behavior. The lower-level build/install commands follow for IDE workflows.
+
 Use JDK 17, Android SDK Platform 35, and an API 26+ device/emulator. Gradle 8.14.3 (checksum verified), AGP 8.13.2, and Kotlin 2.2.20 are pinned. Gradle downloads the pinned dependencies on the first build.
 
 ```sh

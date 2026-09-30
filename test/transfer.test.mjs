@@ -291,6 +291,7 @@ test("HTTPS listener offers paired ingestion only and refuses browser capture re
   assert.equal(await request("/api/v1/events", "POST", fixture[0] + "\n"), 200);
   assert.equal(await request("/api/v1/events"), 404);
   assert.equal(await request("/api/v1/pairing"), 404);
+  assert.equal(await request("/api/v1/viewer-session"), 404);
   assert.equal(await request("/"), 404);
   assert.match(c.connections[1].certificate_sha256, /^[a-f0-9]{64}$/);
 });

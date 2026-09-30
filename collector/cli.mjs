@@ -1,94 +1,25 @@
 #!/usr/bin/env node
-import { resolve } from "node:path";
-import { writeFileSync } from "node:fs";
-import { startCollector } from "./server.mjs";
-import { localCertificate } from "./tls.mjs";
-import { androidBridge } from "./adb.mjs";
-const args = process.argv.slice(2),
-  options = {};
+import { buildViewer, startDesktopCollector } from './runtime.mjs';
+const args = process.argv.slice(2), options = {};
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === "--help") {
-    console.log(
-      "npm run collector -- [--dir artifacts/collector] [--port 4319] [--lan HOST] [--tls-port 4320] [--android APPLICATION_ID --device SERIAL] [--adb PATH]\nAndroid: configures ADB reverse and private pairing, then watches files/captures/*.ndjson as a fallback.\niOS/Wi-Fi: use --lan with the desktop LAN IP/hostname, then paste connection-lan.json in the app.",
-    );
+  if (args[i] === '--help') {
+    console.log('npm start — build the viewer, start live streaming and detect the Android sample.\nnpm run android:live — also build/install/run the sample.\nOptions: --dir PATH --port PORT --android PACKAGE --device SERIAL --adb PATH --lan HOST --tls-port PORT --no-android --open --no-open\nThe plain viewer URL connects automatically. USB pairing and forwarding recover after reconnect.');
     process.exit(0);
   }
-  if (
-    ![
-      "--dir",
-      "--port",
-      "--lan",
-      "--tls-port",
-      "--android",
-      "--device",
-      "--adb",
-    ].includes(args[i]) ||
-    !args[i + 1]
-  )
-    throw new Error(`Unknown or missing option: ${args[i]}`);
-  options[args[i].slice(2)] = args[++i];
+  if (args[i] === '--no-android') { options.android = false; continue; }
+  if (args[i] === '--open' || args[i] === '--no-open') { options.open = args[i] === '--open'; continue; }
+  if (!['--dir', '--port', '--android', '--device', '--adb', '--lan', '--tls-port'].includes(args[i]) || !args[i + 1] || args[i + 1].startsWith('--')) throw new Error(`Unknown or missing option: ${args[i]}`);
+  const key = args[i].slice(2); options[key === 'tls-port' ? 'tlsPort' : key] = args[++i];
 }
-const directory = resolve(options.dir || "artifacts/collector");
-function port(value, fallback) {
-  const number = Number(value ?? fallback);
-  if (!Number.isInteger(number) || number < 1 || number > 65535)
-    throw new Error("Invalid port");
-  return number;
+for (const key of ['port', 'tlsPort']) if (options[key] != null) {
+  options[key] = Number(options[key]);
+  if (!Number.isInteger(options[key]) || options[key] < 1 || options[key] > 65535) throw new Error('Invalid port');
 }
-const tls = options.lan
-  ? {
-      ...localCertificate(directory, options.lan),
-      port: port(options["tls-port"], 4320),
-    }
-  : null;
-const collector = await startCollector({
-  directory,
-  port: port(options.port, 4319),
-  tls,
-});
-for (const [i, connection] of collector.connections.entries())
-  writeFileSync(
-    resolve(directory, i ? "connection-lan.json" : "connection-loopback.json"),
-    JSON.stringify(connection, null, 2) + "\n",
-    { mode: 0o600 },
-  );
-console.log(
-  `Viewer: ${collector.viewerURL}\nCapture: ${collector.store.path}\nPairing files: ${directory}/connection-*.json`,
-);
-let stopped = false;
-for (const signal of ["SIGINT", "SIGTERM"])
-  process.once(signal, async () => {
-    stopped = true;
-    await collector.close();
-    process.exit(0);
-  });
-if (options.android) {
-  const bridge = androidBridge({
-    packageName: options.android,
-    device: options.device,
-    adb: options.adb,
-  });
-  try {
-    await bridge.pair(collector.connections[0]);
-    console.log(
-      "Android paired through ADB reverse. Watching private capture files.",
-    );
-  } catch (error) {
-    console.error(`Android pairing unavailable: ${error.message}`);
-  }
-  let lastError = "";
-  async function poll() {
-    if (stopped) return;
-    try {
-      await bridge.poll((text) => collector.ingest(text));
-      if (lastError) console.log("Android file watch reconnected.");
-      lastError = "";
-    } catch (error) {
-      if (error.message !== lastError)
-        console.error(`Android file watch: ${error.message}`);
-      lastError = error.message;
-    }
-    if (!stopped) setTimeout(poll, 1500).unref();
-  }
-  poll();
+await buildViewer();
+let runtime;
+try { runtime = await startDesktopCollector(options); }
+catch (error) {
+  console.error(error.code === 'EADDRINUSE' ? `Port ${options.port || 4319} is already in use. Open http://127.0.0.1:${options.port || 4319}/ or stop that collector before starting another.` : error.message);
+  process.exit(1);
 }
+for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, async () => { await runtime.close(); process.exit(0); });

@@ -2,18 +2,24 @@
 export class CollectorClient {
   constructor({
     token,
+    automatic = false,
     fetcher = (...args) => fetch(...args),
     onCapture = () => {},
     onStatus = () => {},
     onPairing = () => {},
+    onDevice = () => {},
+    onReset = () => {},
     retryMs = 1000,
   }) {
     Object.assign(this, {
       token,
+      automatic,
       fetcher,
       onCapture,
       onStatus,
       onPairing,
+      onDevice,
+      onReset,
       retryMs,
     });
     this.cursor = 0;
@@ -26,27 +32,58 @@ export class CollectorClient {
       headers: { Authorization: `Bearer ${this.token}` },
       signal,
       cache: "no-store",
+      mode: "same-origin",
+      redirect: "error",
     });
+    signal?.throwIfAborted();
     if (!response.ok) {
       const error = new Error(
         response.status === 401
-          ? "Open the collector’s viewer link to pair this browser."
+          ? "The collector connection expired. Reconnecting…"
           : `Collector returned HTTP ${response.status}`,
       );
-      error.permanent = response.status === 401 || response.status === 403;
+      error.permanent = !this.automatic && (response.status === 401 || response.status === 403);
       throw error;
     }
     return response;
+  }
+  async connect(signal) {
+    if (!this.automatic) return;
+    const response = await this.fetcher("/api/v1/viewer-session", {
+      headers: { "X-Network-Log-Viewer": "1" },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
+      cache: "no-store", mode: "same-origin", redirect: "error",
+    });
+    signal.throwIfAborted();
+    if (!response.ok) throw new Error(response.status === 403
+      ? "Open this viewer directly at the collector's local address."
+      : "Waiting for the local collector to restart…");
+    const session = await response.json();
+    signal.throwIfAborted();
+    if (session.version !== 1 || typeof session.token !== "string" || session.token.length < 16 || typeof session.collector_id !== "string")
+      throw new Error("Invalid collector connection response");
+    if (this.collectorId && this.collectorId !== session.collector_id) {
+      this.cursor = 0; this.lines = []; this.onReset();
+    }
+    this.collectorId = session.collector_id;
+    this.token = session.token;
+  }
+  async refreshDevice(signal) {
+    if (!this.automatic) return;
+    const status = await (await this.request("/api/v1/status", signal)).json();
+    signal.throwIfAborted();
+    this.onDevice(status.device);
   }
   async catchUp(signal) {
     for (;;) {
       const page = await (
         await this.request(`/api/v1/events?after=${this.cursor}`, signal)
       ).json();
+      signal.throwIfAborted();
       if (this.collectorId && page.collector_id !== this.collectorId)
         throw Object.assign(
-          new Error("Collector identity changed. Reopen its viewer link."),
-          { permanent: true },
+          new Error("Collector changed. Reconnecting…"),
+          { permanent: !this.automatic },
         );
       this.collectorId = page.collector_id;
       if (
@@ -77,6 +114,7 @@ export class CollectorClient {
           state: this.cursor ? "reconnecting" : "connecting",
           count: this.cursor,
         });
+        await this.connect(signal);
         // Open notification stream before fetching backlog, so arrivals during catch-up aren't missed.
         const response = await this.request("/api/v1/stream", signal);
         const reader = response.body.getReader();
@@ -86,6 +124,7 @@ export class CollectorClient {
             (await (await this.request("/api/v1/pairing", signal)).json())
               .connections,
           );
+          await this.refreshDevice(signal);
           this.onStatus({ state: "live", count: this.cursor });
           delay = this.retryMs;
           const decoder = new TextDecoder();
@@ -102,6 +141,7 @@ export class CollectorClient {
               buffer = buffer.slice(boundary + 2);
               if (/^event: (ready|changed)$/m.test(message)) {
                 await this.catchUp(signal);
+                await this.refreshDevice(signal);
                 this.onStatus({ state: "live", count: this.cursor });
               }
             }

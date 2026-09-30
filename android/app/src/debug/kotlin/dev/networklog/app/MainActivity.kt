@@ -123,6 +123,19 @@ class MainActivity : Activity() {
         label("DEVELOPMENT DEMO", 11f, Color.rgb(34, 112, 85))
         label("Public synthetic account • demonstration challenge\nNo phone verification or OAuth security claim.\nCredentials and tokens are redacted before writing.\nCaptures stay local unless you pair a collector or export.", 12f)
         Runs.resume(applicationContext)
+        if (savedInstanceState == null) runFromIntent()
+    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        Runs.resume(applicationContext)
+        runFromIntent()
+    }
+    /** Development launcher only; consumed so rotation does not repeat a flow. */
+    private fun runFromIntent() {
+        val requested = intent.getStringExtra("networklog.run") ?: return
+        intent.removeExtra("networklog.run")
+        if (requested == "success" || requested == "recovery") begin(requested == "recovery")
     }
     private fun begin(recover: Boolean) = Runs.run(applicationContext, File(filesDir, "captures"), packageName,
         session.text.toString().takeIf { it.isNotEmpty() }, recover)

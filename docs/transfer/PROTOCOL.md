@@ -30,13 +30,20 @@ Identical duplicate IDs (ignoring JSON key order) are accepted without duplicate
 
 ## Collector and viewer
 
-The collector's loopback HTTP listener serves the built viewer. Its separate browser token allows read access, export, and viewing connection configuration; the device token only permits upload. The CLI prints a viewer link with the browser token in the URL fragment, which the viewer removes and keeps only in session memory. Requests use Authorization headers. An optional HTTPS LAN listener permits authenticated device ingestion only, never unauthenticated capture browsing. Host and Origin checks protect the loopback HTTP listener; no permissive CORS headers are sent.
+The collector's loopback HTTP listener serves the built viewer. Its separate browser token allows read access, export, and viewing connection configuration; the device token only permits upload. The CLI prints the ordinary loopback URL. Collector-served HTML includes a non-secret `network-log-collector` marker; the viewer then obtains its read token from the same origin and keeps it only in memory. Requests still use Authorization headers. Legacy fragment links are removed on initial load and remain compatible; no new links contain credentials. An optional HTTPS LAN listener permits authenticated device ingestion only, never unauthenticated capture browsing. Host and Origin checks protect the loopback HTTP listener; no permissive CORS headers are sent.
 
-`GET /api/v1/health` identifies a collector on the loopback listener, without secrets; it is unavailable on the upload-only LAN listener. Browser-authenticated loopback routes:
+`GET /api/v1/health` identifies a collector on the loopback listener, without secrets; it includes `service: "http-sequence-logger"` and `automatic_viewer: true`. It is unavailable on the upload-only LAN listener.
+
+`GET /api/v1/viewer-session` returns `{version:1,collector_id,token}` only on loopback and requires **all** of `Sec-Fetch-Site: same-origin`, `Sec-Fetch-Mode: same-origin` and `X-Network-Log-Viewer: 1`. Host must be the listener's `127.0.0.1:port` or `localhost:port`; any Origin must match that exact host/port. Navigation, foreign/same-site origins, missing metadata and untrusted Hosts are rejected. It emits `Cache-Control: no-store` and `Cross-Origin-Resource-Policy: same-origin`, with no CORS permission. Browser scripts cannot set [Fetch Metadata headers](https://www.w3.org/TR/fetch-metadata/); local command-line processes remain trusted, as they already have access to the collector's private files. This grants a locally opened viewer access without exposing read APIs or device uploads anonymously. The LAN listener rejects this route.
+
+The viewer bootstraps again after each connection loss, including credential rotation. New collector identity resets the cursor and displayed capture; same-identity reconnect catches up without duplicates. File-only static hosting has no marker and stays in file mode rather than scanning ports or weakening CORS.
+
+Browser-authenticated loopback routes:
 
 - `GET /api/v1/events?after=<cursor>` returns `{collector_id,cursor,lines:[string],has_more}` in bounded pages. Cursors are collector-global journal positions, not source timestamps.
 - `GET /api/v1/stream` sends SSE `ready`/`changed` notifications with `{collector_id,cursor}` and heartbeat comments. Reconnect and read events after the browser's last cursor. Snapshot/event download closes the subscribe/fetch race.
 - `GET /api/v1/download` exports the persisted NDJSON.
+- `GET /api/v1/status` returns collector identity and Android connection state; device changes notify existing SSE subscribers even if the event cursor has not changed.
 - `GET /api/v1/pairing` returns loopback and available LAN connection configurations for explicit pairing.
 
 A browser disconnect is transport state, not a synthetic HTTP failure or method return. Live records with no terminal event display 'completion not yet observed'; imported files retain the existing incomplete-capture wording. The viewer preserves selection, filters and scroll while adding events. HTTP-only and handler behavior remain unchanged.
@@ -58,6 +65,6 @@ Restart the development server after changing the pairing file. Host apps retain
 
 ## ADB file retrieval
 
-The CLI's optional Android watcher reads NDJSON from the debuggable app's `files/captures/` using `run-as`, tracks file changes, and buffers incomplete UTF-8/NDJSON tails. File replacement or rotation resets the file offset, while collector event-ID deduplication prevents duplicate records. Only validated package/filename arguments reach adb; commands do not parse Logcat. This works with the existing file-only SDK and with the transfer sink, and gives a no-app-change migration path. Device disconnects are retried and are shown as retrieval diagnostics.
+The CLI's optional Android watcher reads NDJSON from the debuggable app's `files/captures/` using `run-as`, tracks file changes, and buffers incomplete UTF-8/NDJSON tails. File replacement or rotation resets the file offset, while collector event-ID deduplication prevents duplicate records. Only validated package/filename arguments reach adb; commands do not parse Logcat. This works with the existing file-only SDK and with the transfer sink, and gives a no-app-change migration path. Device disconnects are retried and surfaced in the viewer. Routing and private pairing are rechecked after reconnect/reinstall. The first selected device is retained for the life of the watcher; it never silently switches phones.
 
 ACK bodies are bounded at **2 MiB** by both native senders, including chunked responses. A valid 1 MiB upload with many long or multibyte IDs can exceed 512 KiB in its ACK; do not use a smaller receiver limit. Oversized ACKs retain pending data and are rejected.

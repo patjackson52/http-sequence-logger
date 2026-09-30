@@ -22,11 +22,10 @@ In the pinned logger checkout, with Node **22.12+**:
 
 ```sh
 npm ci
-npm run build:viewer
-npm run collector
+npm start
 ```
 
-Open the **Viewer** link printed by the collector. Default browser/API origin is `http://127.0.0.1:4319`; the link also carries a private browser token in its fragment. The page removes that fragment and retains the token in memory. On refresh, reopen the printed link. Plain `http://127.0.0.1:4319` can show file import without pairing but does not grant live read access.
+Open **http://127.0.0.1:4319/**. The collector-served viewer obtains its read credential automatically through a guarded same-origin bootstrap. Refresh and collector reconnect do not require a special URL. No credential is stored in localStorage/sessionStorage. For the repository Android sample, `npm run android:live` also builds, installs, pairs and runs the app with automatic device selection.
 
 For offline file import only, use `npm run viewer` or `npm run preview:viewer` (after a build), at `http://127.0.0.1:4173`. That Vite origin is **not** a collector endpoint. Live reads use the collector's own origin; adding permissive CORS or using a `file://` viewer is unnecessary and unsupported. Rebuild the viewer after changing source; the collector serves `viewer/dist/`.
 
@@ -34,7 +33,7 @@ For offline file import only, use `npm run viewer` or `npm run preview:viewer` (
 
 | Device | Pairing origin | Setup |
 | --- | --- | --- |
-| Android emulator or USB device | Loopback HTTP on the device, forwarded to desktop | Installed debuggable app, authorized ADB, explicit serial, `adb reverse` |
+| Android emulator or USB device | Loopback HTTP on the device, forwarded to desktop | Installed debuggable app, authorized ADB; automatic selection, pairing and `adb reverse` |
 | iOS Simulator on this Mac | Desktop loopback HTTP | Development target permits local networking; pass generated loopback pairing JSON |
 | Physical iPhone or Android over LAN | Desktop LAN HTTPS origin with paired certificate | Reachable host/firewall, generated LAN pairing JSON, applicable local-network permission |
 | Browser frontend on developer computer | Same-origin development relay; relay forwards to desktop loopback | Debug package, origin-scoped journal, loopback-bound Node dev server; pairing stays server-side |
@@ -46,7 +45,7 @@ Android low-friction connection, with the **actual application ID** (including a
 npm run collector -- --android com.example.customer.debug --device emulator-5554 --adb /absolute/path/to/adb
 ```
 
-This configures port reversal, writes `files/network-log/connection.json` through `run-as`, and polls **only** `files/captures/*.ndjson` as a fallback. It does not modify app source or install an interceptor. `DebugTransfer.open` reads pairing when a new sink opens; an already-open sink does not retarget. Re-pair after reinstalling or removing port reversal. The watcher retries reads after disconnect; the CLI does not continuously reinstall pairing/reverse. File-only logging can use the watcher without a native uploader; double delivery deduplicates by event ID.
+This configures port reversal, writes `files/network-log/connection.json` through `run-as`, and polls **only** `files/captures/*.ndjson` as a fallback. It does not modify app source or install an interceptor. `DebugTransfer.open` reads pairing when a new sink opens; an already-open sink does not retarget. The watcher repairs pairing and port reversal after reconnect/reinstall. With one phone, `--device` and `--adb` can be omitted; selection prefers the single phone over emulators and does not switch devices during a running collector. File-only logging can use the watcher without a native uploader; double delivery deduplicates by event ID.
 
 For manual port reversal, using the selected serial:
 
@@ -137,7 +136,8 @@ Pairing JSON contains `version: 1`, an endpoint **origin**, upload `token`, `col
 | --- | --- |
 | `POST /api/v1/events` | Loopback or LAN; device token; NDJSON batch |
 | `GET /api/v1/health` | Loopback only; no token; connectivity/identity check |
-| `GET /api/v1/events?after=<cursor>`, `/api/v1/stream`, `/api/v1/download`, `/api/v1/pairing` | Loopback only; browser token; same-origin viewer |
+| `GET /api/v1/viewer-session` | Loopback only; strict same-origin browser metadata and custom header; returns in-memory read credential |
+| `GET /api/v1/events?after=<cursor>`, `/api/v1/stream`, `/api/v1/download`, `/api/v1/pairing`, `/api/v1/status` | Loopback only; browser token; same-origin viewer |
 
 Native batches are at most **1 MiB / 500 events**. The collector fsyncs new events before ACK; both native implementations cap ACKs at **2 MiB** and check collector identity and submitted IDs. Retries keep IDs and timestamps intact. Identical events deduplicate and conflicts reject the batch. Pairing a new collector causes native sinks to replay bytes still retained in their files/spools without synthesizing new requests. After Swift spool compaction, recovering full history requires an explicit `relaySanitizedFile(canonicalURL)`; the sink does not discover or reread the app's canonical files automatically. Device transport is HTTP; browser live notification is SSE, not WebSocket.
 
@@ -160,7 +160,7 @@ Browser replay uses the same 1 MiB / 500-event upload and 2 MiB ACK bounds throu
 | `run-as` denied / wrong app | Installed variant's real application ID, debug flag, selected/authorized device |
 | Paired but no events | Capture hooks actually installed; session/sink active; correct canonical directory; `DebugTransfer.open` happened after pairing; validate a local file first |
 | HTTP upload fails on Android loopback | ADB reverse, debug network-security merge, INTERNET permission, correct port and loopback pairing |
-| Browser 401 after refresh | Reopen printed Viewer link, not device JSON/token or a bare URL |
+| Browser cannot connect | Open the plain loopback collector URL at 4319; restart the collector after updating it. Read credentials refresh automatically. Port 4173 is file-only. |
 | Browser sample upload 404 | Restart sample with `NETWORK_LOG_CONNECTION` pointing to private loopback pairing; relay middleware is optional |
 | Browser relay 403 | Frontend origin/Host must exactly match configured scheme, host and port; use `127.0.0.1`, not a mismatched `localhost` alias |
 | Browser journal missing after reload | Same origin/profile/database/journal ID; previous flush succeeded; inspect memory fallback and IndexedDB errors |

@@ -1,5 +1,25 @@
 # Transfer verification
 
+## Automatic live setup — 2026-09-30 UTC
+
+The plain `http://127.0.0.1:4319/` URL now connects automatically. `npm start` builds/serves the viewer and checks the installed Android sample; `npm run android:live` also builds, installs, pairs and launches a flow. Pairing is still private and authenticated; the browser receives its read credential through the guarded same-origin route described in [the protocol](PROTOCOL.md).
+
+Verified on macOS with a Pixel 10 Pro and Chrome 154.0.8037.59:
+
+- The launcher selected the physical phone despite three connected emulators, installed the debug APK, started the collector and ran a complete eight-request sign-in without serial/ADB/pairing arguments.
+- A repeated launch reused the existing collector successfully with `JAVA_HOME`, `ANDROID_HOME`, `ANDROID_SDK_ROOT` unset and `android/local.properties` temporarily absent. The original local file was restored after the check.
+- Removing the device's collector reverse mapping and private pairing file was repaired automatically. Existing valid mappings/configuration are retained during ordinary polls. The viewer showed the phone's paired status.
+- A fresh recovery run produced nine requests across three origins, one expected HTTP 401, one app handler invocation/return and no unfinished observations. The plain viewer URL selected the newest session, streamed the run and reconnected after refresh. An earlier recovery attempt hit `UnknownHostException` against the public auth API; that partial business flow was retained accurately rather than rewritten as success.
+- After the Pixel disconnected and returned over USB, the running collector paired it again without restart. A final eight-request sign-in completed across three origins with one handler handoff, no failed or unfinished observations, and no browser errors. The plain URL streamed the new session and survived refresh; desktop and 390 × 844 layouts were checked with no page overflow.
+- `npm run check:live-setup` passed 14 real-browser checks: ordinary URL, empty collector, device status, incremental capture with selection/search preserved, refresh without credential storage, same-journal restart, new collector identity, pause/resume, file import isolation, resuming an empty collector, following new sessions, legacy link compatibility, localhost alias and rejected foreign-origin access.
+- `npm test`: **219 tests passed**, including bootstrap rejection for untrusted Host/Origin, missing or cross-origin Fetch Metadata, navigation and non-GET methods; upload authentication and LAN isolation remain enforced. ADB tests cover selection ambiguity, authorization and repair without repeatedly rebinding an active route.
+- `android/scripts/verify-release.sh`: passed debug/native unit tests, production dependency/APK/resource audits, R8 and the negative dependency probe. Intent-driven sample launch exists only in debug source; production still contains only the small logging abstraction.
+- Regression checks passed for the full browser SDK flow (63 events, capture/persistence/transfer/viewer and production no-op) and 12 real SVG downloads with standalone/offline rendering.
+
+Runtime evidence is kept in ignored `artifacts/live-setup/`, including the launcher output, browser checks, Pixel summary and screenshot. Captures remain in `artifacts/collector/capture.ndjson` and private device storage. Physical iOS automatic pairing and browser-SDK background upload are not added by this change; their existing explicit pairing/delivery routes still apply.
+
+## Original transport verification
+
 Verified locally on 2026-09-29 UTC (2026-09-28 Pacific). The collector, native senders and browser use the same version-1 transfer protocol and schema-1.0/1.1 event validator.
 
 ## Collector and browser

@@ -52,6 +52,8 @@ try {
   await page.locator('#upload').click(); await page.waitForFunction(() => document.querySelector('#capture-status').textContent.startsWith('Delivered'));
   assert.equal(collector.store.cursor, count);
   const viewer = await context.newPage(); await viewer.goto(collector.viewerURL);
+  // Live viewing follows the newest session; select the auth flow for this inspection.
+  await viewer.locator('.session-nav .session-row').filter({ hasText: 'Browser SDK auth with recovery' }).click();
   await viewer.getByRole('heading', { name: 'Browser SDK auth with recovery', exact: true }).waitFor();
   await viewer.getByText('Client', { exact: true }).waitFor();
   await viewer.screenshot({ path: join(artifact, 'viewer.png'), fullPage: true });

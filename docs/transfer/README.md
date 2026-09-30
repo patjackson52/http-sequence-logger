@@ -16,18 +16,20 @@ HTTP batch upload is enough for the current 10–20 request sessions. Device Web
 
 ## One-command Android connection
 
-Build/install the sample using [Android instructions](../../android/README.md). Then, from the repository root:
+With Node dependencies, JDK 17, Android SDK 35 and an authorized USB device/emulator:
 
 ```sh
 npm ci
-npm run build:viewer
-npm run collector -- --android dev.networklog.sample --device emulator-5554 \
-  --adb "$HOME/Library/Android/sdk/platform-tools/adb"
+npm run android:live
 ```
 
-Use your actual serial from `adb devices`. Open the **Viewer** URL printed by the command and run the sample. The command establishes `adb reverse tcp:4319 tcp:4319`, writes the private app pairing file, and watches existing capture files as a fallback. The sample chooses the HTTP sink at the start of its next run; it still offers local file export. Repeated file reads and HTTP deliveries deduplicate by event ID.
+This builds/installs the sample and viewer, chooses the single phone in preference to emulators, starts the collector, configures private pairing and USB reverse, opens **http://127.0.0.1:4319/** and runs the sample. No serial or connection JSON is required in the common case. Multiple phones or emulators need `-- --device SERIAL`; `-- --recovery` selects the retry flow. Keep the command running.
 
-The app must be installed and debuggable for `run-as`. Re-run the collector command after reinstalling the app or losing ADB reverse. If pairing setup is unavailable, the collector stays usable; the file watcher reconnects automatically. It watches only the documented `files/captures` directory; custom apps can place exports there or use the sink with their own capture location. Files are limited to 16 MiB each for ADB extraction.
+For an already installed sample, **`npm start`** builds/starts the viewer and collector and automatically connects it. For a customer debug app, use `npm run collector -- --android YOUR_APPLICATION_ID`; device selection and ADB discovery are automatic unless overridden with `--device`/`--adb`. `--no-android` disables device watching for iOS/browser-only work.
+
+The collector checks pairing and reinstalls `adb reverse` while watching. It recovers after USB reconnect, app reinstall or removal of the route; a private pairing file is replaced atomically only if its contents differ. It watches `files/captures/*.ndjson` as a fallback, and HTTP plus file deliveries deduplicate by event ID. The live panel shows the selected phone and connection state. An app must be installed and debuggable for `run-as`; if absent, the collector waits and shows the next step. Each extracted file is limited to 16 MiB.
+
+While automatic USB watching is running, it owns this app's collector pairing. Stop that collector or restart it with `--no-android` before disconnecting pairing in the app. **Pause live** pauses browser updates; the collector continues retaining incoming events.
 
 For Kotlin integration see `DebugTransfer.open(context, captureFile)` and `FileHttpEventSink` in the [Android guide](../../android/README.md). Existing HTTP wrappers and customer manual recording APIs stay the same: transfer is an `EventSink` choice. Call recording on a worker thread because durable disk writes are synchronous. The sender's own requests never pass through the recorder.
 
@@ -41,7 +43,7 @@ For a physical phone, use the desktop's LAN IP or hostname:
 npm run collector -- --lan 192.168.1.25
 ```
 
-This adds HTTPS on port 4320 and creates `connection-lan.json`. The HTTPS listener accepts uploads only. The browser UI and capture-reading APIs remain bound to desktop loopback. Open the printed viewer URL on the desktop, click **Connect a device**, copy the HTTPS pairing JSON, and paste it in the sample app. Allow the app's local-network permission when prompted. The phone must be able to reach the desktop through its firewall and Wi-Fi network.
+This adds HTTPS on port 4320 and creates `connection-lan.json`. The HTTPS listener accepts uploads only. The browser UI and capture-reading APIs remain bound to desktop loopback. Open the printed viewer URL on the desktop, click **Other devices**, copy the HTTPS pairing JSON, and paste it in the sample app. Allow the app's local-network permission when prompted. The phone must be able to reach the desktop through its firewall and Wi-Fi network.
 
 For Android apps targeting SDK 37 or higher on Android 17, direct LAN uploads require the app to declare and request `ACCESS_LOCAL_NETWORK`. The current sample targets SDK 35; lower-target apps should not request the new permission. See [Android local-network requirements](https://developer.android.com/privacy-and-security/local-network-permission). iOS requires its local-network usage description and permission where applicable; see [Apple local-network privacy](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
 
@@ -53,7 +55,7 @@ The iOS deliverable is a transport package plus a manually instrumented URLSessi
 
 - The viewer opens the collected sessions automatically. New arrivals preserve selection, inspector, filters and collapsed methods. **Save capture** downloads all persisted events across sessions.
 - Each app keeps a durable local spool. Upload failure does not change an observed HTTP request's success/error outcome. Validated ACKs advance a collector-specific cursor; reopening retries anything unacknowledged.
-- The browser uses a separate read token from its launch URL, removes that token from the address bar, and keeps it in memory. After refreshing, reopen the printed launch URL. A reconnect replays missed events using the cursor. A changed collector identity requires its new launch link.
+- The ordinary loopback viewer URL obtains its separate read credential automatically using a same-origin request. Refresh needs no special link. A reconnect replays missed events; a new collector identity clears old rows before loading the new capture. File import or Pause live suspends updates until Resume live.
 - Missing terminal events remain incomplete observations. A disconnected collector is shown as a connection state, never as an HTTP failure in the diagram.
 - The collector persists before acknowledging. Identical events are safe to replay; conflicting IDs or recording sequences reject the whole batch. Event schema errors are rejected; incomplete live lifecycles are accepted and become viewer diagnostics until completion arrives.
 - Storage is bounded: collector 64 MiB / 100,000 events; each HTTP batch 1 MiB / 500 events. Native spool defaults are documented per platform. On exhaustion, retain/export the existing capture and start a fresh one; unacknowledged events are never evicted. The Swift transport may reclaim already-acknowledged spool records, so keep the canonical capture file for full-history export. Large session diagrams are not virtualized.

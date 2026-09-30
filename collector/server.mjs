@@ -57,6 +57,7 @@ export async function startCollector({
   let server, secureServer;
   let origin;
   const connections = [];
+  let deviceStatus = { state: "none", message: "Run npm run android:live to connect the Android sample, or pair another device." };
   const publish = () => {
     for (const res of subscribers) {
       if (res.writableLength > 64 * 1024) {
@@ -81,7 +82,8 @@ export async function startCollector({
         : [new URL(origin).host, `localhost:${server.address().port}`];
       if (!permittedHosts.includes(req.headers.host))
         throw new TransferError(403, "Unrecognized collector host");
-      if (req.headers.origin && req.headers.origin !== origin)
+      const browserOrigin = `http://${req.headers.host}`;
+      if (req.headers.origin && req.headers.origin !== (lan ? origin : browserOrigin))
         throw new TransferError(403, "Unrecognized browser origin");
       if (!req.url.startsWith("/") || req.url.startsWith("//"))
         throw new TransferError(400, "Use origin-form request targets");
@@ -108,17 +110,30 @@ export async function startCollector({
       if (req.method === "GET" && route === "/api/v1/health") {
         reply(res, 200, {
           version: 1,
+          service: "http-sequence-logger",
+          automatic_viewer: true,
           collector_id: store.config.collector_id,
           live: true,
           recovered_partial_tail: store.recoveredPartial,
         });
         return;
       }
+      if (req.method === "GET" && route === "/api/v1/viewer-session") {
+        // A top-level navigation, image, foreign page or untrusted Host cannot
+        // acquire credentials. Browser scripts cannot set Sec-Fetch-* headers.
+        if (req.headers["sec-fetch-site"] !== "same-origin" ||
+            req.headers["sec-fetch-mode"] !== "same-origin" ||
+            req.headers["x-network-log-viewer"] !== "1")
+          throw new TransferError(403, "Open the viewer on this collector's local address");
+        res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+        reply(res, 200, { version: 1, collector_id: store.config.collector_id, token: store.config.browser_token });
+        return;
+      }
       if (route.startsWith("/api/")) {
         if (!authenticated(req, store.config.browser_token))
           throw new TransferError(
             401,
-            "Open the viewer link printed by the collector",
+            "Reconnect to the local collector",
           );
         if (req.method !== "GET")
           throw new TransferError(405, "Method not allowed");
@@ -131,6 +146,10 @@ export async function startCollector({
         }
         if (route === "/api/v1/pairing") {
           reply(res, 200, { connections });
+          return;
+        }
+        if (route === "/api/v1/status") {
+          reply(res, 200, { collector_id: store.config.collector_id, device: deviceStatus });
           return;
         }
         if (route === "/api/v1/download") {
@@ -185,7 +204,8 @@ export async function startCollector({
       ).catch(() => null);
       if (!target || !target.startsWith(root + sep))
         throw new TransferError(404, "File not found");
-      const content = await readFile(target);
+      let content = await readFile(target);
+      if (extname(target) === ".html") content = Buffer.from(content.toString("utf8").replace("</head>", '<meta name="network-log-collector" content="1"></head>'));
       res.setHeader(
         "Content-Type",
         mime[extname(target)] || "application/octet-stream",
@@ -255,7 +275,12 @@ export async function startCollector({
     origin,
     connections,
     browserToken: store.config.browser_token,
-    viewerURL: `${origin}/#collector=${store.config.browser_token}`,
+    viewerURL: `${origin}/`,
+    setDeviceStatus(status) {
+      if (JSON.stringify(status) === JSON.stringify(deviceStatus)) return;
+      deviceStatus = { ...status };
+      publish();
+    },
     ingest(text) {
       const result = store.ingest(text);
       if (result.accepted) publish();
