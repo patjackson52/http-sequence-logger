@@ -150,15 +150,16 @@ Merge narrowly into the host's existing rules:
 - If using ADB loopback HTTP, add the loopback exceptions from [the sample debug network-security config](../../android/app/src/debug/res/xml/network_log_debug_security.xml) to a **debug-only** configuration. Preserve the app's existing trust/cleartext/domain rules instead of replacing its complete policy. No broad cleartext or trust-all override belongs in production.
 - `DebugTransfer.saveConnection(...)` stores private pairing in `files/network-log/connection.json`. Never write pairing JSON to capture logs, screenshots, source files, or shared artifacts. A non-debuggable runtime check is a secondary guard; dependency/source separation is still required.
 
-From this repository, use Node **22.12+** and start the desktop collector for the host's actual installed debug application ID (including suffixes) and selected ADB serial:
+Build/install the host app's debug variant with its own tools. From the logger checkout, use Node **22.12+** and start the collector for the actual installed debug application ID (including suffixes):
 
 ```sh
 npm ci
-npm run build:viewer
-npm run collector -- --android CUSTOMER_APPLICATION_ID --device DEVICE_SERIAL --adb /path/to/adb
+npm run collector -- --android CUSTOMER_APPLICATION_ID --open
 ```
 
-This writes pairing, establishes ADB reverse, and watches `files/captures/*.ndjson`. The next `DebugTransfer.open` uses the pairing; an already-open local sink remains local. The ADB watcher can still retrieve its complete lines. Open the printed desktop viewer URL. See [transport and retrieval](TRANSPORT.md) for USB, simulator, HTTPS LAN, file export, credential handling, restarts, and connection troubleshooting. Pairing is optional: a sanitized NDJSON file can be imported directly into the viewer.
+This builds/opens the viewer, discovers ADB, selects the single phone (otherwise the sole emulator), writes private pairing, establishes ADB reverse, and watches `files/captures/*.ndjson`. If selection is ambiguous, add `--device SERIAL` after the existing `--`; use `--adb /path/to/adb` only when discovery needs an override. `npm run android:live` is for building/installing the repository sample, not the customer's app.
+
+Open **http://127.0.0.1:4319/** and keep the collector running. Browser connection/refresh and USB reconnection/pairing repair are automatic; the live panel shows device readiness. The next `DebugTransfer.open` uses the pairing; an already-open local sink remains local, but the ADB watcher can still retrieve its complete lines. Run a host-app flow and confirm its event count/session. **Save capture** exports `artifacts/collector/capture.ndjson`; app originals stay in their private directory. **Pause live** only pauses browser updates. Stop the watcher before manually changing app pairing. See [transport and retrieval](TRANSPORT.md) for overrides, HTTPS LAN, file export, credentials, restarts and troubleshooting. A sanitized NDJSON file can also be imported directly into the file-only viewer at port `4173`.
 
 ## 6. Verify the host integration and release boundary
 

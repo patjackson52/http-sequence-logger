@@ -15,14 +15,18 @@ Use [debug-only integration and release verification](RELEASE.md) for production
 
 ## Build and run
 
-The fastest path, once Node dependencies and Android build tools are installed:
+The fastest path, from the repository root with Node 22.12+, JDK 17, Android SDK Platform 35 and platform-tools installed, plus an authorized USB phone or running API 26+ emulator:
 
 ```sh
 npm ci
 npm run android:live
 ```
 
-This builds and installs the debug sample, automatically picks the single connected phone (or sole emulator), configures USB streaming, opens http://127.0.0.1:4319/ and runs a sign-in. `-- --recovery` runs the 401 scenario; `-- --no-run` opens the app without starting a flow; `-- --no-open` skips opening a browser. With multiple phones, supply `-- --device SERIAL`. The process keeps the collector running until Ctrl+C. Repeated runs reuse the collector in the same directory; `--dir` and `--port` are optional overrides, not required setup.
+This builds and installs the debug sample, automatically picks the single connected phone in preference to emulators (or the sole emulator), configures USB streaming, opens http://127.0.0.1:4319/ and runs a sign-in. `-- --recovery` runs the 401 scenario; `-- --no-run` opens the app without starting a flow; `-- --no-open` skips opening a browser. With multiple phones or multiple emulators and no phone, supply `-- --device SERIAL` using `adb devices -l`. `ANDROID_SERIAL` is also honored. The process keeps a newly started collector running until Ctrl+C. Repeated runs reuse the collector in the same directory and port; keep that original collector terminal running. `--dir` and `--port` are optional overrides, not required setup.
+
+ADB is discovered from `ANDROID_HOME`/`ANDROID_SDK_ROOT`, common SDK locations, or PATH; `-- --adb /absolute/path/to/adb` overrides it. The launcher derives the SDK root from an absolute discovered platform-tools path when needed. Set `JAVA_HOME` for a nonstandard JDK installation; common macOS Homebrew JDK 17 locations are detected. Use `npm run android:live -- --help` for the full option list.
+
+For the already installed sample, **`npm start`** builds/opens the viewer and pairs USB without rebuilding the APK or running a flow. Tap either sign-in action in the app. The plain viewer URL reconnects after refresh; USB disconnect/reconnect and app reinstall are retried by the running collector. **Follow newest session** displays each new run until you inspect/filter one. **Save capture** exports the desktop journal at `artifacts/collector/capture.ndjson`; original app files remain available through **Export structured log**. See [live viewer controls](../viewer/README.md#live-device-captures).
 
 The debug activity consumes a `networklog.run` intent extra once, so rotation does not restart the flow. Release code does not include that launcher behavior. The lower-level build/install commands follow for IDE workflows.
 
@@ -42,11 +46,13 @@ Tap **Run successful sign in** or **Run with 401 → refresh → retry**. Supply
 
 Each run writes `files/captures/capture-<time>.ndjson` in private app storage. **Export structured log** opens Android's document picker. Captures remain local until a collector is paired or a file is exported. A paired debug collector receives events automatically, while the local export stays available. Multiple sessions can share a sink, as demonstrated by the live test.
 
-## Pair the development collector
+## Connect the development collector
 
-Start the repository's collector, then paste its connection JSON into **Pair desktop collector**. The bearer token is saved only in private `files/network-log/connection.json`; it is never placed in a capture or URL. **Disconnect** removes pairing and stops the sample's retained upload workers. Pairing can also be installed by desktop tooling using `run-as` in a debuggable app. The factory ignores pairing entirely when `ApplicationInfo.FLAG_DEBUGGABLE` is absent.
+`npm run android:live` and `npm start` pair the sample automatically; no JSON copy/paste or manual reversal is needed. For an already instrumented customer debug app, use `npm run collector -- --android YOUR_APPLICATION_ID --open` instead. The watcher creates private `files/network-log/connection.json`, configures ADB reverse, and retrieves complete lines from `files/captures/*.ndjson` as a fallback. The live panel shows phone readiness separately from the browser connection. Pairing/reversal recover after reconnect or reinstall; HTTP and ADB delivery deduplicate by event ID.
 
-For an Android emulator or USB-connected device, forward the collector port:
+For explicit/manual pairing, start with `npm start -- --no-android` (add `--lan YOUR_DESKTOP_IP` for Wi-Fi), then copy the appropriate JSON from **Other devices** into the app's **Pair desktop collector** dialog. The bearer token is saved only in private `files/network-log/connection.json`; it is never placed in a capture or URL. **Disconnect** removes pairing and stops retained upload workers. Stop automatic USB watching first, since an active watcher reinstates its pairing. The factory ignores pairing entirely when `ApplicationInfo.FLAG_DEBUGGABLE` is absent.
+
+Only for manual loopback setup, forward the collector port using the selected serial:
 
 ```sh
 adb -s "$ANDROID_SERIAL" reverse tcp:4319 tcp:4319

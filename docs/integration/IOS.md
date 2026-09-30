@@ -143,7 +143,9 @@ node validate.mjs /absolute/path/to/copied-capture.ndjson
 
 For a physical device, provide a development **Share capture** action using the canonical file URL and the system share sheet. The sample's **Share last capture** supports this path. Do not promise `adb`, `simctl`, or unrestricted filesystem access for physical iPhones.
 
-Open the collector's printed desktop viewer link for live sessions, or choose/import the canonical file in the offline viewer. Confirm the correct session, domains, request/response details, and any handler return boundaries. A collector disconnect is a connection status, not a synthetic HTTP failure. [TRANSPORT.md](TRANSPORT.md) covers simulator loopback, device HTTPS pairing, private configuration, permissions, retries, and refreshing the viewer connection.
+For live viewing, run `npm ci` and `npm start -- --no-android` in the logger checkout. It builds/opens **http://127.0.0.1:4319/**; the ordinary URL auto-connects and survives refresh. The iOS producer still needs explicit loopback pairing for Simulator or paired LAN HTTPS for a physical phone, available under **Other devices**. Automatic browser connection does not install capture hooks or pair the app. Keep the collector running, exercise the flow, and confirm arriving events, the correct session, domains, request/response details and handler boundaries.
+
+**Save capture** downloads the desktop `artifacts/collector/capture.ndjson` journal. **Pause live** or file import pauses browser updates; **Resume live** returns to the collector. You can also import the canonical app file in the file-only viewer at `4173`. A collector disconnect is a connection status, not a synthetic HTTP failure. [TRANSPORT.md](TRANSPORT.md) covers device pairing, private configuration, permissions, retries and log paths.
 
 ## 8. Verify the customer's integration
 

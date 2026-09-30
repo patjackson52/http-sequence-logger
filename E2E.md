@@ -1,5 +1,7 @@
 # End-to-end evidence
 
+This page records the original Kotlin SDK/sample milestone. For the current realtime workflow, use [the quick start](README.md#stream-logs-into-the-viewer): `npm run android:live` builds/installs/pairs/runs the sample and opens the ordinary **http://127.0.0.1:4319/** viewer URL. [Transfer verification](docs/transfer/VERIFICATION.md) records later Pixel, automatic connection/reconnect, browser and native transfer checks. Historical test counts below describe that earlier run.
+
 The Kotlin sample was built and run against real public HTTPS services on **2026-09-29 UTC** (September 28 in the development machine's local time), using an **Android 17 / API 37 arm64 emulator**. The source is MIT licensed. The public repository is [patjackson52/http-sequence-logger](https://github.com/patjackson52/http-sequence-logger).
 
 ## Recorded results
@@ -35,9 +37,9 @@ node validate.mjs artifacts/live/*.ndjson
 
 The APK is generated at `android/app/build/outputs/apk/debug/app-debug.apk`. Build products and local captures are ignored by Git; the three explicitly selected captures under `samples/live/` are committed evidence.
 
-This completes the requested Kotlin SDK/sample/capture milestone. The interactive web sequence viewer, server-side merging, iOS implementation, full transparent native adapters, and physical-device/API-range release testing remain separate work. The sample is an auth-style development exercise using fake account data, not an OAuth implementation or a production identity-verification service.
+This completed the original Kotlin SDK/sample/capture milestone. The [interactive viewer](viewer/README.md) and [iOS transfer package/manual demo](ios/README.md) were implemented afterward; server-side merging, a general Swift capture SDK, full transparent native adapters and broad physical-device/API-range testing remain outside this evidence. The sample is an auth-style development exercise using fake account data, not an OAuth implementation or a production identity-verification service.
 
 
 ## Handler extension
 
-The updated live files use schema 1.1 and recorder version 0.2.0. The public demo now exercises the app-supplied handler in both normal and 401-recovery runs. Six additional synthetic fixtures cover HTTP/no-HTTP, throw, cancellation, observation stop, and a missing end. The sequence-view design requirements and copy-ready Claude prompt are in [HANDLER-TRACING.md](HANDLER-TRACING.md) and [docs/claude-handler-design-prompt.md](docs/claude-handler-design-prompt.md). The web viewer itself remains a design deliverable, not an implemented GUI.
+The updated live files use schema 1.1 and recorder version 0.2.0. The public demo now exercises the app-supplied handler in both normal and 401-recovery runs. Six additional synthetic fixtures cover HTTP/no-HTTP, throw, cancellation, observation stop, and a missing end. The sequence-view design requirements and copy-ready Claude prompt are in [HANDLER-TRACING.md](HANDLER-TRACING.md) and [docs/claude-handler-design-prompt.md](docs/claude-handler-design-prompt.md). The implemented [viewer](viewer/README.md) renders these HTTP and handler sequences from imported files or live collector events.

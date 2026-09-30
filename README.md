@@ -4,7 +4,67 @@ Draft **1.2** capture format (reader also accepts **1.0/1.1**) for mobile and br
 
 Repository: [patjackson52/http-sequence-logger](https://github.com/patjackson52/http-sequence-logger) · [MIT license](LICENSE).
 
-**Integrating an existing app with a coding agent?** Start at [AGENTS.md](AGENTS.md) and the [integration guide](docs/integration/README.md), or copy the [agent prompt](docs/integration/AGENT-PROMPT.md). They cover Android/iOS/browser installation, implemented capabilities, JSON specs, files and IndexedDB, transfer, the viewer, and production isolation.
+## FOR AGENTS
+
+Start with **[AGENTS.md — agent directions](AGENTS.md)**, then the [existing-app integration guide](docs/integration/README.md). These identify the implemented SDK APIs, JSON specs, log locations, connection commands and production-build boundaries. The [full agent prompt](docs/integration/AGENT-PROMPT.md) supplies more detail.
+
+**Copy and paste this into your coding agent while it is working in your app's repository:**
+
+```text
+Integrate https://github.com/patjackson52/http-sequence-logger into this app's
+development builds and connect real captures to its local sequence viewer.
+
+Read the logger repository's AGENTS.md and docs/integration/README.md, then the
+relevant platform guide, TRANSPORT.md and SPECS.md. Inspect this app, infer its
+platform and HTTP clients, and pin the source revision. Support existing/custom
+HTTP clients, manual observations and SDK → app handler → SDK tracing. Production
+should retain only the small logging abstraction/no-op; exclude recorder and
+transfer implementations and their dependencies/resources.
+
+Use the documented automatic streaming setup for our app and open
+http://127.0.0.1:4319/ without a token URL. For Android, target our actual debug
+application ID; the android:live command installs the repository sample. Follow
+the explicit iOS pairing or browser relay/upload instructions where applicable.
+The iOS package transfers sanitized events; implement an app-owned capture adapter
+if needed.
+
+Exercise a real app flow, validate its sanitized NDJSON, inspect the live diagram,
+check reconnect recovery and audit our shipping build. Document the source
+revision, exact log locations, start/reconnect/export commands and verification
+results. Ask only for missing information that blocks the work.
+```
+
+To try the repository sample before integrating an app, use the quick start below.
+
+## Stream logs into the viewer
+
+For the Android sample, install Node **22.12+**, JDK **17**, Android SDK Platform **35** and platform-tools. Connect a phone with USB debugging authorized, or start an API 26+ emulator. In a new checkout:
+
+```sh
+git clone https://github.com/patjackson52/http-sequence-logger.git
+cd http-sequence-logger
+npm ci
+npm run android:live
+```
+
+If you already have a checkout, run the last two commands from its root. This builds the viewer and debug app, selects the single connected phone in preference to emulators (or the sole emulator), installs the app, pairs USB, opens **[the live viewer](http://127.0.0.1:4319/)** and runs a sign-in. No serial, pairing JSON or special viewer URL is needed in the common case. Leave the collector terminal running.
+
+Choose one startup command for your workflow, after `npm ci`:
+
+| Workflow | Command from the logger checkout |
+| --- | --- |
+| Build/install/run the Android sample | `npm run android:live` |
+| Exercise the sample's 401/refresh/retry flow | `npm run android:live -- --recovery` |
+| Stream from the already installed Android sample | `npm start` |
+| Stream from your instrumented Android debug app | `npm run collector -- --android YOUR_APPLICATION_ID --open` |
+| Use an iOS or browser producer | `npm start -- --no-android`, then follow [its transfer route](docs/integration/TRANSPORT.md#select-the-device-route) |
+| Import files without a live collector | `npm run viewer` — serves the file viewer at port `4173` |
+
+The streaming commands build the viewer automatically. For ambiguous Android device selection, append `-- --device SERIAL` to `npm run android:live`, or add `--device SERIAL` after the existing `--` in other commands. [Additional options and tool discovery](android/README.md#build-and-run) cover custom SDK paths, ports and directories. `android:live` can reuse the collector for the same directory and port; `npm start` does not start a second instance on an occupied port.
+
+Open **http://127.0.0.1:4319/** normally, including after refresh. The live panel shows collector connection, event count and Android readiness. USB pairing and forwarding recover after reconnect/reinstall. **Follow newest session** follows arrivals until you inspect or filter a session. **Pause live** and file import suspend browser updates; **Resume live** returns to the collector. The collector continues retaining events while the viewer is paused.
+
+Logs remain in the app's private storage and accumulate on the desktop in `artifacts/collector/capture.ndjson`, with multiple sessions per file. **Save capture** downloads that collected NDJSON; **Download SVG** saves the current diagram. Keep private `connection-*.json`, state and TLS files out of shared artifacts. [All log locations and retrieval commands](docs/integration/TRANSPORT.md#where-every-file-lives) · [Connection troubleshooting](docs/integration/TRANSPORT.md#troubleshooting-by-symptom) · [Viewer controls](viewer/README.md).
 
 ## Desktop viewer examples
 
@@ -35,21 +95,6 @@ HTTP 200 headers do not establish successful completion: a later body-read timeo
 [![Desktop viewer distinguishing HTTP 200 headers from a later body-read timeout, with terminal error details](docs/screenshots/desktop-body-timeout.png)](docs/screenshots/desktop-body-timeout.png)
 
 [Screenshot sources and refresh command](docs/screenshots/README.md) · [Viewer controls](viewer/README.md)
-
-## Stream logs into the viewer
-
-For an Android device or emulator, with JDK 17 and Android SDK 35 installed:
-
-```sh
-npm ci
-npm run android:live
-```
-
-This builds the viewer and debug app, selects the connected phone (or sole emulator), installs it, pairs USB, opens the browser, and runs a sign-in. No serial, pairing JSON or special viewer URL is needed for a single phone. Use `-- --device SERIAL` only when device selection is ambiguous; `-- --recovery` runs the 401/refresh scenario. Leave the command running for live updates.
-
-For an already installed app or another producer, run **`npm start`**. It builds and starts the collector, opens [the live viewer](http://127.0.0.1:4319/), and detects the Android sample if present. The plain URL connects automatically and survives refresh. The live panel shows device connection state; USB routing and pairing recover after reconnect/reinstall. File imports pause live updates until **Resume live** is selected.
-
-See [device transfer and pairing](docs/transfer/README.md) for customer apps, iOS Simulator and paired Wi-Fi HTTPS. [Web viewer guide](viewer/README.md) · [Swift transport and iOS demo](ios/README.md).
 
 ## Run the browser sample
 
@@ -145,4 +190,4 @@ Version `1.1` adds explicit synchronous handler calls and returns; `1.2` adds br
 
 ## Interactive viewer
 
-Run `npm ci && npm run viewer`, then open http://127.0.0.1:4173. Import NDJSON or open a bundled sample to inspect HTTP exchanges and SDK/app handler calls. **Download SVG** saves the current sequence for sharing or documentation, including lane headings, filters, collapsed methods and selection, with interactive controls omitted. See [viewer setup and controls](viewer/README.md), [design history](docs/design/README.md), and [verification evidence](docs/VIEWER-REVIEW.md).
+Use [the streaming quick start](#stream-logs-into-the-viewer) for live captures at port `4319`. For file import only, run `npm ci && npm run viewer`, then open http://127.0.0.1:4173. Import NDJSON or open a bundled sample to inspect HTTP exchanges and SDK/app handler calls. **Download SVG** saves the current sequence for sharing or documentation, including lane headings, filters, collapsed methods and selection, with interactive controls omitted. See [viewer setup and controls](viewer/README.md), [design history](docs/design/README.md), and [verification evidence](docs/VIEWER-REVIEW.md).

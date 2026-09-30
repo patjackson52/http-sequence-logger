@@ -21,16 +21,19 @@ npm run web:sample
 
 Open `http://127.0.0.1:4180`. **Run sign-in with token recovery** exercises a small SDK, two local server origins (`4181` and `4182`), Fetch, an awaited app handler using XHR, and an expected 401 followed by refresh. The fixture is simulated authentication, not a production OAuth implementation. **Try two public APIs** calls JSONPlaceholder and DummyJSON; availability and browser CORS policy can affect that optional flow.
 
-The development panel exports NDJSON, reopens its IndexedDB journal, runs browser boundary checks, and explicitly uploads through an optional relay. Start the collector in another terminal, then restart the sample with its private connection file:
+The development panel exports NDJSON, reopens its IndexedDB journal, runs browser boundary checks, and explicitly uploads through an optional relay. For live viewing, start the collector from the logger checkout in one terminal:
 
 ```sh
-npm run build:viewer
-npm run collector
-# Separate terminal; substitute the actual absolute path printed by the collector:
-NETWORK_LOG_CONNECTION=/absolute/path/to/connection-loopback.json npm run web:sample
+npm start -- --no-android
 ```
 
-Click **Flush and upload**, then open the collector's printed viewer link. Upload replay preserves event IDs and the collector deduplicates events; the browser keeps its canonical journal. File import works without pairing.
+It builds/opens the viewer automatically at **http://127.0.0.1:4319/**. Keep it running, then start or restart the sample from the same checkout in a second terminal:
+
+```sh
+NETWORK_LOG_CONNECTION="$PWD/artifacts/collector/connection-loopback.json" npm run web:sample
+```
+
+Use the actual private connection-file path if you changed the collector's `--dir`. Run a sample flow and click **Flush and upload**; the viewer displays arriving events automatically and reconnects after refresh without a token URL. The source browser SDK still needs that explicit upload each time; it has no background stream. Upload replay preserves event IDs and the collector deduplicates events. The source browser retains its IndexedDB journal, while **Save capture** downloads the desktop `artifacts/collector/capture.ndjson`. File import works without pairing. Keep the relay's connection file server-side and out of commits.
 
 ## Verify
 

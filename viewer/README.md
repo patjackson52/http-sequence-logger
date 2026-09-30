@@ -2,35 +2,35 @@
 
 A local browser viewer for the SDK's schema 1.0, 1.1 and 1.2 NDJSON. It follows the [imported Claude design](../docs/design/README.md), including SDK → app handler → SDK control flow.
 
-Agents integrating a mobile app should start with the [integration guide](../docs/integration/README.md). Keep this viewer on the desktop; the [transport map](../docs/integration/TRANSPORT.md) distinguishes live collector port 4319 from file-import development/preview port 4173.
+Agents integrating an app should start with [AGENTS.md](../AGENTS.md) and the [integration guide](../docs/integration/README.md). Keep this viewer on the desktop; the [transport map](../docs/integration/TRANSPORT.md) distinguishes live collector port 4319 from file-import development/preview port 4173.
+
+## Live device captures
 
 From the repository root, with Node 22.12+:
 
 ```sh
 npm ci
-npm run viewer
+npm start
 ```
 
-Open **http://127.0.0.1:4173**. Choose or drop one or more capture files. Select **Open** beside a session. **Open sample** includes the real Android successful/recovered sign-ins and focused edge-case fixtures.
+Open **http://127.0.0.1:4319/**. The command builds/opens the viewer, starts the collector and watches the installed Android sample. The ordinary URL connects automatically; refresh normally. No token URL, browser storage or pasted browser configuration is needed. **`npm run android:live`** also builds/installs the sample, pairs USB and runs a sign-in on the selected phone. For a customer Android debug app use `npm run collector -- --android YOUR_APPLICATION_ID --open`; for iOS/browser work use `npm start -- --no-android` and complete its [producer transfer route](../docs/integration/TRANSPORT.md#select-the-device-route). Keep the collector terminal running.
 
-For a production build:
+The live panel distinguishes collector connection, event count and Android device readiness. **Live** means this browser is connected, even when no producer has sent events yet. USB disconnects and reinstalls are retried automatically. A collector restart reconnects; changing its identity clears the old capture before loading the new one. Device upload credentials still stay private and upload authentication is unchanged. **Other devices** exposes explicit iOS/manual pairing; browser producers use a server-side relay and explicit upload.
+
+**Follow newest session** is enabled initially. New sessions come into view as events arrive; selecting a session/request, changing filters or collapsing a method stops following so inspection stays in place. Enable it again to return to the newest session. Updates within the selected session preserve its diagram state. **Pause live** or importing a file stops browser updates; **Resume live** returns to the collector. The collector continues saving while paused. **Save capture** downloads its persisted NDJSON across all sessions, stored by default in `<checkout>/artifacts/collector/capture.ndjson`. [Storage and troubleshooting](../docs/integration/TRANSPORT.md) cover custom directories and connection failures.
+
+The file-only Vite viewer at port 4173 remains available via `npm run viewer`; its live link opens the collector at 4319. It never probes unrelated sites or scans local ports. Legacy token links remain accepted, but the collector now prints only its ordinary URL.
+
+## File import only
+
+After `npm ci`, run `npm run viewer` and open **http://127.0.0.1:4173/**. Choose or drop one or more capture files, then select **Open** beside a session. **Open sample** includes the real Android successful/recovered sign-ins and focused edge-case fixtures. For a built static bundle:
 
 ```sh
 npm run build:viewer
 npm run preview:viewer
 ```
 
-The static output is `viewer/dist/`. Serve this directory over HTTP; direct `file://` loading is not supported because the importer uses a module worker. No server backend, account, or dashboard is needed. Bundled fonts and samples are served from the same origin. Imported files remain in memory and are cleared on refresh; no persistence or upload is performed. A strict content-security policy is included in `index.html`.
-
-## Live device captures
-
-Run **`npm start`**, then open **http://127.0.0.1:4319/**. The command builds the viewer and starts the collector; the ordinary URL detects it and connects automatically. Refresh normally. No token URL, browser storage or pasted configuration is needed. **`npm run android:live`** also builds/installs the sample, pairs USB and runs a sign-in on the selected phone. Android ADB, iOS Simulator and Wi-Fi setup are in the [transfer guide](../docs/transfer/README.md).
-
-The live panel distinguishes collector connection, event count and Android device readiness. USB disconnects and reinstalls are retried automatically. A collector restart reconnects; changing its identity clears the old capture before loading the new one. Device upload credentials still stay private and upload authentication is unchanged.
-
-**Follow newest session** is enabled initially. New sessions come into view as events arrive; selecting a session/request, changing filters or collapsing a method stops following so inspection stays in place. Enable it again to return to the newest session. Updates within the selected session preserve its diagram state. **Pause live** or importing a file stops live updates; **Resume live** returns to the collector. **Save capture** downloads the persisted NDJSON.
-
-The file-only Vite viewer at port 4173 remains available via `npm run viewer`; its live link opens the collector at 4319. It never probes unrelated sites or scans local ports. Legacy token links remain accepted, but the collector now prints only its ordinary URL.
+The static output is `viewer/dist/`. Serve this directory over HTTP; direct `file://` loading is not supported because the importer uses a module worker. File mode needs no collector, account or dashboard. Bundled fonts and samples are served from the same origin. Imported files remain in memory and are cleared on refresh; no persistence or upload is performed. A strict content-security policy is included in `index.html`.
 
 ## Reading a capture
 

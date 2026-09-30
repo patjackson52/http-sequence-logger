@@ -25,7 +25,9 @@ npm ci
 npm start
 ```
 
-Open **http://127.0.0.1:4319/**. The collector-served viewer obtains its read credential automatically through a guarded same-origin bootstrap. Refresh and collector reconnect do not require a special URL. No credential is stored in localStorage/sessionStorage. For the repository Android sample, `npm run android:live` also builds, installs, pairs and runs the app with automatic device selection.
+Open **http://127.0.0.1:4319/**. The collector-served viewer obtains its read credential automatically through a guarded same-origin bootstrap. Refresh and collector reconnect do not require a special URL. No credential is stored in localStorage/sessionStorage. `npm start` watches the already installed Android sample by default; it does not build or install a mobile app. For the repository sample, `npm run android:live` also builds, installs, pairs and runs the app with automatic device selection. For iOS/browser-only work, start with `npm start -- --no-android`.
+
+Choose one collector startup command and keep its terminal running. `android:live` can reuse a running collector only when its directory/identity and port match. Other startup commands report an occupied port; inspect that process and use its viewer or stop it cleanly before restarting. An override such as `--port 4330 --dir artifacts/another-run` changes the viewer address and storage together; use the printed ordinary URL. Relative directories resolve from the logger checkout. A new directory creates a new identity and requires producer pairing again.
 
 For offline file import only, use `npm run viewer` or `npm run preview:viewer` (after a build), at `http://127.0.0.1:4173`. That Vite origin is **not** a collector endpoint. Live reads use the collector's own origin; adding permissive CORS or using a `file://` viewer is unnecessary and unsupported. Rebuild the viewer after changing source; the collector serves `viewer/dist/`.
 
@@ -39,13 +41,15 @@ For offline file import only, use `npm run viewer` or `npm run preview:viewer` (
 | Browser frontend on developer computer | Same-origin development relay; relay forwards to desktop loopback | Debug package, origin-scoped journal, loopback-bound Node dev server; pairing stays server-side |
 | Any device, offline | No endpoint | Export a sanitized canonical file and import it in the viewer |
 
-Android low-friction connection, with the **actual application ID** (including any debug suffix), selected `adb devices` serial, and ADB executable:
+For a customer Android app, build/install its debuggable variant with the host's own tools, then start the collector with the **actual application ID** (including any debug suffix):
 
 ```sh
-npm run collector -- --android com.example.customer.debug --device emulator-5554 --adb /absolute/path/to/adb
+npm run collector -- --android com.example.customer.debug --open
 ```
 
-This configures port reversal, writes `files/network-log/connection.json` through `run-as`, and polls **only** `files/captures/*.ndjson` as a fallback. It does not modify app source or install an interceptor. `DebugTransfer.open` reads pairing when a new sink opens; an already-open sink does not retarget. The watcher repairs pairing and port reversal after reconnect/reinstall. With one phone, `--device` and `--adb` can be omitted; selection prefers the single phone over emulators and does not switch devices during a running collector. File-only logging can use the watcher without a native uploader; double delivery deduplicates by event ID.
+This builds/opens the viewer, configures port reversal, writes `files/network-log/connection.json` through `run-as`, and polls **only** `files/captures/*.ndjson` as a fallback. It does not modify app source or install an interceptor. `DebugTransfer.open` reads pairing when a new sink opens; an already-open sink does not retarget. The watcher repairs pairing and port reversal after reconnect/reinstall. With one phone, `--device` and `--adb` can be omitted; selection prefers the single phone over emulators and does not switch devices during a running collector. If ambiguous, discover the serial with `adb devices -l` and add `--device SERIAL` after the existing `--`; add `--adb /absolute/path/to/adb` only if discovery fails. `ANDROID_SERIAL` is also honored. File-only logging can use the watcher without a native uploader; double delivery deduplicates by event ID.
+
+While the watcher is active it owns that app's USB pairing. Stop the collector or use `--no-android` before changing the app to a different manual/LAN pairing. **Pause live** only pauses browser reads; it does not stop file retrieval or native uploads.
 
 For manual port reversal, using the selected serial:
 
@@ -58,10 +62,10 @@ Use the generated loopback JSON, not `10.0.2.2` HTTP: the transfer library only 
 For a physical phone, with a desktop IP/hostname reachable from that phone:
 
 ```sh
-npm run collector -- --lan 192.168.1.25 --dir artifacts/customer-collector
+npm start -- --no-android --lan 192.168.1.25 --dir artifacts/customer-collector
 ```
 
-The optional HTTPS listener defaults to `4320` and binds for LAN ingestion. Its certificate is generated with OpenSSL for the specified host and is valid for 30 days. Use **connection-lan.json** on the device. The browser still opens the loopback Viewer link on the desktop. LAN `/`, health, download and browser reads return 404; that is intentional. The LAN listener accepts authenticated uploads only. A changed LAN host or expired certificate requires a fresh collector directory and re-pairing; do not disable hostname/date/pin verification or install a global trust override.
+The optional HTTPS listener defaults to `4320` and binds for LAN ingestion. Its certificate is generated with OpenSSL for the specified host and is valid for 30 days. Use **connection-lan.json** on the device, or copy that HTTPS configuration from **Other devices** in the viewer. The browser still uses the ordinary loopback URL on the desktop. LAN `/`, health, download and browser reads return 404; that is intentional. The LAN listener accepts authenticated uploads only. A changed LAN host or expired certificate requires a fresh collector directory and re-pairing; do not disable hostname/date/pin verification or install a global trust override.
 
 Merge permissions into the development target according to its OS/target SDK; use [platform setup](../transfer/README.md#ios-simulator-and-wi-fi) and its official platform references. Physical-device signing, firewall and permissions must be verified on the chosen device; simulator success does not establish them.
 
@@ -119,10 +123,10 @@ Import the resulting file at `4173`, or use **Save capture** in the paired colle
 For the repository sample, run the collector above, then start the frontend in another terminal:
 
 ```sh
-NETWORK_LOG_CONNECTION=/absolute/path/to/connection-loopback.json npm run web:sample
+NETWORK_LOG_CONNECTION="$PWD/artifacts/collector/connection-loopback.json" npm run web:sample
 ```
 
-Open `http://127.0.0.1:4180`, run a flow, and click **Flush and upload**. Open the collector's printed viewer link at `4319`. The sample's fixture servers use `4181`/`4182`; these are business-request destinations, not collector endpoints. [Existing frontend setup](WEB.md#export-and-connect-the-viewer) shows `createNetworkLogRelay` middleware and production separation.
+Run this from the logger checkout; change the private connection-file path if the collector uses a different `--dir`. Open `http://127.0.0.1:4180`, run a flow, and click **Flush and upload**. The collector viewer at **http://127.0.0.1:4319/** displays arrivals automatically and survives refresh. The sample's fixture servers use `4181`/`4182`; these are business-request destinations, not collector endpoints. [Existing frontend setup](WEB.md#export-and-connect-the-viewer) shows `createNetworkLogRelay` middleware and production separation.
 
 `uploadJournal(journal)` uses the frontend's own `/__network_log/config` and `/__network_log/events` routes. The Node development relay reads the private connection file at startup and forwards only sanitized NDJSON to the loopback collector. Host/Origin must match its configured frontend origin; do not add permissive CORS or expose the relay on the LAN. The current relay supports only an HTTP `127.0.0.1` collector endpoint, not the native certificate-pinned LAN route. Restart it after changing pairing.
 
@@ -161,6 +165,11 @@ Browser replay uses the same 1 MiB / 500-event upload and 2 MiB ACK bounds throu
 | Paired but no events | Capture hooks actually installed; session/sink active; correct canonical directory; `DebugTransfer.open` happened after pairing; validate a local file first |
 | HTTP upload fails on Android loopback | ADB reverse, debug network-security merge, INTERNET permission, correct port and loopback pairing |
 | Browser cannot connect | Open the plain loopback collector URL at 4319; restart the collector after updating it. Read credentials refresh automatically. Port 4173 is file-only. |
+| Live but no new app events | Live confirms the viewer connection only. Check Android readiness, actual app ID/capture hooks, or iOS pairing/browser explicit upload. Run an app flow and confirm its event count. |
+| Multiple Android devices / unauthorized phone | Use `adb devices -l`, authorize USB debugging, and add `--device SERIAL` after npm's `--`. A running watcher stays with its first selected device. |
+| Port already in use | Use the running collector or stop it cleanly before restart. For a separate collector choose both a new `--port` and `--dir`. Only `android:live` automatically reuses a matching collector. |
+| New session arrives but old one stays selected | Enable **Follow newest session**; inspection, session selection and filtering turn it off. After file import or pause, choose **Resume live**. |
+| App pairing keeps returning after Disconnect | Automatic USB watching owns pairing. Stop that collector or restart with `--no-android` before disconnecting or using LAN pairing. |
 | Browser sample upload 404 | Restart sample with `NETWORK_LOG_CONNECTION` pointing to private loopback pairing; relay middleware is optional |
 | Browser relay 403 | Frontend origin/Host must exactly match configured scheme, host and port; use `127.0.0.1`, not a mismatched `localhost` alias |
 | Browser journal missing after reload | Same origin/profile/database/journal ID; previous flush succeeded; inspect memory fallback and IndexedDB errors |

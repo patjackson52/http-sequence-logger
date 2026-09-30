@@ -127,7 +127,7 @@ try {
 
 ## Export and connect the viewer
 
-Start the collector as described in [TRANSPORT.md](TRANSPORT.md). For direct file use, export NDJSON and import it into `npm run viewer` at `http://127.0.0.1:4173`. No pairing is needed.
+In the pinned logger checkout, run `npm ci` and **`npm start -- --no-android`**. It builds/opens the collector viewer at **http://127.0.0.1:4319/**; the ordinary URL auto-connects and survives refresh. Keep that terminal running. Automatic viewer connection does not configure the frontend's upload relay. For direct file use, export NDJSON and import it into `npm run viewer` at `http://127.0.0.1:4173`. No pairing is needed for file import.
 
 For delivery, mount the Node-only relay in a **loopback-bound development server**. Its configured `origin` must exactly match the frontend's scheme, host and port. Use the collector's `connection-loopback.json`; the relay accepts only an HTTP `127.0.0.1` collector endpoint. It reads credentials server-side at startup. Do not use `VITE_*`/public environment variables, bundle the JSON, expose it through a public directory, or relax collector CORS.
 
@@ -141,6 +141,8 @@ server.middlewares.use(createNetworkLogRelay({
 ```
 
 From debug browser wiring, `await uploadJournal(journal)` uses the same-origin `/__network_log` relay. It flushes, snapshots, replays retained records in bounded batches and verifies acknowledgments. Failed delivery leaves the journal available for export/retry. Repeated calls deliberately replay the retained journal; deduplication occurs at the collector. There is **no browser ACK cursor, compaction, timer retry, continuous streaming, WebSocket, or background sender**. Trigger another upload when desired. Collector → viewer live updates use SSE after the upload arrives.
+
+Run the host flow, upload, and confirm the viewer's event count/session. **Save capture** exports the desktop journal at `artifacts/collector/capture.ndjson`; the frontend's IndexedDB remains its canonical source. Viewer pause or file import suspends browser reads while the collector continues retaining uploads. **Resume live** returns to the collector, and **Follow newest session** displays new sessions until inspection/filtering disables it. [The transport recipe](TRANSPORT.md#browser-frontend-delivery) has a copyable two-terminal setup for the repository sample.
 
 The relay permits only config reads and event uploads, validates Host/Origin, and keeps the device token away from browser code. Restart the dev server after changing pairing files. Same-origin script can use this development capability; it is not a production upload API. Remote mobile browsers, arbitrary LAN relay exposure, direct browser-to-collector cross-origin uploads and hosted collector access are outside this recipe.
 

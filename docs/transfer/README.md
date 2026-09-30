@@ -10,13 +10,14 @@ For customer-app integration, use the [agent entry point](../integration/README.
 | Android file watch | Existing app already writes capture files | Collector reads debuggable app's `files/captures/*.ndjson` with `adb run-as`; no new transport code |
 | iOS Simulator | Development on the same Mac | Paste loopback connection JSON into the demo or configure the Swift sink |
 | Physical iOS / Wi-Fi Android | Same trusted local network | Explicitly paired HTTPS with a leaf certificate fingerprint |
+| Browser frontend | Existing local development server | Same-origin Node relay and explicit journal upload; [browser setup](../integration/WEB.md#export-and-connect-the-viewer) |
 | Export/import | Offline work, sharing a reproducible session | Export NDJSON from the app, then drop it into the web viewer |
 
 HTTP batch upload is enough for the current 10–20 request sessions. Device WebSockets would add connection/lifecycle complexity without a need for commands from desktop to device. SSE gives the browser live updates and cursor-based catch-up. Logcat/console parsing loses structure and can truncate payloads, so it is not the capture transport.
 
 ## One-command Android connection
 
-With Node dependencies, JDK 17, Android SDK 35 and an authorized USB device/emulator:
+From the repository root, with Node 22.12+, JDK 17, Android SDK Platform 35/platform-tools and an authorized USB device or running API 26+ emulator:
 
 ```sh
 npm ci
@@ -25,7 +26,7 @@ npm run android:live
 
 This builds/installs the sample and viewer, chooses the single phone in preference to emulators, starts the collector, configures private pairing and USB reverse, opens **http://127.0.0.1:4319/** and runs the sample. No serial or connection JSON is required in the common case. Multiple phones or emulators need `-- --device SERIAL`; `-- --recovery` selects the retry flow. Keep the command running.
 
-For an already installed sample, **`npm start`** builds/starts the viewer and collector and automatically connects it. For a customer debug app, use `npm run collector -- --android YOUR_APPLICATION_ID`; device selection and ADB discovery are automatic unless overridden with `--device`/`--adb`. `--no-android` disables device watching for iOS/browser-only work.
+For an already installed sample, **`npm start`** builds/starts the viewer and collector and automatically connects it; run the flow in the app. For an instrumented customer debug app, build/install it with its own tools and use `npm run collector -- --android YOUR_APPLICATION_ID --open`; device selection and ADB discovery are automatic unless overridden with `--device`/`--adb`. Use `npm start -- --no-android` for iOS/browser-only work. Choose one collector startup command; `android:live` can reuse a matching directory/port, while `npm start` requires the port to be free.
 
 The collector checks pairing and reinstalls `adb reverse` while watching. It recovers after USB reconnect, app reinstall or removal of the route; a private pairing file is replaced atomically only if its contents differ. It watches `files/captures/*.ndjson` as a fallback, and HTTP plus file deliveries deduplicate by event ID. The live panel shows the selected phone and connection state. An app must be installed and debuggable for `run-as`; if absent, the collector waits and shows the next step. Each extracted file is limited to 16 MiB.
 
@@ -35,12 +36,12 @@ For Kotlin integration see `DebugTransfer.open(context, captureFile)` and `FileH
 
 ## iOS Simulator and Wi-Fi
 
-For the Simulator, start `npm run collector` and use the generated `artifacts/collector/connection-loopback.json`. The [Swift package and iOS demo](../../ios/README.md) accept this JSON. An existing iOS producer can append already-sanitized schema events or relay its NDJSON file; it need not change its HTTP client.
+For the Simulator, start **`npm start -- --no-android`** and use the generated `artifacts/collector/connection-loopback.json`, also available under **Other devices** in the viewer. The [Swift package and iOS demo](../../ios/README.md) accept this JSON. An existing iOS producer can append already-sanitized schema events or relay its NDJSON file; it need not change its HTTP client. The desktop viewer auto-connects at **http://127.0.0.1:4319/**; the iOS app still needs explicit pairing.
 
 For a physical phone, use the desktop's LAN IP or hostname:
 
 ```sh
-npm run collector -- --lan 192.168.1.25
+npm start -- --no-android --lan 192.168.1.25
 ```
 
 This adds HTTPS on port 4320 and creates `connection-lan.json`. The HTTPS listener accepts uploads only. The browser UI and capture-reading APIs remain bound to desktop loopback. Open the printed viewer URL on the desktop, click **Other devices**, copy the HTTPS pairing JSON, and paste it in the sample app. Allow the app's local-network permission when prompted. The phone must be able to reach the desktop through its firewall and Wi-Fi network.
@@ -53,7 +54,8 @@ The iOS deliverable is a transport package plus a manually instrumented URLSessi
 
 ## Live viewing and recovery
 
-- The viewer opens the collected sessions automatically. New arrivals preserve selection, inspector, filters and collapsed methods. **Save capture** downloads all persisted events across sessions.
+- The viewer opens the collected sessions automatically. **Follow newest session** initially selects each arriving session; choosing a session/request, filtering or collapsing a method disables following. New arrivals then preserve inspection state until following is enabled again. **Save capture** downloads all persisted events across sessions; **Download SVG** exports the current diagram.
+- **Live** and the event count describe the collector → browser connection. Android readiness appears separately; for iOS/browser producers, verify delivery by running a flow and checking arrivals. A connected empty collector is waiting for a producer, not evidence of successful capture.
 - Each app keeps a durable local spool. Upload failure does not change an observed HTTP request's success/error outcome. Validated ACKs advance a collector-specific cursor; reopening retries anything unacknowledged.
 - The ordinary loopback viewer URL obtains its separate read credential automatically using a same-origin request. Refresh needs no special link. A reconnect replays missed events; a new collector identity clears old rows before loading the new capture. File import or Pause live suspends updates until Resume live.
 - Missing terminal events remain incomplete observations. A disconnected collector is shown as a connection state, never as an HTTP failure in the diagram.

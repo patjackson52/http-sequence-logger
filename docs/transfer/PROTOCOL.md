@@ -46,7 +46,7 @@ Browser-authenticated loopback routes:
 - `GET /api/v1/status` returns collector identity and Android connection state; device changes notify existing SSE subscribers even if the event cursor has not changed.
 - `GET /api/v1/pairing` returns loopback and available LAN connection configurations for explicit pairing.
 
-A browser disconnect is transport state, not a synthetic HTTP failure or method return. Live records with no terminal event display 'completion not yet observed'; imported files retain the existing incomplete-capture wording. The viewer preserves selection, filters and scroll while adding events. HTTP-only and handler behavior remain unchanged.
+A browser disconnect is transport state, not a synthetic HTTP failure or method return. Live records with no terminal event display 'completion not yet observed'; imported files retain the existing incomplete-capture wording. The viewer initially follows new sessions; selection, filtering or method collapse disables following and retains inspection state as events arrive. Pause/file import stops browser reads while the collector continues retaining events; Resume returns to the collector capture. These controls do not change HTTP or handler outcomes.
 
 ## Browser SDK delivery through a development relay
 

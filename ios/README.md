@@ -6,6 +6,19 @@ For an existing application, use the [agent-oriented iOS integration guide](../d
 
 Requires Swift 6 and iOS 15+ (macOS 12+ for package tests). Add `ios/` as a local Swift package to your **development app target** and import `NetworkLogTransfer` inside `#if DEBUG`.
 
+## Open the live viewer
+
+From the repository root, with Node 22.12+:
+
+```sh
+npm ci
+npm start -- --no-android
+```
+
+This builds the viewer and starts the collector at **http://127.0.0.1:4319/**. The ordinary browser URL connects automatically and survives refresh; no viewer token link is needed. Keep the collector running. For the Simulator, copy the loopback pairing from **Other devices** or use private `artifacts/collector/connection-loopback.json` in your development setup. The iOS app still requires explicit pairing and a sanitized event producer.
+
+For a physical iPhone, start the collector with `npm start -- --no-android --lan YOUR_DESKTOP_IP` and use the generated HTTPS pairing instead. See [device setup](../docs/transfer/README.md#ios-simulator-and-wi-fi) for reachability, permission and TLS requirements. The browser continues using desktop loopback. **Save capture** exports `artifacts/collector/capture.ndjson`; the demo's canonical files remain under `<Documents>/demo-<UUID>/`. App-supplied events appear as batches arrive; viewer pause/import does not stop native delivery.
+
 ## Keep production free of development logging
 
 `project.yml` defines two app targets with separate source membership and dependency graphs:
