@@ -1,0 +1,121 @@
+{
+  "source_url": "https://claude.ai/design/p/09dc9ea8-677e-4967-b421-c9b890af09c0?file=Mockups.dc.html",
+  "retrieved_on": "2026-10-02",
+  "export_kind": "Project HTML / Project archive",
+  "archive_sha256": "1bbfb9e1555333386b5d7c93d06545441944d1c38f6186a99bb6f15127c9e9f2",
+  "omitted_files": [
+    ".thumbnail"
+  ],
+  "files": [
+    {
+      "path": "Mockups.dc.html",
+      "bytes": 22719,
+      "sha256": "91a3e7a39e5afadb0c219d0f03b99b5791a5f9c888c5b5136125cf7bccd66ba7"
+    },
+    {
+      "path": "NLL Inspector.dc.html",
+      "bytes": 19110,
+      "sha256": "891fdde373fdfa00a638c86b597b5c64fcdffe37d30950ae8158c0f08631b595"
+    },
+    {
+      "path": "NLL Pair Inspector.dc.html",
+      "bytes": 19139,
+      "sha256": "7396feabf45824ad9ad1fa4a38ff8a2a09f2883300626804e413f324b0afa25b"
+    },
+    {
+      "path": "NLL Sequence.dc.html",
+      "bytes": 10185,
+      "sha256": "d6c0751277521679d29985053011fabf6976af449e52901229a06ab4fd1827be"
+    },
+    {
+      "path": "Network Log Lab v1.dc.html",
+      "bytes": 76724,
+      "sha256": "651e39e2d0c3060fc3ea46ba36e37f7aae650c9eb169551397e4650860cd625c"
+    },
+    {
+      "path": "Network Log Lab.dc.html",
+      "bytes": 174930,
+      "sha256": "c5358ffc2f32910591b944541127dc78c5bc4170c09d7d468ee77669a0e715e7"
+    },
+    {
+      "path": "Spec.dc.html",
+      "bytes": 80289,
+      "sha256": "ebdfcccca78d06fecca985cbc831e218b6cee0f5c6b1b61cfce5239b0fa7fce1"
+    },
+    {
+      "path": "examples/handler-cancelled.ndjson",
+      "bytes": 4801,
+      "sha256": "8ef906f41c7529b0fa4a446bddc31a1289ae785610db04945865cc0b4c8c3e3b"
+    },
+    {
+      "path": "examples/handler-http.ndjson",
+      "bytes": 9906,
+      "sha256": "bc11b7cf9060f9b6266d116ccc16c5d16755c6fefa29cc03594751650306dfde"
+    },
+    {
+      "path": "examples/handler-interrupted.ndjson",
+      "bytes": 4285,
+      "sha256": "2f5d33b4b4987629f8be7590c21aad5740198c9255d0bb61ba9fd2907d2a4108"
+    },
+    {
+      "path": "examples/handler-no-http.ndjson",
+      "bytes": 5866,
+      "sha256": "fb795e0a937f8a04268eaa5c9b710722ef1e0dcf0ef1b61c89191b981053d4ef"
+    },
+    {
+      "path": "examples/handler-stopped.ndjson",
+      "bytes": 4827,
+      "sha256": "96c0cdd9e96ac4710d827987d833de532db94ff526bba107591fbdea316c3325"
+    },
+    {
+      "path": "examples/handler-throw.ndjson",
+      "bytes": 5870,
+      "sha256": "f2f0239ad29d7ab219fd60edd9e6d37b10b13b9b34f9c83a70855c92c4ec8592"
+    },
+    {
+      "path": "github.md",
+      "bytes": 1578,
+      "sha256": "bf5cb834cad31617726c85ace5c0b784a56e983a07219d161393b3fff1b30c9c"
+    },
+    {
+      "path": "nll-compare-layout.js",
+      "bytes": 15777,
+      "sha256": "b0d8d328b788728753f35836e8f98d621ddeb33803e88ae647c5d9efeec0d24a"
+    },
+    {
+      "path": "nll-data.js",
+      "bytes": 59764,
+      "sha256": "082c3bd8bc76c91c115ef14f9c0f9bb9ea066f8790bbc56622965421eefa6c2d"
+    },
+    {
+      "path": "nll-diff.js",
+      "bytes": 26011,
+      "sha256": "e8f4f62bcc42c7a391e75c3765136349ddfcbc031f1c43b1bcf4d482e9d7a6e3"
+    },
+    {
+      "path": "nll-layout.js",
+      "bytes": 11140,
+      "sha256": "b227534672ce3c4ac688c667e7690d525f9ad4f8629216d152fb5ab3aeb4987e"
+    },
+    {
+      "path": "samples/comparison-handler.diff.json",
+      "bytes": 23138,
+      "sha256": "424aef215075df52de6f1895b97371b5ddeb585294bd3d67e0f2640dcf39e092"
+    },
+    {
+      "path": "samples/comparison.diff.json",
+      "bytes": 32302,
+      "sha256": "af82533982f831e18c91125ef0a7f84296c537a393c76c7cc24df213593dbebd"
+    },
+    {
+      "path": "samples/live/successful-sign-in.ndjson",
+      "bytes": 60316,
+      "sha256": "37ee662314569e8ce48aac65bad98fc8b9b28865b13a50deeca20b9a58c8a9a9"
+    },
+    {
+      "path": "support.js",
+      "bytes": 69150,
+      "sha256": "8fe7df74405f3c55f49b7249c74ea1397e65d07dea2b1bd3b4a489bec2e28cbe"
+    }
+  ]
+}

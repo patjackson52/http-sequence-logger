@@ -253,6 +253,78 @@ const S5 = session({ sessionId: 'sess_25cc-demo-handler', name: 'Sign-in — app
   s.sessionEnd(B + 5351);
 });
 
+// ---- Session 6: Android rerun of the sign-in on build 1.8.1 — comparison counterpart of Session 1 ----
+const S6 = session({ sessionId: 'sess_a41b-demo-ok-rerun', name: 'Sign-in — rerun on build 1.8.1', source: 'sdk', platform: 'android', sdk: 'DemoAuth 2.4.1 (Kotlin)' }, (s) => {
+  const B = 600000, A = 'okhttp-interceptor', UA = 'DemoAuth/2.4.1 (Android 14; okhttp/4.12.0)';
+  s.start(B, { app: 'Sample App 1.8.1 (demo)', build: '1.8.1 (412)' });
+  s.recStart(B + 10, 'rec_f1', { trigger: 'session.start' });
+  s.opStart(B + 40, 'op_signin', { owner: 'app', component: 'SampleApp.LoginViewModel', method: 'signIn(username)', callsite: 'LoginViewModel.kt:64' });
+  s.opStart(B + 55, 'op_auth', { owner: 'sdk', parentOpId: 'op_signin', component: 'DemoAuth.AuthClient', method: 'authenticate(credentials)', callsite: 'AuthClient.kt:91' });
+  s.req(B + 80, 'r1', Object.assign({ opId: 'op_auth', owner: 'sdk', adapter: A, method: 'GET', url: 'https://httpbin.org/get?flow=demo&step=challenge&step=1', headers: H_JSON(UA), body: null, callsite: 'ChallengeApi.kt:31' }, TRACE(61), NATIVE_H2));
+  s.hdr(B + 270, 'r1', 200, R_HTTPBIN(388)); s.body(B + 281, 'r1', { body: B_CHALLENGE, bodyState: 'captured', bytes: 388 }); s.end(B + 282, 'r1', 'success');
+  s.req(B + 300, 'r2', Object.assign({ opId: 'op_auth', owner: 'sdk', adapter: A, method: 'POST', url: 'https://httpbin.org/post', headers: H_JSON(UA).concat([['Content-Type', 'application/json']]), body: '{"challenge":"[REDACTED]","proof":"[REDACTED]","flow":"demo"}', bodyState: 'redacted', bodyBytes: 132, callsite: 'ChallengeApi.kt:52' }, TRACE(62), NATIVE_H2));
+  s.hdr(B + 505, 'r2', 200, R_HTTPBIN(512)); s.body(B + 514, 'r2', { body: '{"json":{"challenge":"[REDACTED]","flow":"demo","proof":"[REDACTED]"},"origin":"[REDACTED]","url":"https://httpbin.org/post"}', bodyState: 'redacted', bytes: 512 }); s.end(B + 515, 'r2', 'success');
+  s.req(B + 530, 'r3', Object.assign({ opId: 'op_auth', owner: 'sdk', adapter: A, method: 'POST', url: 'https://dummyjson.com/auth/login', headers: H_JSON(UA).concat([['Content-Type', 'application/json']]), body: '{"username":"emilys","password":"[REDACTED]","expiresInMins":60}', bodyState: 'redacted', bodyBytes: 71, callsite: 'LoginApi.kt:27' }, TRACE(63), NATIVE_H2));
+  s.hdr(B + 780, 'r3', 200, R_DUMMY(742, true)); s.body(B + 790, 'r3', { body: B_LOGIN_RES, bodyState: 'redacted', bytes: 742 }); s.end(B + 791, 'r3', 'success');
+  s.opEnd(B + 795, 'op_auth', 'ok');
+  // prefetchProfile() no longer runs on 1.8.1
+  s.opStart(B + 820, 'op_profile', { owner: 'sdk', parentOpId: 'op_signin', component: 'DemoAuth.ProfileClient', method: 'getProfile()', callsite: 'ProfileClient.kt:72' });
+  s.req(B + 825, 'r4', Object.assign({ opId: 'op_profile', owner: 'sdk', adapter: A, method: 'GET', url: 'https://dummyjson.com/auth/me', headers: H_AUTH(UA), body: null, callsite: 'ProfileClient.kt:58', note: 'Used cached token from a previous demo run' }, TRACE(64), NATIVE_H2));
+  s.hdr(B + 1030, 'r4', 401, R_DUMMY(27), { statusText: 'Unauthorized' }); s.body(B + 1034, 'r4', { body: B_401, bodyState: 'captured', bytes: 27 }); s.end(B + 1035, 'r4', 'http_error');
+  s.opStart(B + 1040, 'op_refresh', { owner: 'sdk', parentOpId: 'op_profile', component: 'DemoAuth.TokenStore', method: 'refresh()', callsite: 'TokenStore.kt:112' });
+  s.req(B + 1045, 'r5', Object.assign({ opId: 'op_refresh', owner: 'sdk', adapter: A, method: 'POST', url: 'https://dummyjson.com/auth/refresh', headers: H_JSON(UA).concat([['Content-Type', 'application/json']]), body: B_REFRESH_REQ, bodyState: 'redacted', bodyBytes: 58, callsite: 'TokenStore.kt:131' }, TRACE(65), NATIVE_H2));
+  s.hdr(B + 1260, 'r5', 200, R_DUMMY(96, true)); s.body(B + 1266, 'r5', { body: B_REFRESH_RES, bodyState: 'redacted', bytes: 96 }); s.end(B + 1267, 'r5', 'success');
+  s.opEnd(B + 1270, 'op_refresh', 'ok');
+  s.req(B + 1280, 'r6', Object.assign({ opId: 'op_profile', owner: 'sdk', adapter: A, method: 'GET', url: 'https://dummyjson.com/auth/me', headers: H_AUTH(UA), body: null, callsite: 'ProfileClient.kt:58', retryOf: 'r4', retryReason: 'token refreshed after 401' }, TRACE(66), NATIVE_H2));
+  s.hdr(B + 1490, 'r6', 200, R_DUMMY(219)); s.body(B + 1496, 'r6', { body: B_ME, bodyState: 'captured', bytes: 219 }); s.end(B + 1497, 'r6', 'success');
+  s.opEnd(B + 1500, 'op_profile', 'ok');
+  s.opEnd(B + 1510, 'op_signin', 'ok');
+  s.req(B + 1530, 'r7', { owner: 'app', adapter: 'manual', component: 'SampleApp.TodoRepository', method: 'GET', url: 'https://jsonplaceholder.typicode.com/todos/1', headersState: 'not_recorded', bodyState: 'not_applicable', callsite: 'TodoRepository.kt:22' });
+  s.body(B + 1710, 'r7', { body: B_TODO, bodyState: 'captured', bytes: 83 }); s.end(B + 1711, 'r7', 'success', { status: 200 });
+  s.opStart(B + 1720, 'op_receipt', { owner: 'sdk', component: 'DemoAuth.Telemetry', method: 'sendReceipt()', callsite: 'Telemetry.kt:19' });
+  s.req(B + 1725, 'r8', Object.assign({ opId: 'op_receipt', owner: 'sdk', adapter: A, method: 'POST', url: 'https://httpbin.org/post', headers: H_JSON(UA).concat([['Content-Type', 'application/json']]), body: '{"event":"demo_flow_complete","result":"ok","sdk":"DemoAuth/2.4.1","attempts":2}', bodyState: 'captured', bodyBytes: 82, callsite: 'Telemetry.kt:33' }, TRACE(68), NATIVE_H2));
+  s.hdr(B + 1930, 'r8', 200, R_HTTPBIN(215)); s.body(B + 1936, 'r8', { body: '{"json":{"event":"demo_flow_complete","result":"ok","sdk":"DemoAuth/2.4.1","attempts":2},"origin":"[REDACTED]","url":"https://httpbin.org/post"}', bodyState: 'captured', bytes: 215 }); s.end(B + 1937, 'r8', 'success');
+  s.opEnd(B + 1940, 'op_receipt', 'ok');
+  s.recStop(B + 1950, 'session.end');
+  s.sessionEnd(B + 1951);
+});
+
+// ---- Session 7: handler flow rerun — comparison counterpart of Session 5 (reorder, concurrency, duplicate calls) ----
+const S7 = session({ sessionId: 'sess_7e02-demo-handler-rerun', name: 'Sign-in — app handler (rerun)', source: 'sdk', platform: 'android', sdk: 'DemoAuth 2.4.1 (Kotlin)' }, (s) => {
+  const B = 700000, A = 'okhttp-interceptor', UA = 'DemoAuth/2.4.1 (Android 14; okhttp/4.12.0)';
+  s.start(B, { app: 'Sample App 1.8.1 (demo)', build: '1.8.1 (412)' });
+  s.recStart(B + 5, 'rec_g1', { trigger: 'session.start' });
+  s.opStart(B + 6, 'op_signin', { owner: 'app', component: 'SampleApp', method: 'signIn(handler)', callsite: 'SampleFlow.kt:41' });
+  s.opStart(B + 7, 'op_auth', { owner: 'sdk', parentOpId: 'op_signin', component: 'DemoAuthSdk', method: 'authenticate(handler)', callsite: 'DemoAuthSdk.kt:12' });
+  // login now completes before the uuid challenge starts (confirmed reorder)
+  s.req(B + 9, 'r2', Object.assign({ opId: 'op_auth', owner: 'sdk', adapter: A, method: 'POST', url: 'https://dummyjson.com/auth/login', headers: H_JSON(UA).concat([['Content-Type', 'application/json; charset=utf-8']]), body: B_LOGIN_REQ, bodyState: 'redacted', bodyBytes: 63 }, TRACE(72)));
+  s.hdr(B + 1890, 'r2', 200, R_DUMMY(930, true)); s.body(B + 1896, 'r2', { body: B_LOGIN_RES, bodyState: 'redacted', bytes: 930 }); s.end(B + 1897, 'r2', 'success');
+  s.req(B + 1900, 'r1', Object.assign({ opId: 'op_auth', owner: 'sdk', adapter: A, method: 'GET', url: 'https://httpbin.org/uuid', headers: H_JSON(UA), body: null }, TRACE(71)));
+  s.hdr(B + 2410, 'r1', 200, R_HTTPBIN(53)); s.body(B + 2414, 'r1', { body: '{"uuid":"0b7c2d6e-5f21-4e7a-9c3b-2a1d4f6e8b90"}', bodyState: 'captured', bytes: 53 }); s.end(B + 2414, 'r1', 'success');
+  // profile fetched twice with the same signature — indistinguishable without source identity
+  s.req(B + 2416, 'r3', Object.assign({ opId: 'op_auth', owner: 'sdk', adapter: A, method: 'GET', url: 'https://dummyjson.com/auth/me', headers: H_AUTH(UA), body: null }, TRACE(73)));
+  s.req(B + 2420, 'r3b', Object.assign({ opId: 'op_auth', owner: 'sdk', adapter: A, method: 'GET', url: 'https://dummyjson.com/auth/me', headers: H_AUTH(UA), body: null }, TRACE(74)));
+  s.hdr(B + 2560, 'r3', 200, R_DUMMY(1423)); s.body(B + 2566, 'r3', { body: B_ME, bodyState: 'redacted', bytes: 1423 }); s.end(B + 2568, 'r3', 'success');
+  s.hdr(B + 2590, 'r3b', 200, R_DUMMY(1423)); s.body(B + 2594, 'r3b', { body: B_ME, bodyState: 'redacted', bytes: 1423 }); s.end(B + 2596, 'r3b', 'success');
+  // handler signature changed: loadTaskAsync() replaces loadTask()
+  s.opStart(B + 2800, 'op_handler', { owner: 'app', parentOpId: 'op_auth', component: 'CustomerTaskHandler', method: 'loadTaskAsync()', callsite: 'CustomerTaskHandler.kt:24', invocation: { kind: 'handler', dispatch: 'synchronous', caller: { owner: 'sdk', component: 'DemoAuthSdk', method: 'authenticate' } } });
+  s.req(B + 2801, 'r4', { opId: 'op_handler', owner: 'app', adapter: 'manual', component: 'CustomerTaskClient', method: 'GET', url: 'https://jsonplaceholder.typicode.com/todos/1', headersState: 'not_recorded', bodyState: 'not_applicable', callsite: 'CustomerTaskClient.kt:22' });
+  s.hdr(B + 4100, 'r4', 200, [['Content-Type', 'application/json; charset=utf-8'], ['cf-cache-status', 'MISS']]);
+  s.body(B + 4101, 'r4', { body: B_TODO, bodyState: 'captured', bytes: 83 }); s.end(B + 4102, 'r4', 'success');
+  s.opEnd(B + 4102, 'op_handler', 'ok', { completion: 'returned' });
+  // completeDemo() now starts while authenticate() is still open (concurrency change)
+  s.opStart(B + 4103, 'op_complete', { owner: 'sdk', parentOpId: 'op_signin', component: 'DemoAuthSdk', method: 'completeDemo()', callsite: 'DemoAuthSdk.kt:58' });
+  s.req(B + 4104, 'r5', Object.assign({ opId: 'op_complete', owner: 'sdk', adapter: A, method: 'POST', url: 'https://httpbin.org/anything/receipt', headers: H_JSON(UA).concat([['Content-Type', 'application/json']]), body: '{"challengeId":"0b7c2d6e-5f21-4e7a-9c3b-2a1d4f6e8b90","completed":false,"demo":true,"retries":0}', bodyState: 'captured', bodyBytes: 95 }, TRACE(75)));
+  s.opStart(B + 4110, 'op_accept', { owner: 'sdk', parentOpId: 'op_auth', component: 'DemoAuthSdk', method: 'acceptTask()', callsite: 'DemoAuthSdk.kt:44' });
+  s.opEnd(B + 4111, 'op_accept', 'ok');
+  s.opEnd(B + 4115, 'op_auth', 'ok');
+  s.hdr(B + 4200, 'r5', 200, R_HTTPBIN(690)); s.body(B + 4203, 'r5', { body: '{"json":{"challengeId":"0b7c2d6e-5f21-4e7a-9c3b-2a1d4f6e8b90","completed":false,"demo":true,"retries":0},"origin":"[REDACTED]","url":"https://httpbin.org/anything/receipt"}'.slice(0, 96), bodyState: 'truncated', bytes: 690, capturedBytes: 96, limit: 96 }); s.end(B + 4204, 'r5', 'success');
+  s.opEnd(B + 4205, 'op_complete', 'ok');
+  s.opEnd(B + 4206, 'op_signin', 'ok');
+  s.recStop(B + 4210, 'session.end');
+  s.sessionEnd(B + 4211);
+});
+
 const toNdjson = (evs) => evs.map((e) => JSON.stringify(e)).join('\n') + '\n';
 
 const MALFORMED_TEXT = [
@@ -270,7 +342,7 @@ const MALFORMED_TEXT = [
 ].join('\n');
 
 export const SAMPLE_FILES = {
-  sample: { name: 'demoauth-sample-sessions.ndjson', text: toNdjson([].concat(S1, S2, S3, S4, S5)) },
+  sample: { name: 'demoauth-sample-sessions.ndjson', text: toNdjson([].concat(S1, S2, S3, S4, S5, S6, S7)) },
   malformed: { name: 'broken-export.ndjson', text: MALFORMED_TEXT },
 };
 
@@ -339,7 +411,7 @@ export function reconstruct(parsed) {
     const rawEv = { line, raw, type: e.type, tsMs };
     switch (e.type) {
       case 'session.start':
-        s.name = e.sessionName || null; s.source = e.sessionIdSource || null; s.platform = e.platform || null; s.sdk = e.sdk || null; s.app = e.app || null; s.started = tsMs; s.explicitStart = true; break;
+        s.name = e.sessionName || null; s.source = e.sessionIdSource || null; s.platform = e.platform || null; s.sdk = e.sdk || null; s.app = e.app || null; s.build = e.build || null; s.started = tsMs; s.explicitStart = true; break;
       case 'session.end': s.ended = tsMs; break;
       case 'recording.start': {
         const r = { id: e.recordingId || `(unnamed@${line})`, startMs: tsMs, stopMs: null, stopReason: null, interrupted: true, trigger: e.trigger || null, clockNote: e.clockNote || null, line };

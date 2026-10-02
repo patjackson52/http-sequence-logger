@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Code+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>html,body{margin:0;height:100%;background:#f4f6f8}#root{height:100%}a{color:#1b6f8f}a:hover{color:#15586f}button:focus-visible,[tabindex]:focus-visible,input:focus-visible{outline:2px solid #1b6f8f;outline-offset:2px}</style>
+</helmet>
+<div ref="{{ rootRef }}" style="height:100%;min-height:100%;display:flex;flex-direction:column;font-family:'Source Sans 3',system-ui,sans-serif;font-size:13px;color:#1b2430;background:#f4f6f8;position:relative;overflow:hidden">
+  <sc-if value="{{ loading }}" hint-placeholder-val="{{ true }}">
+    <div style="padding:40px;color:#5b6673;font-size:13px">Loading Network Log Lab…</div>
+  </sc-if>
+  <sc-if value="{{ isImport }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;overflow:auto">
+      <div style="max-width:920px;margin:0 auto;padding:36px 24px 60px;display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <h1 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em">Network Log Lab</h1>
+            <p style="margin:6px 0 0;color:#5b6673;font-size:14px;line-height:1.5;max-width:640px;text-wrap:pretty">Explore structured HTTP logs captured by the DemoAuth mobile SDK. Files are parsed in this browser only: nothing is uploaded, no URL found in a log is ever contacted, and content is shown as inert text.</p>
+          </div>
+          <sc-if value="{{ hasFile }}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{ goWorkspace }}" style="height:36px;padding:0 14px;border:1px solid #1b6f8f;background:#1b6f8f;color:#fff;border-radius:6px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#15586f">Back to workspace →</button>
+          </sc-if>
+        </div>
+        <div role="button" tabIndex="0" onDrop="{{ onDrop }}" onDragOver="{{ onDragOver }}" onDragLeave="{{ onDragLeave }}" aria-label="Drop an NDJSON file to import" style="border:1.5px dashed {{ dropBorder }};background:{{ dropBg }};border-radius:10px;padding:34px 24px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center">
+          <div style="font-size:15px;font-weight:600">Drop an <span style="font-family:'Source Code Pro',ui-monospace,monospace">.ndjson</span> file here</div>
+          <div style="font-size:12.5px;color:#5b6673">One JSON event per line. A file may contain several sessions and recording periods.</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:4px">
+            <label style="height:36px;padding:0 14px;border:1px solid #1b6f8f;background:#1b6f8f;color:#fff;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;position:relative;white-space:nowrap" style-hover="background:#15586f">Choose file…<input type="file" accept=".ndjson,.jsonl,.txt,application/x-ndjson,application/json" onChange="{{ onFilePick }}" aria-label="Choose an NDJSON file" style="position:absolute;inset:0;opacity:0;width:100%;cursor:pointer"></label>
+            <button type="button" onClick="{{ openSample }}" style="height:36px;padding:0 14px;border:1px solid #c9d1da;background:#fff;color:#1b2430;border-radius:6px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap" style-hover="background:#eef1f4">Open sample</button>
+            <button type="button" onClick="{{ openMalformed }}" style="height:36px;padding:0 14px;border:1px solid #c9d1da;background:#fff;color:#1b2430;border-radius:6px;font-family:inherit;font-size:13px;cursor:pointer;white-space:nowrap" style-hover="background:#eef1f4">Open malformed sample</button>
+          </div>
+          <div style="font-size:11.5px;color:#7a8592">Samples are synthetic: a demo authentication flow between “Sample App”, the “DemoAuth” SDK and public test servers. No real credentials or identity checks.</div>
+        </div>
+        <sc-if value="{{ hasFile }}" hint-placeholder-val="{{ false }}">
+          <section style="background:#fff;border:1px solid #e1e6eb;border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <div style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:13.5px;font-weight:600">{{ fileName }}</div>
+              <span style="display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;background:{{ fileBadgeBg }};color:{{ fileBadgeFg }}">{{ fileBadge }}</span>
+              <div style="font-size:12.5px;color:#5b6673">{{ fileStats }}</div>
+            </div>
+            <sc-if value="{{ hasDiags }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <h2 style="margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580">Import diagnostics</h2>
+                <div style="font-size:12px;color:#5b6673;margin-bottom:8px;line-height:1.45">Validation is separate from rendering: lines with errors are skipped, warnings keep their events, and interrupted recordings stay inspectable. Nothing below is treated as a network failure.</div>
+                <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;max-height:260px;overflow:auto">
+                  <sc-for list="{{ diags }}" as="dg" hint-placeholder-count="2">
+                    <li style="display:grid;grid-template-columns:72px 64px minmax(0,1fr);gap:10px;align-items:baseline;padding:6px 8px;border-radius:6px;background:{{ dg.bg }};font-size:12.5px">
+                      <span style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:{{ dg.fg }}">{{ dg.severity }}</span>
+                      <span style="font-family:'Source Code Pro',ui-monospace,monospace;color:#5b6673;font-size:11.5px">{{ dg.lineLabel }}</span>
+                      <span style="line-height:1.4">{{ dg.message }} <span style="font-family:'Source Code Pro',ui-monospace,monospace;color:#7a8592;font-size:11px;word-break:break-all">{{ dg.excerpt }}</span></span>
+                    </li>
+                  </sc-for>
+                </ul>
+              </div>
+            </sc-if>
+            <div>
+              <h2 style="margin:0 0 8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580">Sessions ({{ sessionCount }})</h2>
+              <sc-if value="{{ noSessions }}" hint-placeholder-val="{{ false }}"><div style="font-size:12.5px;color:#5b6673">No sessions could be reconstructed from this file.</div></sc-if>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <sc-for list="{{ sessionRows }}" as="s" hint-placeholder-count="3">
+                  <div style="display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1.2fr) minmax(0,1.6fr) auto;gap:14px;align-items:center;padding:10px 12px;border:1px solid #e1e6eb;border-radius:8px;background:#fafbfc">
+                    <div style="min-width:0">
+                      <div style="font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</div>
+                      <div style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;color:#5b6673;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.id }} <span style="font-family:'Source Sans 3',system-ui,sans-serif">· {{ s.source }}</span></div>
+                    </div>
+                    <div style="font-size:12px;color:#5b6673;line-height:1.4">{{ s.platform }}<br>{{ s.recLabel }}</div>
+                    <div style="font-size:12px;line-height:1.4"><span style="font-weight:600;color:{{ s.tone }}">{{ s.glyph }} {{ s.summary }}</span><br><span style="color:#5b6673;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px">{{ s.time }}</span></div>
+                    <button type="button" onClick="{{ s.onOpen }}" style="height:34px;padding:0 12px;border:1px solid #c9d1da;background:#fff;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap" style-hover="background:#eef1f4">Open</button>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </section>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isDesktopWs }}" hint-placeholder-val="{{ false }}">
+    <header style="height:46px;flex:none;display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px solid #e1e6eb;background:#fff">
+      <button type="button" onClick="{{ toggleNav }}" aria-label="Toggle session navigator" aria-expanded="{{ navOpen }}" style="width:32px;height:32px;border:1px solid #d9dee5;background:#fff;border-radius:6px;cursor:pointer;color:#3b4650;font-size:14px" style-hover="background:#eef1f4">☰</button>
+      <div style="font-size:14px;font-weight:700;letter-spacing:-.01em">Network Log Lab</div>
+      <div style="display:flex;align-items:center;gap:8px;min-width:0;font-size:12.5px;color:#5b6673">
+        <span style="font-family:'Source Code Pro',ui-monospace,monospace;color:#1b2430;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ fileName }}</span>
+        <span style="white-space:nowrap">· {{ sessionCount }} sessions</span>
+        <sc-if value="{{ hasDiags }}" hint-placeholder-val="{{ false }}">
+          <button type="button" onClick="{{ goImport }}" style="height:26px;padding:0 9px;border:1px solid {{ fileBadgeFg }};background:{{ fileBadgeBg }};color:{{ fileBadgeFg }};border-radius:999px;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap">{{ fileBadge }}</button>
+        </sc-if>
+      </div>
+      <div style="flex:1"></div>
+      <span style="font-size:11.5px;color:#7a8592;white-space:nowrap">Synthetic demo data · processed locally</span>
+      <button type="button" onClick="{{ goImport }}" style="height:32px;padding:0 12px;border:1px solid #c9d1da;background:#fff;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:#eef1f4">Import…</button>
+    </header>
+    <div style="flex:1;min-height:0;display:flex;position:relative">
+      <sc-if value="{{ navOpen }}" hint-placeholder-val="{{ true }}">
+        <nav aria-label="Sessions" style="width:236px;flex:none;border-right:1px solid #e1e6eb;background:#fafbfc;display:flex;flex-direction:column;min-height:0">
+          <div style="padding:12px 12px 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600">Sessions</div>
+          <div style="overflow:auto;flex:1;padding:0 8px 8px;display:flex;flex-direction:column;gap:3px">
+            <sc-for list="{{ sessionRows }}" as="s" hint-placeholder-count="3">
+              <button type="button" onClick="{{ s.onOpen }}" aria-current="{{ s.active }}" style="text-align:left;padding:8px 10px;border:1px solid {{ s.border }};background:{{ s.bg }};border-radius:8px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:2px;min-width:0" style-hover="background:#eef1f4">
+                <span style="font-size:13px;font-weight:600;color:#1b2430;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">{{ s.name }}</span>
+                <span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11px;color:#6b7580;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">{{ s.id }}</span>
+                <span style="font-size:11.5px;color:{{ s.tone }};font-weight:600">{{ s.glyph }} {{ s.summary }}</span>
+                <span style="font-size:11px;color:#6b7580">{{ s.time }} · {{ s.recLabel }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <sc-if value="{{ hasMultiRec }}" hint-placeholder-val="{{ false }}">
+            <div style="border-top:1px solid #e1e6eb;padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600">Recording periods</div>
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <sc-for list="{{ recRows }}" as="r" hint-placeholder-count="2">
+                  <button type="button" onClick="{{ r.onClick }}" aria-pressed="{{ r.active }}" style="text-align:left;padding:6px 8px;border:1px solid {{ r.border }};background:{{ r.bg }};border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px;display:flex;flex-direction:column;gap:1px" style-hover="background:#eef1f4">
+                    <span style="font-family:'Source Code Pro',ui-monospace,monospace;font-weight:600;color:#1b2430">{{ r.label }}</span>
+                    <span style="font-size:11px;color:{{ r.subColor }}">{{ r.sub }}</span>
+                  </button>
+                </sc-for>
+              </div>
+              <div style="font-size:11px;color:#6b7580;line-height:1.45">Recording periods are shown in file order. Their clocks do not share an origin, so gaps between them are not measured.</div>
+            </div>
+          </sc-if>
+        </nav>
+      </sc-if>
+      <main style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;background:#fafbfc">
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #e1e6eb;background:#fff;flex-wrap:wrap">
+          <div style="min-width:0;margin-right:auto">
+            <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sessName }}</div>
+            <div style="font-size:11.5px;color:#6b7580;font-family:'Source Code Pro',ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sessMeta }}</div>
+          </div>
+          <input type="search" value="{{ search }}" onChange="{{ onSearch }}" placeholder="Search path or component" aria-label="Search paths and component names" style="height:32px;width:220px;max-width:100%;padding:0 10px;border:1px solid #d9dee5;border-radius:6px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:12px;background:#fff;color:#1b2430">
+          <div role="group" aria-label="Owner filter" style="display:flex;border:1px solid #d9dee5;border-radius:6px;overflow:hidden">
+            <sc-for list="{{ ownerOpts }}" as="o" hint-placeholder-count="3"><button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.active }}" style="height:30px;padding:0 10px;border:none;border-left:1px solid #e1e6eb;background:{{ o.bg }};color:{{ o.fg }};font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">{{ o.label }}</button></sc-for>
+          </div>
+          <div role="group" aria-label="Outcome filter" style="display:flex;border:1px solid #d9dee5;border-radius:6px;overflow:hidden">
+            <sc-for list="{{ outcomeOpts }}" as="o" hint-placeholder-count="4"><button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.active }}" style="height:30px;padding:0 10px;border:none;border-left:1px solid #e1e6eb;background:{{ o.bg }};color:{{ o.fg }};font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">{{ o.label }}</button></sc-for>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-bottom:1px solid #e1e6eb;background:#fff;flex-wrap:wrap;font-size:12px">
+          <span style="color:#6b7580;margin-right:2px">Origins</span>
+          <sc-for list="{{ originOpts }}" as="o" hint-placeholder-count="3"><button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.active }}" title="{{ o.title }}" style="height:28px;padding:0 10px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }};border-radius:999px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;cursor:pointer;white-space:nowrap" style-hover="border-color:#1b6f8f">{{ o.label }}</button></sc-for>
+          <sc-if value="{{ filtersActive }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ clearFilters }}" style="height:28px;padding:0 10px;border:none;background:transparent;color:#1b6f8f;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline">Clear filters</button></sc-if>
+          <span style="margin-left:auto;color:#6b7580">{{ shownLabel }}</span>
+          <button type="button" onClick="{{ toggleAllOps }}" style="height:28px;padding:0 10px;border:1px solid #d9dee5;background:#fff;border-radius:6px;font-family:inherit;font-size:12px;cursor:pointer;white-space:nowrap" style-hover="background:#eef1f4">{{ toggleAllLabel }}</button>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;position:relative">
+          <sc-if value="{{ emptyResults }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:3;pointer-events:none">
+              <div style="pointer-events:auto;background:#fff;border:1px solid #e1e6eb;border-radius:10px;padding:18px 22px;text-align:center;max-width:360px;box-shadow:0 4px 16px rgba(27,36,48,.06)">
+                <div style="font-weight:600;font-size:14px">No exchanges match</div>
+                <div style="font-size:12.5px;color:#5b6673;margin:4px 0 12px;line-height:1.5">{{ emptyText }}</div>
+                <button type="button" onClick="{{ clearFilters }}" style="height:34px;padding:0 14px;border:1px solid #1b6f8f;background:#1b6f8f;color:#fff;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">Clear search and filters</button>
+              </div>
+            </div>
+          </sc-if>
+          <dc-import name="NLL Sequence" lay="{{ L }}" on-key-down="{{ onKeyDown }}" hint-size="100%,480px"></dc-import>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:6px 12px;border-top:1px solid #e1e6eb;background:#fff;font-size:11.5px;color:#6b7580;flex-wrap:wrap">
+          <span>Vertical axis = event order with compressed spacing, not a duration scale. Gaps over 1.5 s are marked.</span>
+          <span style="margin-left:auto;font-family:'Source Code Pro',ui-monospace,monospace">↑↓ select · Enter open · Esc close</span>
+        </div>
+      </main>
+      <sc-if value="{{ inspInline }}" hint-placeholder-val="{{ false }}">
+        <div role="separator" aria-orientation="vertical" aria-label="Resize inspector" onMouseDown="{{ onResizeStart }}" style="width:6px;cursor:col-resize;background:#e1e6eb;flex:none" style-hover="background:#1b6f8f"></div>
+        <aside style="width:{{ inspW }}px;flex:none;min-height:0;display:flex;flex-direction:column;background:#fff">
+          <dc-import name="NLL Inspector" d="{{ d }}" hint-size="100%,100%" style="flex:1;min-height:0"></dc-import>
+        </aside>
+      </sc-if>
+      <sc-if value="{{ inspDrawer }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closeInsp }}" style="position:absolute;inset:0;background:rgba(27,36,48,.18);z-index:5"></div>
+        <aside style="position:absolute;top:0;right:0;bottom:0;width:min(440px,92%);z-index:6;display:flex;flex-direction:column;background:#fff;box-shadow:-8px 0 24px rgba(27,36,48,.12)">
+          <dc-import name="NLL Inspector" d="{{ d }}" hint-size="100%,100%" style="flex:1;min-height:0"></dc-import>
+        </aside>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isMobileWs }}" hint-placeholder-val="{{ false }}">
+    <header style="flex:none;display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid #e1e6eb;background:#fff">
+      <button type="button" onClick="{{ openSessionsSheet }}" aria-haspopup="dialog" style="flex:1;min-width:0;min-height:44px;padding:4px 10px;border:1px solid #d9dee5;background:#fff;border-radius:8px;text-align:left;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px" style-hover="background:#eef1f4">
+        <span style="flex:1;min-width:0;display:flex;flex-direction:column">
+          <span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sessName }}</span>
+          <span style="font-size:11px;color:#6b7580;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sessShort }}</span>
+        </span>
+        <span aria-hidden="true" style="color:#6b7580">⌄</span>
+      </button>
+      <button type="button" onClick="{{ toggleSearch }}" aria-label="Search" aria-pressed="{{ searchOpen }}" style="width:44px;height:44px;border:1px solid #d9dee5;background:{{ searchBtnBg }};border-radius:8px;cursor:pointer;font-size:16px;color:#3b4650">⌕</button>
+      <button type="button" onClick="{{ openFiltersSheet }}" aria-label="Filters" style="width:44px;height:44px;border:1px solid {{ filterBtnBorder }};background:{{ filterBtnBg }};border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;color:{{ filterBtnFg }}">{{ filterBtnLabel }}</button>
+    </header>
+    <sc-if value="{{ searchOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:6px 8px;border-bottom:1px solid #e1e6eb;background:#fff"><input type="search" value="{{ search }}" onChange="{{ onSearch }}" placeholder="Search path or component" aria-label="Search paths and component names" style="width:100%;box-sizing:border-box;height:44px;padding:0 12px;border:1px solid #d9dee5;border-radius:8px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:14px"></div>
+    </sc-if>
+    <div role="tablist" style="flex:none;display:flex;padding:6px 8px;gap:6px;background:#fff;border-bottom:1px solid #e1e6eb">
+      <sc-for list="{{ viewOpts }}" as="v" hint-placeholder-count="2"><button type="button" role="tab" aria-selected="{{ v.active }}" onClick="{{ v.onClick }}" style="flex:1;height:40px;border:1px solid {{ v.border }};background:{{ v.bg }};color:{{ v.fg }};border-radius:8px;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">{{ v.label }}</button></sc-for>
+      <span style="align-self:center;font-size:11.5px;color:#6b7580;padding:0 4px;white-space:nowrap">{{ shownShort }}</span>
+    </div>
+    <div style="flex:1;min-height:0;position:relative;display:flex;flex-direction:column">
+      <sc-if value="{{ emptyResults }}" hint-placeholder-val="{{ false }}">
+        <div style="margin:16px;background:#fff;border:1px solid #e1e6eb;border-radius:10px;padding:16px;text-align:center">
+          <div style="font-weight:600;font-size:14px">No exchanges match</div>
+          <div style="font-size:12.5px;color:#5b6673;margin:4px 0 12px;line-height:1.5">{{ emptyText }}</div>
+          <button type="button" onClick="{{ clearFilters }}" style="height:44px;padding:0 16px;border:1px solid #1b6f8f;background:#1b6f8f;color:#fff;border-radius:8px;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Clear search and filters</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ mobileSeq }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;min-height:0;overflow:auto;position:relative;-webkit-overflow-scrolling:touch">
+          <dc-import name="NLL Sequence" lay="{{ L }}" on-key-down="{{ onKeyDown }}" hint-size="100%,480px"></dc-import>
+        </div>
+        <div style="flex:none;padding:6px 10px;border-top:1px solid #e1e6eb;background:#fff;font-size:11px;color:#6b7580;line-height:1.4">Event order, compressed spacing (not a duration scale). Pan sideways for more origins.</div>
+      </sc-if>
+      <sc-if value="{{ mobileList }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;min-height:0;overflow:auto;background:#fff">
+          <sc-for list="{{ listRows }}" as="r" hint-placeholder-count="6">
+            <button type="button" onClick="{{ r.onClick }}" aria-pressed="{{ r.selected }}" style="display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px 10px;align-items:center;width:100%;text-align:left;min-height:56px;padding:8px 12px;border:none;border-left:3px solid {{ r.accent }};border-bottom:1px solid #eef1f4;background:{{ r.bg }};cursor:pointer;font-family:inherit;box-sizing:border-box">
+              <span aria-hidden="true" style="font-size:14px;font-weight:700;color:{{ r.tone }};text-align:center">{{ r.glyph }}</span>
+              <span style="min-width:0;display:flex;flex-direction:column;gap:2px">
+                <span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="font-weight:700">{{ r.method }}</span> {{ r.path }}</span>
+                <span style="font-size:11.5px;color:#6b7580;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.originLabel }} · {{ r.ownerLabel }}</span>
+              </span>
+              <span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;color:{{ r.tone }};font-weight:600">{{ r.status }}<span style="color:#6b7580;font-weight:400">{{ r.dur }}</span></span>
+            </button>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ inspMobile }}" hint-placeholder-val="{{ false }}">
+        <div role="dialog" aria-modal="true" aria-label="Request details" style="position:absolute;inset:0;z-index:10;background:#fff;display:flex;flex-direction:column">
+          <dc-import name="NLL Inspector" d="{{ d }}" hint-size="100%,100%" style="flex:1;min-height:0"></dc-import>
+        </div>
+      </sc-if>
+      <sc-if value="{{ sheetSessions }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(27,36,48,.3);z-index:20"></div>
+        <div role="dialog" aria-modal="true" aria-label="Choose session" style="position:absolute;left:0;right:0;bottom:0;max-height:80%;z-index:21;background:#fff;border-radius:14px 14px 0 0;display:flex;flex-direction:column;box-shadow:0 -8px 24px rgba(27,36,48,.14)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 8px 6px 16px"><span style="font-size:14px;font-weight:700">Sessions</span><button type="button" onClick="{{ closeSheet }}" aria-label="Close" style="width:44px;height:44px;border:none;background:transparent;font-size:18px;cursor:pointer;color:#3b4650">×</button></div>
+          <div style="overflow:auto;padding:0 8px 12px;display:flex;flex-direction:column;gap:4px">
+            <sc-for list="{{ sessionRows }}" as="s" hint-placeholder-count="3">
+              <button type="button" onClick="{{ s.onOpen }}" aria-current="{{ s.active }}" style="text-align:left;min-height:56px;padding:8px 12px;border:1px solid {{ s.border }};background:{{ s.bg }};border-radius:8px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:14px;font-weight:600">{{ s.name }}</span>
+                <span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11px;color:#6b7580">{{ s.id }}</span>
+                <span style="font-size:12px;color:{{ s.tone }};font-weight:600">{{ s.glyph }} {{ s.summary }} <span style="color:#6b7580;font-weight:400">· {{ s.recLabel }}</span></span>
+              </button>
+            </sc-for>
+            <sc-if value="{{ hasMultiRec }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:10px 4px 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600">Recording periods (independent clocks)</div>
+              <sc-for list="{{ recRows }}" as="r" hint-placeholder-count="2">
+                <button type="button" onClick="{{ r.onClick }}" aria-pressed="{{ r.active }}" style="text-align:left;min-height:44px;padding:6px 12px;border:1px solid {{ r.border }};background:{{ r.bg }};border-radius:8px;cursor:pointer;font-family:inherit;font-size:13px;display:flex;flex-direction:column"><span style="font-family:'Source Code Pro',ui-monospace,monospace;font-weight:600">{{ r.label }}</span><span style="font-size:11.5px;color:{{ r.subColor }}">{{ r.sub }}</span></button>
+              </sc-for>
+            </sc-if>
+            <button type="button" onClick="{{ goImport }}" style="min-height:44px;margin-top:6px;border:1px solid #c9d1da;background:#fff;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Import another file…</button>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ sheetFilters }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(27,36,48,.3);z-index:20"></div>
+        <div role="dialog" aria-modal="true" aria-label="Filters" style="position:absolute;left:0;right:0;bottom:0;max-height:85%;z-index:21;background:#fff;border-radius:14px 14px 0 0;display:flex;flex-direction:column;box-shadow:0 -8px 24px rgba(27,36,48,.14)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 8px 6px 16px"><span style="font-size:14px;font-weight:700">Filters <span style="font-weight:400;color:#6b7580;font-size:12.5px">· {{ shownLabel }}</span></span><button type="button" onClick="{{ closeSheet }}" aria-label="Close" style="width:44px;height:44px;border:none;background:transparent;font-size:18px;cursor:pointer;color:#3b4650">×</button></div>
+          <div style="overflow:auto;padding:0 16px 16px;display:flex;flex-direction:column;gap:14px">
+            <div><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600;margin-bottom:6px">Owner</div><div style="display:flex;gap:6px"><sc-for list="{{ ownerOpts }}" as="o" hint-placeholder-count="3"><button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.active }}" style="flex:1;height:44px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }};border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">{{ o.label }}</button></sc-for></div></div>
+            <div><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600;margin-bottom:6px">Outcome</div><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ outcomeOpts }}" as="o" hint-placeholder-count="4"><button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.active }}" style="flex:1;min-width:40%;height:44px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }};border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">{{ o.label }}</button></sc-for></div></div>
+            <div><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600;margin-bottom:6px">Origins</div><div style="display:flex;flex-direction:column;gap:6px"><sc-for list="{{ originOpts }}" as="o" hint-placeholder-count="3"><button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.active }}" style="min-height:44px;text-align:left;padding:0 12px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }};border-radius:8px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center"><span>{{ o.label }}</span><span style="font-size:11px;color:#6b7580;font-family:'Source Sans 3',system-ui,sans-serif">{{ o.title }}</span></button></sc-for></div></div>
+            <div style="display:flex;gap:8px"><button type="button" onClick="{{ clearFilters }}" style="flex:1;height:44px;border:1px solid #c9d1da;background:#fff;border-radius:8px;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Clear</button><button type="button" onClick="{{ closeSheet }}" style="flex:1;height:44px;border:1px solid #1b6f8f;background:#1b6f8f;color:#fff;border-radius:8px;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Done</button></div>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;viewport&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;auto&quot;,&quot;desktop&quot;,&quot;mobile&quot;],&quot;default&quot;:&quot;auto&quot;,&quot;tsType&quot;:&quot;'auto' | 'desktop' | 'mobile'&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;laneWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:164,&quot;min&quot;:120,&quot;max&quot;:240,&quot;step&quot;:4,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;workspace&quot;,&quot;import&quot;],&quot;default&quot;:&quot;workspace&quot;,&quot;tsType&quot;:&quot;'workspace' | 'import'&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;file&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sample&quot;,&quot;malformed&quot;,&quot;none&quot;],&quot;default&quot;:&quot;sample&quot;,&quot;tsType&quot;:&quot;'sample' | 'malformed' | 'none'&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;session&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:0,&quot;min&quot;:0,&quot;max&quot;:3,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;selection&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string | null&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;request&quot;,&quot;response&quot;,&quot;timing&quot;,&quot;attribution&quot;,&quot;raw&quot;],&quot;default&quot;:&quot;request&quot;,&quot;tsType&quot;:&quot;InspectorTab&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;search&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;mobileView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sequence&quot;,&quot;list&quot;],&quot;default&quot;:&quot;sequence&quot;,&quot;tsType&quot;:&quot;'sequence' | 'list'&quot;,&quot;section&quot;:&quot;Initial state&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const p = props || {};
+    this.state = { ready: false, loadError: null, width: 1440, screen: p.screen || 'workspace', fileKey: p.file || 'sample', file: null, sessionIdx: p.session ?? 0, sel: p.selection || null, hist: [], insp: !!p.selection, tab: p.tab || 'request', search: p.search || '', owner: 'all', outcome: 'all', origins: [], collapsed: [], recFocus: null, navOpen: true, inspW: 420, mobileView: p.mobileView || 'sequence', sheet: null, reqBodyOpen: false, resBodyOpen: true, jsonMode: 'pretty', copied: null, drag: false, searchOpen: !!p.search };
+    this.rootRef = React.createRef(); this.M = null;
+  }
+  componentDidMount() {
+    Promise.all([import('./nll-data.js'), import('./nll-layout.js')]).then(([D, Lm]) => {
+      this.M = Object.assign({}, D, Lm);
+      const st = { ready: true };
+      if (this.state.fileKey !== 'none') { const f = D.SAMPLE_FILES[this.state.fileKey]; if (f) st.file = D.importText(f.name, f.text); }
+      this.setState(st);
+    }).catch((e) => this.setState({ ready: true, loadError: String(e) }));
+    if (window.ResizeObserver && this.rootRef.current) {
+      this.ro = new ResizeObserver((en) => { const w = en[0].contentRect.width; if (w && Math.abs(w - this.state.width) > 2) this.setState({ width: w }); });
+      this.ro.observe(this.rootRef.current);
+    }
+  }
+  componentWillUnmount() { if (this.ro) this.ro.disconnect(); clearTimeout(this.copyT); this.stopResize(); }
+  componentDidUpdate(pp) {
+    const p = this.props || {}, pv = pp || {}, st = {};
+    if (p.screen !== pv.screen && p.screen) st.screen = p.screen;
+    if (p.file !== pv.file && p.file && this.M) { const f = this.M.SAMPLE_FILES[p.file]; st.fileKey = p.file; st.file = f ? this.M.importText(f.name, f.text) : null; st.sessionIdx = 0; st.sel = null; st.insp = false; st.origins = []; st.recFocus = null; }
+    if (p.session !== pv.session && p.session != null) { st.sessionIdx = p.session; st.sel = null; st.insp = false; st.origins = []; st.recFocus = null; }
+    if (p.selection !== pv.selection) { st.sel = p.selection || null; st.insp = !!p.selection; }
+    if (p.tab !== pv.tab && p.tab) st.tab = p.tab;
+    if (p.search !== pv.search && p.search != null) { st.search = p.search; st.searchOpen = !!p.search; }
+    if (p.mobileView !== pv.mobileView && p.mobileView) st.mobileView = p.mobileView;
+    if (Object.keys(st).length) this.setState(st);
+  }
+  // ---- actions
+  select(id) { this.setState((s) => ({ sel: id, hist: s.sel && s.sel !== id ? s.hist.concat([s.sel]).slice(-20) : s.hist, insp: true, copied: null, sheet: null })); }
+  back() { this.setState((s) => { const h = s.hist.slice(); const prev = h.pop(); return prev ? { sel: prev, hist: h } : {}; }); }
+  closeInsp() { this.setState({ insp: false }); }
+  toggleCollapse(opId) { this.setState((s) => ({ collapsed: s.collapsed.includes(opId) ? s.collapsed.filter((x) => x !== opId) : s.collapsed.concat([opId]) })); }
+  setSession(i) { this.setState({ sessionIdx: i, sel: null, hist: [], insp: false, recFocus: null, origins: [], collapsed: [], screen: 'workspace', sheet: null }); }
+  loadFile(file, key) { this.setState({ file, fileKey: key, sessionIdx: 0, sel: null, hist: [], insp: false, recFocus: null, origins: [], collapsed: [], drag: false, search: '' }); }
+  loadSample(key) { const f = this.M.SAMPLE_FILES[key]; this.loadFile(this.M.importText(f.name, f.text), key); }
+  readFile(file) { if (!file) return; const r = new FileReader(); r.onload = () => this.loadFile(this.M.importText(file.name, String(r.result)), 'custom'); r.readAsText(file); }
+  copy(key, text) {
+    const done = () => { this.setState({ copied: key }); clearTimeout(this.copyT); this.copyT = setTimeout(() => this.setState({ copied: null }), 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done); else done();
+  }
+  keyNav(e, ids) {
+    const k = e.key;
+    if (k === 'Escape') { e.preventDefault(); this.closeInsp(); return; }
+    if (!ids.length) return;
+    const cur = ids.indexOf(this.state.sel);
+    if (k === 'ArrowDown' || k === 'j') { e.preventDefault(); const n = cur < 0 ? ids[0] : ids[Math.min(ids.length - 1, cur + 1)]; this.setState((s) => ({ sel: n, hist: s.sel && s.sel !== n ? s.hist.concat([s.sel]).slice(-20) : s.hist })); }
+    else if (k === 'ArrowUp' || k === 'k') { e.preventDefault(); const n = cur < 0 ? ids[ids.length - 1] : ids[Math.max(0, cur - 1)]; this.setState((s) => ({ sel: n, hist: s.sel && s.sel !== n ? s.hist.concat([s.sel]).slice(-20) : s.hist })); }
+    else if (k === 'Enter') { e.preventDefault(); if (this.state.sel) this.setState({ insp: true }); }
+  }
+  startResize(e) {
+    e.preventDefault(); const startX = e.clientX, startW = this.state.inspW;
+    this.onMove = (ev) => this.setState({ inspW: Math.max(320, Math.min(680, startW + (startX - ev.clientX))) });
+    this.onUp = () => this.stopResize();
+    document.addEventListener('mousemove', this.onMove); document.addEventListener('mouseup', this.onUp);
+  }
+  stopResize() { if (this.onMove) document.removeEventListener('mousemove', this.onMove); if (this.onUp) document.removeEventListener('mouseup', this.onUp); this.onMove = this.onUp = null; }
+
+  // ---- view model
+  renderVals() {
+    const s = this.state, M = this.M, p = this.props || {};
+    const C = { acc: '#1b6f8f', accBg: '#e3f1f6', ok: '#1f7a4d', okBg: '#e4f3ea', err: '#b9382c', errBg: '#fbe8e5', warn: '#8a5a00', warnBg: '#fff3d6', neu: '#5b6673', neuBg: '#eceff3' };
+    const toneC = { ok: C.ok, error: C.err, warn: C.warn, neutral: C.neu }, toneBg = { ok: C.okBg, error: C.errBg, warn: C.warnBg, neutral: C.neuBg };
+    const vp = p.viewport || 'auto';
+    const mode = vp === 'mobile' ? 'mobile' : vp === 'desktop' ? 'desktop' : s.width < 720 ? 'mobile' : s.width < 1100 ? 'tablet' : 'desktop';
+    const base = { rootRef: this.rootRef, loading: !s.ready, isImport: false, isDesktopWs: false, isMobileWs: false };
+    if (!s.ready) return base;
+    const file = s.file;
+    const sessions = file ? file.sessions : [];
+    const hasFile = !!file;
+    const isImport = s.screen === 'import' || !hasFile || sessions.length === 0;
+    const sessIdx = Math.min(s.sessionIdx, Math.max(0, sessions.length - 1));
+    const sess = sessions[sessIdx] || null;
+
+    // File + diagnostics
+    const sevMeta = { error: { fg: C.err, bg: C.errBg }, warning: { fg: C.warn, bg: C.warnBg }, info: { fg: C.acc, bg: C.accBg } };
+    const diags = file ? file.diagnostics.map((d) => ({ severity: d.severity, fg: sevMeta[d.severity].fg, bg: sevMeta[d.severity].bg, lineLabel: d.line ? `line ${d.line}` : '', message: d.message, excerpt: d.excerpt ? `“${d.excerpt}”` : '' })) : [];
+    const fileBadge = !file ? '' : file.errors ? `${file.errors} error${file.errors > 1 ? 's' : ''}${file.warnings ? ` · ${file.warnings} warning${file.warnings > 1 ? 's' : ''}` : ''}` : file.warnings ? `${file.warnings} warning${file.warnings > 1 ? 's' : ''}` : diags.length ? `${diags.length} note${diags.length > 1 ? 's' : ''}` : 'Parsed cleanly';
+    const fileTone = !file ? 'neutral' : file.errors ? 'error' : file.warnings ? 'warn' : diags.length ? 'neutral' : 'ok';
+    const summarize = (x) => {
+      const c = x.counts, err = c.http_error + c.transport_failure + c.timeout, inc = c.unknown + c.unfinished + c.cancelled;
+      const parts = [`${c.total} req`, `${c.success} ok`]; if (err) parts.push(`${err} failed`); if (inc) parts.push(`${inc} incomplete`); if (c.handlerCalls) parts.push(`${c.handlerCalls} handler call${c.handlerCalls === 1 ? '' : 's'}`);
+      return { text: parts.join(' · '), tone: err ? C.err : inc ? C.warn : C.ok, glyph: err ? '✕' : inc ? '…' : '✓' };
+    };
+    const sessionRows = sessions.map((x, i) => { const sm = summarize(x); const active = i === sessIdx && !isImport; return { name: x.name || x.id, id: x.id, source: x.source === 'customer' ? 'customer-supplied ID' : x.source === 'sdk' ? 'SDK-generated ID' : 'ID source not recorded', platform: [x.platform === 'android' ? 'Android' : x.platform === 'ios' ? 'iOS' : x.platform || 'platform not recorded', x.sdk].filter(Boolean).join(' · '), recLabel: `${x.recordings.length} recording${x.recordings.length === 1 ? '' : 's'}${x.incomplete ? ' · incomplete' : ''}`, summary: sm.text, tone: sm.tone, glyph: sm.glyph, time: M.fmtClock(x.startMs), active, border: active ? C.acc : 'transparent', bg: active ? '#fff' : 'transparent', onOpen: () => this.setSession(i) }; });
+
+    const common = Object.assign(base, {
+      isImport, isDesktopWs: !isImport && mode !== 'mobile', isMobileWs: !isImport && mode === 'mobile',
+      hasFile, fileName: file ? file.name : '', fileBadge, fileBadgeFg: toneC[fileTone], fileBadgeBg: toneBg[fileTone],
+      fileStats: file ? `${M.fmtBytes(file.bytes)} · ${file.lineCount} lines · ${file.eventCount} events accepted · ${sessions.length} session${sessions.length === 1 ? '' : 's'}` : '',
+      hasDiags: diags.length > 0, diags, sessionCount: sessions.length, noSessions: hasFile && sessions.length === 0, sessionRows,
+      dropBorder: s.drag ? C.acc : '#c3cbd4', dropBg: s.drag ? C.accBg : '#fff',
+      onDrop: (e) => { e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; this.readFile(f); },
+      onDragOver: (e) => { e.preventDefault(); if (!s.drag) this.setState({ drag: true }); }, onDragLeave: () => this.setState({ drag: false }),
+      onFilePick: (e) => { const f = e.target.files && e.target.files[0]; this.readFile(f); e.target.value = ''; },
+      openSample: () => this.loadSample('sample'), openMalformed: () => this.loadSample('malformed'),
+      goWorkspace: () => this.setState({ screen: 'workspace' }), goImport: () => this.setState({ screen: 'import', sheet: null }),
+    });
+    if (isImport || !sess) return common;
+
+    // Filters
+    const q = s.search.trim().toLowerCase();
+    const filtersActive = s.owner !== 'all' || s.outcome !== 'all' || s.origins.length > 0 || q !== '';
+    const opMap = new Map(sess.operations.map((o) => [o.id, o]));
+    const hidden = new Set();
+    sess.exchanges.forEach((x) => {
+      const op = x.opId ? opMap.get(x.opId) : null; let show = true;
+      if (s.owner !== 'all' && x.owner !== s.owner) show = false;
+      if (s.origins.length && !s.origins.includes(x.origin)) show = false;
+      if (s.outcome === 'ok' && x.outcome !== 'success') show = false;
+      if (s.outcome === 'error' && !['http_error', 'transport_failure', 'timeout'].includes(x.outcome)) show = false;
+      if (s.outcome === 'incomplete' && !['unknown', 'unfinished', 'cancelled'].includes(x.outcome)) show = false;
+      if (q) { const hay = [x.path, x.search, x.method, x.component, x.host, op && op.component, op && op.method].filter(Boolean).join(' ').toLowerCase(); if (!hay.includes(q)) show = false; }
+      if (!show) hidden.add(x.id);
+    });
+    const laneW = p.laneWidth || (mode === 'mobile' ? 136 : 164);
+    const lay = M.layoutSequence(sess, { laneWidth: laneW, hidden, collapsed: new Set(s.collapsed), filtersActive, recordingId: s.recFocus });
+    const shownIds = lay.shownIds;
+    const total = sess.exchanges.length, shown = shownIds.length;
+
+    // Selection
+    const selEx = s.sel && !s.sel.startsWith('op:') ? sess.exchanges.find((x) => x.id === s.sel) : null;
+    const selOp = s.sel && s.sel.startsWith('op:') ? opMap.get(s.sel.slice(3)) : null;
+    const relatedOps = new Set();
+    if (selEx && selEx.opId) { let cur = opMap.get(selEx.opId); while (cur) { relatedOps.add(cur.id); cur = cur.parentId ? opMap.get(cur.parentId) : null; } }
+    if (selOp) relatedOps.add(selOp.id);
+    const mono = "'Source Code Pro',ui-monospace,monospace", sans = "'Source Sans 3',system-ui,sans-serif";
+
+    // Decorate layout
+    const L = {
+      width: lay.width, height: lay.height, laneW: lay.laneW, gapX: lay.left + 8, clientGroup: lay.clientGroup,
+      lanes: lay.lanes.map((l) => ({ id: l.id, x: l.x, left: l.x - lay.laneW / 2, label: l.label, title: l.title, sub: l.kind === 'client' ? (l.id === 'app' ? 'customer code' : 'SDK code') : `${l.scheme}${l.title.includes(':') && /:\d+$/.test(l.title) ? ' · port ' + l.title.split(':').pop() : ''}`, font: l.kind === 'client' ? sans : mono, aria: `${l.kind === 'client' ? 'Client lane' : 'Server lane'} ${l.label}. Full origin: ${l.title}` })),
+      recs: lay.recs.map((r) => ({ y: r.y, top: r.y - 14, textTop: r.y - 7, label: r.label, sub: r.sub + (r.clockNote ? ` · ${r.clockNote}` : ''), fill: r.interrupted ? '#fff3d6' : '#eef1f4', subColor: r.interrupted ? C.warn : C.neu })),
+      gaps: lay.gaps.map((g) => ({ y: g.y, textTop: g.y - 7, label: g.label })),
+      serverBars: lay.serverBars.map((b) => ({ x: b.x, y: b.y, h: b.h, fill: b.open ? 'none' : '#fff', stroke: '#9aa5b1', dash: b.open ? '3 3' : 'none' })),
+      collapsedRows: lay.collapsedRows.map((c) => ({ x: c.x + 12, textTop: c.y - 7, label: c.label })),
+      bars: lay.bars.map((b) => { const rel = relatedOps.has(b.opId), isSel = selOp && selOp.id === b.opId; const LOCAL = '#4f4a8a'; const hStroke = b.completion === 'threw' ? C.err : (b.stopped || b.open) ? C.warn : LOCAL; const hFill = b.completion === 'threw' ? C.errBg : (b.stopped || b.open) ? C.warnBg : '#ecebf6'; const comp = b.handler ? `${b.component} ← ${b.caller ? (b.caller.component || '?') + '.' + (b.caller.method || '?') : 'caller not recorded'} · handler` : b.component; const endNote = b.open ? (b.handler ? ' · no end recorded — no return drawn' : ' · end not recorded') : b.stopped ? ' · observation stopped — exit not observed' : ''; return { x: b.x, y: b.y, w: b.w, h: b.h, fill: b.handler ? hFill : b.owner === 'app' ? '#dbe4ec' : '#cfe4ee', stroke: rel ? C.acc : b.handler ? hStroke : '#9fb3c2', sw: isSel ? 2.5 : rel ? 2 : b.handler ? 1.5 : 1, dash: b.open || b.stopped ? '4 3' : 'none', labelX: b.labelX, textTop: b.labelY - 11, hitY: b.labelY - 12, hitW: Math.min(laneW * 1.6, b.label.length * 7 + 40), maxW: laneW * 2.6, text: b.label, component: comp + endNote + (b.returnedEarly ? ' · returned before request finished' : ''), textColor: rel ? C.acc : b.handler ? hStroke : '#1b2430', toggle: b.count > 0 ? (b.collapsed ? '[+]' : '[−]') : '', aria: b.handler ? `Handler ${b.label} on ${b.component}, App code, called by ${b.caller ? b.caller.component + '.' + b.caller.method : 'unknown caller'}, ${b.completion === 'missing' ? 'no end recorded' : b.completion}, ${b.count} request${b.count === 1 ? '' : 's'}${b.collapsed ? ', collapsed' : ''}. Enter to inspect.` : `Operation ${b.label} in ${b.component}, ${b.owner === 'app' ? 'Sample App' : 'DemoAuth SDK'}, ${b.count} request${b.count === 1 ? '' : 's'}${b.collapsed ? ', collapsed' : ''}. Enter to inspect.`, onClick: () => this.select('op:' + b.opId), onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); this.select('op:' + b.opId); } } }; }),
+      waits: lay.waitSegments.map((w) => ({ x: w.x, y: w.y, w: w.w, h: w.h, labelX: w.x + w.w + 8, textTop: w.y + Math.max(8, w.h / 2 - 7), label: w.label })),
+      localArrows: lay.localArrows.map((a) => { const selected = !!(selOp && selOp.id === a.opId); const LOCAL = '#4f4a8a'; const color = selected ? C.acc : a.tone === 'error' ? C.err : a.tone === 'neutral' ? C.neu : a.tone === 'warn' ? C.warn : LOCAL; const right = a.x2 > a.x1; const hx = a.x2; return { key: a.key, x1: a.x1, x2: a.x2, y: a.y, selected, color, sw: selected ? 2.5 : 1.5, dash: a.kind === 'ret' ? '5 4' : 'none', head: right ? `${hx - 8},${a.y - 4} ${hx},${a.y} ${hx - 8},${a.y + 4}` : `${hx + 8},${a.y - 4} ${hx},${a.y} ${hx + 8},${a.y + 4}`, dotR: a.fromDot ? 3.5 : 0, hitX: Math.min(a.x1, a.x2) + 4, hitY: a.y - 18, hitW: Math.max(20, Math.abs(a.x2 - a.x1) - 8), hitFill: selected ? 'rgba(27,111,143,.10)' : 'transparent', labelX: Math.min(a.x1, a.x2) + 12, textTop: a.y - 18, text: a.label, sub: a.sub, textColor: color, weight: a.kind === 'call' ? 600 : 400, aria: `${a.full}${selected ? ' (selected)' : ''}. Selects the invocation.`, onClick: () => this.select('op:' + a.opId), onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); this.select('op:' + a.opId); } } }; }),
+      arrows: lay.arrows.map((a) => { const selected = s.sel === a.exId; const right = a.x2 > a.x1; const color = selected ? C.acc : toneC[a.tone] || C.neu; const hx = a.x2; return { key: a.key, x1: a.x1, x2: a.x2, y: a.y, selected, color, sw: selected ? 2.5 : 1.5, dash: a.dashed ? '5 4' : 'none', head: right ? `${hx},${a.y} ${hx - 8},${a.y - 4} ${hx - 8},${a.y + 4}` : `${hx},${a.y} ${hx + 8},${a.y - 4} ${hx + 8},${a.y + 4}`, hitX: Math.min(a.x1, a.x2) + 4, hitY: a.y - 20, hitW: Math.max(20, Math.abs(a.x2 - a.x1) - 8), hitFill: selected ? 'rgba(27,111,143,.10)' : 'transparent', labelX: Math.min(a.x1, a.x2) + 12, textTop: a.y - 20, text: (a.glyph ? a.glyph + ' ' : '') + a.label + (a.sub ? `  ·  ${a.sub}` : ''), textColor: selected ? C.acc : a.kind === 'req' ? '#1b2430' : color, weight: a.kind === 'req' ? 600 : 400, halo: Math.min(a.x1, a.x2) < lay.clientGroup.x + lay.clientGroup.w ? '#f1f4f7' : '#fafbfc', aria: `${a.kind === 'req' ? 'Request' : a.kind === 'res' ? 'Response' : 'Outcome'} ${a.exId}: ${a.full || a.label}${selected ? ' (selected)' : ''}`, onClick: () => this.select(a.exId), onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); this.select(a.exId); } } }; }),
+    };
+
+    // Filter option models
+    const mk = (opts, cur, set) => opts.map(([id, label]) => { const active = cur === id; return { id, label, active, bg: active ? C.acc : '#fff', fg: active ? '#fff' : '#3b4650', border: active ? C.acc : '#d9dee5', onClick: () => this.setState(set(id)) }; });
+    const ownerOpts = mk([['all', 'All'], ['app', 'App'], ['sdk', 'SDK']], s.owner, (id) => ({ owner: id }));
+    const outcomeOpts = mk([['all', 'Any outcome'], ['ok', 'Success'], ['error', 'Failed'], ['incomplete', 'Incomplete']], s.outcome, (id) => ({ outcome: id }));
+    const originLabels = new Map(); sess.exchanges.forEach((x) => { if (!originLabels.has(x.origin)) originLabels.set(x.origin, x.label); });
+    const originOpts = sess.origins.map((o) => { const active = s.origins.includes(o); return { label: originLabels.get(o), title: o, active, bg: active ? C.accBg : '#fff', fg: active ? C.acc : '#3b4650', border: active ? C.acc : '#d9dee5', onClick: () => this.setState((st) => ({ origins: st.origins.includes(o) ? st.origins.filter((v) => v !== o) : st.origins.concat([o]) })) }; });
+    const recRows = sess.recordings.length > 1 ? [{ label: 'All recordings', sub: `${sess.recordings.length} periods, file order`, active: !s.recFocus, id: null }].concat(sess.recordings.map((r) => ({ label: r.id, sub: r.interrupted ? `started ${M.fmtClock(r.startMs)} · interrupted` : `${M.fmtClock(r.startMs)} → ${M.fmtClock(r.stopMs)} · ${r.stopReason}`, active: s.recFocus === r.id, id: r.id, interrupted: r.interrupted }))).map((r) => Object.assign(r, { border: r.active ? C.acc : 'transparent', bg: r.active ? '#fff' : 'transparent', subColor: r.interrupted ? C.warn : C.neu, onClick: () => this.setState({ recFocus: r.id, sel: null, insp: false }) })) : [];
+    const activeFilterCount = (s.owner !== 'all') + (s.outcome !== 'all') + (s.origins.length > 0);
+
+    // Inspector view model
+    const d = selEx ? this.exchangeDetails(selEx, sess, opMap, mode, C, toneC, toneBg, mono, sans) : selOp ? this.opDetails(selOp, sess, mode, C, mono, sans) : null;
+    const inspOpen = s.insp && !!d;
+
+    const listRows = sess.exchanges.filter((x) => shownIds.includes(x.id)).map((x) => { const m = M.OUTCOME_META[x.outcome]; const selected = s.sel === x.id; const dur = x.startMs != null && x.endMs != null ? M.fmtMs(x.endMs - x.startMs) : 'no duration'; return { id: x.id, glyph: m.glyph, tone: toneC[m.tone], accent: selected ? C.acc : 'transparent', bg: selected ? C.accBg : '#fff', method: x.method, path: x.path + (x.search || ''), originLabel: x.label, ownerLabel: x.owner === 'app' ? 'Sample App' : 'DemoAuth SDK', status: x.status != null ? `${x.status}` : (m.label), dur, selected, onClick: () => this.select(x.id) }; });
+
+    return Object.assign(common, {
+      sessName: sess.name || sess.id, sessMeta: `${sess.id} · ${sess.source === 'customer' ? 'customer-supplied' : 'SDK-generated'} · ${sess.platform || ''} · ${sess.sdk || ''}`, sessShort: `${sess.id} · ${shown} of ${total} shown`,
+      search: s.search, onSearch: (e) => this.setState({ search: e.target.value }), ownerOpts, outcomeOpts, originOpts, filtersActive, clearFilters: () => this.setState({ owner: 'all', outcome: 'all', origins: [], search: '' }),
+      shownLabel: `${shown} of ${total} exchanges${sess.counts.handlerCalls ? ` · ${sess.counts.handlerCalls} handler call${sess.counts.handlerCalls === 1 ? '' : 's'}` : ''}`, shownShort: `${shown}/${total}${sess.counts.handlerCalls ? ` · ${sess.counts.handlerCalls}↦` : ''}`, emptyResults: shown === 0 && total > 0, emptyText: q ? `Nothing in this session matches “${s.search.trim()}” with the current filters.` : 'The current filters hide every exchange in this session.',
+      toggleAllOps: () => this.setState({ collapsed: s.collapsed.length ? [] : sess.operations.filter((o) => o.exchanges.length || o.children.length).map((o) => o.id) }), toggleAllLabel: s.collapsed.length ? 'Expand all methods' : 'Collapse all methods',
+      L, onKeyDown: (e) => this.keyNav(e, shownIds), navOpen: s.navOpen, toggleNav: () => this.setState({ navOpen: !s.navOpen }), hasMultiRec: recRows.length > 0, recRows,
+      inspInline: inspOpen && mode === 'desktop', inspDrawer: inspOpen && mode === 'tablet', inspMobile: inspOpen && mode === 'mobile', inspW: s.inspW, onResizeStart: (e) => this.startResize(e), closeInsp: () => this.closeInsp(), d,
+      viewOpts: [['sequence', 'Sequence'], ['list', 'List']].map(([id, label]) => { const active = s.mobileView === id; return { label, active, bg: active ? C.acc : '#fff', fg: active ? '#fff' : '#3b4650', border: active ? C.acc : '#d9dee5', onClick: () => this.setState({ mobileView: id }) }; }),
+      mobileSeq: s.mobileView === 'sequence', mobileList: s.mobileView === 'list', listRows,
+      searchOpen: s.searchOpen, toggleSearch: () => this.setState({ searchOpen: !s.searchOpen }), searchBtnBg: s.searchOpen ? C.accBg : '#fff',
+      filterBtnLabel: activeFilterCount ? `${activeFilterCount}` : '≡', filterBtnBg: activeFilterCount ? C.accBg : '#fff', filterBtnFg: activeFilterCount ? C.acc : '#3b4650', filterBtnBorder: activeFilterCount ? C.acc : '#d9dee5',
+      openSessionsSheet: () => this.setState({ sheet: 'sessions' }), openFiltersSheet: () => this.setState({ sheet: 'filters' }), closeSheet: () => this.setState({ sheet: null }), sheetSessions: s.sheet === 'sessions', sheetFilters: s.sheet === 'filters',
+    });
+  }
+
+  exchangeDetails(x, sess, opMap, mode, C, toneC, toneBg, mono, sans) {
+    const M = this.M, s = this.state, m = M.OUTCOME_META[x.outcome] || M.OUTCOME_META.unknown;
+    const op = x.opId ? opMap.get(x.opId) : null;
+    const dur = x.startMs != null && x.endMs != null ? M.fmtMs(x.endMs - x.startMs) : null;
+    const ttfb = x.startMs != null && x.headersMs != null ? M.fmtMs(x.headersMs - x.startMs) : null;
+    const missing = '#8a94a0';
+    const statusLine = x.status != null ? `HTTP ${x.status} ${x.statusText || ''}`.trim() : x.statusInvalid ? 'No HTTP response (log reported status 0)' : 'No HTTP response received';
+    let statusNote = '';
+    if (x.outcome === 'timeout' && x.status != null) statusNote = `Response headers arrived (${x.status}) but the transfer failed while reading the body: ${x.error || 'timeout'}. Header arrival is not completion; this exchange is a failure.`;
+    else if (x.outcome === 'transport_failure') statusNote = `No HTTP response was received. ${x.error || ''}`.trim();
+    else if (x.outcome === 'unknown') statusNote = 'Observation was stopped explicitly while this request was in flight. It may have completed afterwards; the log cannot tell.';
+    else if (x.outcome === 'unfinished') statusNote = 'The recording was interrupted (the file ended without recording.stop). An interrupted file does not prove a network failure.';
+    else if (x.outcome === 'cancelled') statusNote = `Cancelled by the caller${x.error ? ': ' + x.error : ''}.`;
+    else if (x.statusInvalid) statusNote = 'The log reported status 0, which is not an HTTP status. Shown as “no response received”.';
+    else if (x.outcome === 'http_error') statusNote = `The server answered with ${x.status} ${x.statusText || ''}. Transfer completed; the outcome is an HTTP error.`;
+    const hv = (k, v) => ({ k, v, color: /\[REDACTED\]/.test(v) ? C.warn : '#1b2430' });
+    const stateColor = (st) => (st === 'captured' ? C.neu : ['redacted', 'truncated', 'partial'].includes(st) ? C.warn : missing);
+    const bytes = (n) => M.fmtBytes(n);
+    const mkBody = (key, text, state, total, captured, limit, open, toggle) => {
+      const has = text != null; const pj = has ? M.prettyJson(text) : null; const isJson = !!(pj && pj.ok);
+      const displayed = has ? (isJson && s.jsonMode === 'pretty' ? pj.text : text) : '';
+      const preview = has && !open ? (displayed.length > 160 ? displayed.slice(0, 160) + ' …' : displayed) : displayed;
+      const note = state === 'truncated' ? `Capture stopped at the SDK limit of ${bytes(limit || captured)}; ${bytes(total)} were transferred. The remaining bytes are not in the log and cannot be recovered here.` : state === 'partial' ? `Only ${bytes(captured)} of ${bytes(total)} arrived before the transfer ended.` : state === 'redacted' ? 'Sensitive values were replaced with [REDACTED] by the SDK before logging. Originals are not present in this file.' : '';
+      const emptyText = state === 'not_applicable' ? 'No body — not applicable for this request.' : state === 'not_recorded' ? 'Body not recorded by the capture.' : 'Body unavailable — not captured by this adapter.';
+      const sizeLabel = total != null ? bytes(total) + (captured != null && captured !== total ? ` (${bytes(captured)} captured)` : '') : has ? bytes(new TextEncoder().encode(text).length) : 'size not recorded';
+      return { has, isJson, show: has, showEmpty: !has, text: preview, open, maxH: open ? '460px' : '54px', toggleLabel: open ? 'Collapse' : 'Expand', onToggle: toggle, stateLabel: M.STATE_LABEL[state] || state, stateColor: stateColor(state), bytes: sizeLabel, hasNote: !!note, note, emptyText, copyLabel: s.copied === key ? 'Copied' : 'Copy', onCopy: () => this.copy(key, displayed) };
+    };
+    const reqBody = mkBody('reqBody', x.reqBody, x.reqBodyState, x.reqBytes, null, null, s.reqBodyOpen, () => this.setState({ reqBodyOpen: !s.reqBodyOpen }));
+    const resBody = mkBody('resBody', x.resBody, x.resBodyState, x.resBytes, x.resCapturedBytes, x.resLimit, s.resBodyOpen, () => this.setState({ resBodyOpen: !s.resBodyOpen }));
+    const timing = [
+      { label: 'Request started', value: M.fmtTime(x.startMs), font: mono, color: x.startMs != null ? '#1b2430' : missing },
+      { label: 'Response headers', value: x.headersMs != null ? `${M.fmtTime(x.headersMs)}  (+${ttfb})` : x.status != null ? 'not recorded — status supplied at completion' : 'not received', font: x.headersMs != null ? mono : sans, color: x.headersMs != null ? '#1b2430' : missing },
+      { label: 'Body transfer', value: x.bodyMs != null ? `${M.fmtTime(x.bodyMs)}  · ${M.STATE_LABEL[x.resBodyState] || x.resBodyState}` : x.resBodyState === 'not_applicable' ? 'not applicable' : 'not recorded', font: x.bodyMs != null ? mono : sans, color: x.bodyMs != null ? '#1b2430' : missing },
+      { label: 'Request ended', value: x.endMs != null ? M.fmtTime(x.endMs) : x.outcome === 'unfinished' ? 'not recorded — capture interrupted' : 'not recorded — observation stopped', font: x.endMs != null ? mono : sans, color: x.endMs != null ? '#1b2430' : missing },
+      { label: 'Total duration', value: dur || 'not computed — an endpoint is missing', font: dur ? mono : sans, color: dur ? '#1b2430' : missing },
+      { label: 'Calling method returned', value: op ? (op.endMs != null ? M.fmtTime(op.endMs) + (x.returnedEarly ? '  · before this request finished' : '') : 'not recorded') : 'no parent method', font: op && op.endMs != null ? mono : sans, color: op && op.endMs != null ? '#1b2430' : missing },
+    ];
+    const row = (label, value, isMono) => ({ label, value: value == null || value === '' ? 'not recorded' : value, font: value == null || value === '' ? sans : isMono ? mono : sans, color: value == null || value === '' ? missing : '#1b2430' });
+    const attribution = [
+      row('Initiator', x.owner === 'app' ? 'Sample App (customer code)' : x.owner === 'sdk' ? 'DemoAuth SDK' : x.owner),
+      row('Executor', x.adapter === 'manual' ? 'Customer HTTP client via manual recording API' : x.adapter ? `DemoAuth SDK network adapter (${x.adapter})` : null),
+      row('Component / method', op ? `${op.component || '?'} · ${op.method || '?'}` : x.component ? `${x.component} (no method operation recorded)` : null, true),
+      { label: 'Parent operation', value: op ? (op.invocation ? `${op.id} — inside handler ${op.component}.${op.method}, called by ${op.invocation.caller ? op.invocation.caller.component + '.' + op.invocation.caller.method : 'unknown caller'}; executed by app code` : op.id) : 'none — request without a method parent', font: op ? mono : sans, color: op ? '#1b2430' : C.neu },
+      row('Adapter', x.adapter, true), row('Callsite', x.callsite || (op && op.callsite), true),
+      row('Session ID', `${sess.id} (${sess.source === 'customer' ? 'customer-supplied' : sess.source === 'sdk' ? 'SDK-generated' : 'source not recorded'})`, true),
+      row('Recording ID', x.recordingId, true), row('Trace ID', x.traceId, true), row('Span ID', x.spanId, true),
+    ];
+    if (x.retryOf) attribution.push({ label: 'Retry of', value: `${x.retryOf}${x.retryReason ? ' — ' + x.retryReason : ''}${x.retryOfMissing ? ' (original not in this file)' : ''}`, font: mono, color: '#1b2430' });
+    if (x.retriedBy && x.retriedBy.length) attribution.push({ label: 'Retried by', value: x.retriedBy.join(', '), font: mono, color: '#1b2430' });
+    const native = x.native ? Object.entries(x.native).map(([k, v]) => ({ label: k, value: String(v) })) : [];
+    const notes = [];
+    if (x.returnedEarly && op) notes.push(`${op.method} returned at ${M.fmtTime(op.endMs)}, before this request finished at ${M.fmtTime(x.endMs)}. The method result did not depend on this response.`);
+    if (x.adapter === 'manual') notes.push('Recorded through the manual recording API by customer code. Headers and header timing were not supplied, so those fields read “not recorded” rather than empty.');
+    if (x.note) notes.push(x.note);
+    if (x.opMissing) notes.push(`Parent operation ${x.opId} was referenced but never started in this file.`);
+    const raw = x.events.map((ev) => ({ line: ev.line, type: ev.type, ts: ev.tsMs != null ? M.fmtTime(ev.tsMs) : 'no timestamp', text: M.prettyJson(ev.raw).text }));
+    const sanitized = { id: x.id, method: x.method, url: x.url, status: x.status, outcome: x.outcome, requestHeaders: x.reqHeaders, requestBody: x.reqBody, responseHeaders: x.resHeaders, responseBody: x.resBody, bodyState: x.resBodyState, startedAt: x.startMs != null ? new Date(x.startMs).toISOString() : null, endedAt: x.endMs != null ? new Date(x.endMs).toISOString() : null, sessionId: sess.id, recordingId: x.recordingId, traceId: x.traceId, spanId: x.spanId };
+    const tabs = [['request', 'Request'], ['response', 'Response'], ['timing', 'Timing'], ['attribution', 'Attribution'], ['raw', 'Raw events']].map(([id, label]) => { const active = s.tab === id; return { label, active, line: active ? C.acc : 'transparent', color: active ? C.acc : '#5b6673', onClick: () => this.setState({ tab: id }) }; });
+    const later = ['timeout', 'transport_failure', 'cancelled', 'unknown', 'unfinished'].includes(x.outcome);
+    return {
+      isExchange: true, isOp: false, title: `${x.method} ${x.path}${x.search || ''}`, subtitle: `${x.id} · ${x.label} · ${x.owner === 'app' ? 'Sample App' : 'DemoAuth SDK'}`, closeGlyph: mode === 'mobile' ? '←' : '×', onClose: () => this.closeInsp(),
+      hasPrev: s.hist.length > 0, prevTitle: `Back to ${s.hist[s.hist.length - 1] || ''}`, onBack: () => this.back(),
+      glyph: m.glyph, outcomeLabel: m.label, badgeBg: toneBg[m.tone], badgeFg: toneC[m.tone], statusLine, statusColor: x.status >= 400 ? C.err : x.status != null ? '#1b2430' : '#8a94a0', durationLine: dur ? `${dur} total` : 'duration not recorded', hasStatusNote: !!statusNote, statusNote,
+      tabs, isReq: s.tab === 'request', isRes: s.tab === 'response', isTiming: s.tab === 'timing', isAttr: s.tab === 'attribution', isRaw: s.tab === 'raw',
+      method: x.method, url: x.url, origin: x.origin, host: x.host, port: x.port ? `${x.port}${x.origin.includes(':' + x.port) ? '' : ' (default)'}` : '?', path: x.path,
+      hasQuery: x.query.length > 0, query: x.query.map(([k, v]) => ({ k, v })), queryNote: x.query.length ? `${x.query.length} entr${x.query.length === 1 ? 'y' : 'ies'}, repeats preserved` : 'none',
+      hasReqHeaders: !!x.reqHeaders, reqHeaders: (x.reqHeaders || []).map(([k, v]) => hv(k, v)), reqHeadersState: x.reqHeaders ? `${x.reqHeaders.length} captured` : (M.STATE_LABEL[x.reqHeadersState] || x.reqHeadersState), reqHeadersColor: x.reqHeaders ? C.neu : missing,
+      hasResHeaders: !!x.resHeaders, resHeaders: (x.resHeaders || []).map(([k, v]) => hv(k, v)), resHeadersState: x.resHeaders ? `${x.resHeaders.length} captured` : (M.STATE_LABEL[x.resHeadersState] || x.resHeadersState), resHeadersColor: x.resHeaders ? C.neu : missing,
+      reqBody, resBody, jsonModeLabel: s.jsonMode === 'pretty' ? 'Raw' : 'Pretty', onJsonMode: () => this.setState({ jsonMode: s.jsonMode === 'pretty' ? 'raw' : 'pretty' }),
+      arrival: x.headersMs != null ? `${M.fmtTime(x.headersMs)} (headers)` : x.status != null ? 'time not recorded' : 'no response', transfer: x.outcome === 'success' ? (x.bodyMs != null ? M.fmtTime(x.bodyMs) : x.endMs != null ? `by ${M.fmtTime(x.endMs)}` : 'not recorded') : later ? 'did not complete' : x.outcome === 'http_error' ? (x.bodyMs != null ? M.fmtTime(x.bodyMs) : 'completed') : 'not recorded', transferColor: later ? C.err : '#1b2430',
+      timing, attribution, hasNative: native.length > 0, native, hasNotes: notes.length > 0, notes,
+      raw, rawCount: raw.length, copyJsonLabel: s.copied === 'json' ? 'Copied' : 'Copy sanitized JSON', onCopyJson: () => this.copy('json', JSON.stringify(sanitized, null, 2)), copyUrlLabel: s.copied === 'url' ? 'Copied' : 'Copy URL', onCopyUrl: () => this.copy('url', x.url),
+    };
+  }
+
+  opDetails(op, sess, mode, C, mono, sans) {
+    const M = this.M, s = this.state;
+    const dur = op.startMs != null && op.endMs != null ? M.fmtMs(op.endMs - op.startMs) : null;
+    const missing = '#8a94a0';
+    const row = (label, value, isMono) => ({ label, value: value == null ? 'not recorded' : value, font: value == null ? sans : isMono ? mono : sans, color: value == null ? missing : '#1b2430' });
+    const collapsed = s.collapsed.includes(op.id);
+    const count = op.exchanges.length + op.children.reduce((n, c) => n + c.exchanges.length, 0);
+    const ownerName = (o) => (o === 'app' || o === 'integrator' ? 'App code (customer)' : o === 'sdk' ? 'DemoAuth SDK' : o || 'unknown');
+    const inv = op.invocation;
+    if (inv) {
+      const cm = op.endMs == null ? M.COMPLETION_META.missing : (M.COMPLETION_META[op.completion] || M.COMPLETION_META.returned);
+      const tone = { ok: ['#e4f3ea', '#1f7a4d'], error: ['#fbe8e5', '#b9382c'], neutral: ['#eceff3', '#5b6673'], warn: ['#fff3d6', '#8a5a00'] }[cm.tone];
+      const callerOp = op.parentId ? sess.operations.find((o) => o.id === op.parentId) : null;
+      const caller = inv.caller ? `${inv.caller.component || '?'}.${inv.caller.method || '?'} · ${ownerName(inv.caller.owner)}` : null;
+      const errText = op.error ? (typeof op.error === 'object' ? `${op.error.type || 'error'}${op.error.message ? ' — ' + op.error.message : ''}${op.error.stage ? ' · stage: ' + op.error.stage + (op.error.stage === 'unknown' ? ' (not a network classification)' : '') : ''}` : String(op.error)) : null;
+      const nc = (label) => ({ label, value: 'Not captured', font: sans, color: missing });
+      const children = op.exchanges.map((x) => `${x.method} ${x.path} → ${x.label} · ${x.status != null ? x.status : M.OUTCOME_META[x.outcome].label}${x.returnedEarly ? ' · completed after return' : ''}`);
+      let note = '';
+      if (op.completion === 'threw') note = `The exception unwound to ${inv.caller ? inv.caller.component + '.' + inv.caller.method : 'the caller'}${callerOp && callerOp.result === 'ok' ? ', which caught it and completed with result ok' : ''}. This does not make the session or the caller a failure.`;
+      else if (op.completion === 'observation_stopped') note = `Method exit was not observed${op.stopReason ? ' (' + op.stopReason + ')' : ''}. No return is drawn; the elapsed value is the observed interval only.`;
+      else if (op.endMs == null) note = 'No operation end event exists for this invocation. No end time, duration or return is inferred.';
+      else if (callerOp && callerOp.endMs != null && callerOp.endMs < op.endMs) note = 'The caller ended before this synchronous handler — contradicts the synchronous contract; shown as recorded.';
+      return {
+        isExchange: false, isOp: true, opIntro: 'Local handler invocation: the SDK called application code and waited for it to return. Requests whose parent is this invocation are shown as children; they were executed by app code.', title: `${op.method || '?'} · handler`, subtitle: `${op.component || '?'} · App code ← ${inv.caller ? inv.caller.component + '.' + inv.caller.method : 'caller not recorded'}`, closeGlyph: mode === 'mobile' ? '←' : '×', onClose: () => this.closeInsp(),
+        hasPrev: s.hist.length > 0, prevTitle: `Back to ${s.hist[s.hist.length - 1] || ''}`, onBack: () => this.back(),
+        glyph: cm.glyph, outcomeLabel: op.endMs == null ? cm.label : `${cm.label} · outcome ${op.result}`, badgeBg: tone[0], badgeFg: tone[1],
+        statusLine: `${inv.kind} · ${inv.dispatch}`, durationLine: dur ? `${dur} elapsed (includes nested HTTP and waiting)` : 'duration not recorded', hasStatusNote: !!note, statusNote: note,
+        attribution: [row('Callee', `${op.component || '?'}.${(op.method || '?').replace(/\(.*\)$/, '')} · ${ownerName(op.owner)}`, true), row('Caller', caller, true), row('Kind / dispatch', `${inv.kind} · ${inv.dispatch}`, true), row('Completion', op.endMs != null ? op.completion : null, true), row('Outcome', op.endMs != null ? op.result : null, true), (op.endMs != null && !errText ? { label: 'Error', value: 'none (error: null)', font: sans, color: C.neu } : row('Error', errText)), (op.endMs != null && !op.stopReason ? { label: 'Stop reason', value: '—', font: sans, color: C.neu } : row('Stop reason', op.stopReason, true)), nc('Arguments'), nc('Return value'), row('Observed start', op.startMs != null ? M.fmtTime(op.startMs) : null, true), row('Observed end', op.endMs != null ? M.fmtTime(op.endMs) : null, true), row('Child requests', children.length ? children.join('\n') : 'none — handler made no HTTP calls'), row('Caller operation', op.parentId ? `${op.parentId}${callerOp ? '' : ' (not in this file)'}` : 'none — caller not instrumented', true), row('Callsite', op.callsite, true), row('Recording ID', op.recordingId, true), row('Session ID', sess.id, true)],
+        collapseLabel: count ? (collapsed ? `Expand ${count} child request${count === 1 ? '' : 's'}` : `Collapse ${count} child request${count === 1 ? '' : 's'}`) : 'No child requests', onToggleCollapse: () => { if (count) this.toggleCollapse(op.id); },
+      };
+    }
+    return {
+      isExchange: false, isOp: true, opIntro: 'Method operation recorded by the SDK instrumentation. Requests started while it was active are attributed to it as children.', title: `${op.component || '?'} · ${op.method || '?'}`, subtitle: `Operation ${op.id} · ${op.owner === 'app' ? 'Sample App' : 'DemoAuth SDK'}`, closeGlyph: mode === 'mobile' ? '←' : '×', onClose: () => this.closeInsp(),
+      hasPrev: s.hist.length > 0, prevTitle: `Back to ${s.hist[s.hist.length - 1] || ''}`, onBack: () => this.back(),
+      glyph: op.result === 'ok' ? '✓' : op.result ? '✕' : '…', outcomeLabel: op.result ? `Result: ${op.result}` : 'End not recorded', badgeBg: op.result === 'ok' ? '#e4f3ea' : op.result ? '#fbe8e5' : '#fff3d6', badgeFg: op.result === 'ok' ? '#1f7a4d' : op.result ? '#b9382c' : '#8a5a00',
+      statusLine: `${op.exchanges.length} direct request${op.exchanges.length === 1 ? '' : 's'} · ${op.children.length} nested method${op.children.length === 1 ? '' : 's'}${op.children.some((c) => c.invocation) ? ' · waits on a handler' : ''}`, durationLine: dur ? `${dur} in method` : 'duration not recorded', hasStatusNote: false, statusNote: '',
+      attribution: [row('Owner', op.owner === 'app' ? 'Sample App (customer code)' : 'DemoAuth SDK'), row('Component', op.component, true), row('Method', op.method, true), row('Callsite', op.callsite, true), row('Parent operation', op.parentId || 'none (top level)', true), row('Recording ID', op.recordingId, true), row('Started', op.startMs != null ? M.fmtTime(op.startMs) : null, true), row('Ended', op.endMs != null ? M.fmtTime(op.endMs) : null, true), row('Session ID', sess.id, true)],
+      collapseLabel: count ? (collapsed ? `Expand ${count} child request${count === 1 ? '' : 's'}` : `Collapse ${count} child request${count === 1 ? '' : 's'}`) : 'No child requests', onToggleCollapse: () => { if (count) this.toggleCollapse(op.id); },
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -21,6 +21,16 @@ Implemented first slice: strict input/semantic validation; recording and parent-
 
 The UI representations below are planned, not yet integrated into the viewer.
 
+## Mockup handoff — 2 October 2026
+
+The refreshed [Claude Design export](claude-export/Mockups.dc.html) demonstrates all three layouts in frames 2a–2f, with a secondary-session picker, shared comparison controls, paired inspector, overview navigation and explicit match resolution. The [UI specification](SESSION-COMPARISON-UI.md) records the concrete layout, color, interaction and acceptance requirements. [Import provenance and compatibility notes](CLAUDE-IMPORT-2026-10-02.md) distinguish prototype behavior from the current standalone engine.
+
+New design details include blue/orange primary/secondary roles, a shared aligned scroll container, 124px comparison lanes, a 56px gutter, and amber pulsing for the unresolved node and selected match candidate. Other candidates use a static dashed amber outline. Production integration must provide a reduced-motion alternative.
+
+The prototype also normalizes Swift-style method-name punctuation when establishing correspondence. That behavior is not implemented in the standalone engine and is not implicitly enabled by this import. A future engine change must expose and version any normalization policy, preserve raw names and keep colliding signatures unresolved. The current explicit-pair profile remains available for cross-platform correspondences.
+
+These are imported design assets and updated specifications. Viewer integration, genuine live snapshot recomputation and production diff-engine integration remain the delivery steps below.
+
 ## Aligned sequences
 
 Default detailed view. Primary left, secondary right. Corresponding calls share vertical positions; blank spaces account for one-sided calls. Components occupy consistent horizontal lanes across both sides. Preserve nested methods and handler ancestry.

@@ -10,7 +10,7 @@
 <helmet>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Code+Pro:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>html,body{margin:0;height:100%;background:#f4f6f8}#root{height:100%}a{color:#1b6f8f}a:hover{color:#15586f}button:focus-visible,[tabindex]:focus-visible,input:focus-visible{outline:2px solid #1b6f8f;outline-offset:2px}</style>
+  <style>html,body{margin:0;height:100%;background:#f4f6f8}#root{height:100%}@keyframes nll-row-pulse{0%,100%{box-shadow:inset 0 0 0 1.5px rgba(196,122,0,.35)}50%{box-shadow:inset 0 0 0 2.5px rgba(196,122,0,1)}}a{color:#1b6f8f}a:hover{color:#15586f}button:focus-visible,[tabindex]:focus-visible,input:focus-visible{outline:2px solid #1b6f8f;outline-offset:2px}</style>
 </helmet>
 <div ref="{{ rootRef }}" style="height:100%;min-height:100%;display:flex;flex-direction:column;font-family:'Source Sans 3',system-ui,sans-serif;font-size:13px;color:#1b2430;background:#f4f6f8;position:relative;overflow:hidden">
   <sc-if value="{{ loading }}" hint-placeholder-val="{{ true }}">
@@ -86,7 +86,7 @@
   <sc-if value="{{ isDesktopWs }}" hint-placeholder-val="{{ false }}">
     <header style="height:46px;flex:none;display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px solid #e1e6eb;background:#fff">
       <button type="button" onClick="{{ toggleNav }}" aria-label="Toggle session navigator" aria-expanded="{{ navOpen }}" style="width:32px;height:32px;border:1px solid #d9dee5;background:#fff;border-radius:6px;cursor:pointer;color:#3b4650;font-size:14px" style-hover="background:#eef1f4">☰</button>
-      <div style="font-size:14px;font-weight:700;letter-spacing:-.01em">Network Log Lab</div>
+      <div style="font-size:14px;font-weight:700;letter-spacing:-.01em;white-space:nowrap">Network Log Lab</div>
       <div style="display:flex;align-items:center;gap:8px;min-width:0;font-size:12.5px;color:#5b6673">
         <span style="font-family:'Source Code Pro',ui-monospace,monospace;color:#1b2430;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ fileName }}</span>
         <span style="white-space:nowrap">· {{ sessionCount }} sessions</span>
@@ -128,12 +128,16 @@
           </sc-if>
         </nav>
       </sc-if>
+      <sc-if value="{{ cmpOff }}" hint-placeholder-val="{{ true }}">
       <main style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;background:#fafbfc">
         <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #e1e6eb;background:#fff;flex-wrap:wrap">
           <div style="min-width:0;margin-right:auto">
             <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sessName }}</div>
             <div style="font-size:11.5px;color:#6b7580;font-family:'Source Code Pro',ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ sessMeta }}</div>
           </div>
+          <sc-if value="{{ canCompare }}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{ openPicker }}" aria-haspopup="dialog" title="Compare this session (primary) with another captured session" style="height:32px;padding:0 12px;border:1px solid #d9dee5;background:#fff;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;color:#1b2430" style-hover="background:#eef1f4">Compare with…</button>
+          </sc-if>
           <input type="search" value="{{ search }}" onChange="{{ onSearch }}" placeholder="Search path or component" aria-label="Search paths and component names" style="height:32px;width:220px;max-width:100%;padding:0 10px;border:1px solid #d9dee5;border-radius:6px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:12px;background:#fff;color:#1b2430">
           <div role="group" aria-label="Owner filter" style="display:flex;border:1px solid #d9dee5;border-radius:6px;overflow:hidden">
             <sc-for list="{{ ownerOpts }}" as="o" hint-placeholder-count="3"><button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.active }}" style="height:30px;padding:0 10px;border:none;border-left:1px solid #e1e6eb;background:{{ o.bg }};color:{{ o.fg }};font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">{{ o.label }}</button></sc-for>
@@ -177,6 +181,212 @@
         <aside style="position:absolute;top:0;right:0;bottom:0;width:min(440px,92%);z-index:6;display:flex;flex-direction:column;background:#fff;box-shadow:-8px 0 24px rgba(27,36,48,.12)">
           <dc-import name="NLL Inspector" d="{{ d }}" hint-size="100%,100%" style="flex:1;min-height:0"></dc-import>
         </aside>
+      </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ cmpOn }}" hint-placeholder-val="{{ false }}">
+      <main data-screen-label="Comparison" style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;background:#fafbfc">
+        <div style="display:flex;align-items:stretch;border-bottom:1px solid #e1e6eb;background:#fff">
+          <div style="flex:1;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;padding:8px 12px">
+            <div style="min-width:0;display:flex;gap:10px;align-items:center">
+              <span style="flex:none;font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:#fff;background:#2f6db5;padding:3px 7px;border-radius:4px">Primary</span>
+              <div style="min-width:0">
+                <div style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cmpP.name }}</div>
+                <div style="font-size:11.5px;color:#6b7580;font-family:'Source Code Pro',ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="{{ cmpP.idLine }}">{{ cmpP.idLine }}</div>
+                <div style="font-size:11.5px;color:#6b7580;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cmpP.meta }}</div>
+              </div>
+            </div>
+            <button type="button" onClick="{{ cmpSwap }}" title="Swap primary and secondary. Roles are directional only; neither side is the expected or correct one." aria-label="Swap primary and secondary" style="width:36px;height:36px;border:1px solid #d9dee5;background:#fff;border-radius:50%;cursor:pointer;font-size:16px;color:#3b4650" style-hover="background:#eef1f4">⇄</button>
+            <div style="min-width:0;display:flex;gap:10px;align-items:center">
+              <span style="flex:none;font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:#fff;background:#c4651c;padding:3px 7px;border-radius:4px">Secondary</span>
+              <div style="min-width:0">
+                <div style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cmpS.name }}</div>
+                <div style="font-size:11.5px;color:#6b7580;font-family:'Source Code Pro',ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="{{ cmpS.idLine }}">{{ cmpS.idLine }}</div>
+                <div style="font-size:11.5px;color:#6b7580;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cmpS.meta }}</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;justify-content:center;align-items:flex-end;gap:5px;padding:8px 12px;border-left:1px solid #e1e6eb">
+            <button type="button" onClick="{{ cmpExit }}" style="height:32px;padding:0 12px;border:1px solid #c9d1da;background:#fff;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap" style-hover="background:#eef1f4">Exit comparison</button>
+            <span style="font-size:11px;color:#6b7580;white-space:nowrap" title="Fixed snapshots: the comparison does not change while live events arrive.">{{ cmpSnapshot }}</span>
+          </div>
+        </div>
+        <sc-if value="{{ cmpLive }}" hint-placeholder-val="{{ false }}">
+          <div role="status" style="display:flex;align-items:center;gap:12px;padding:6px 12px;background:#fff8e6;border-bottom:1px solid #f0e2b8;font-size:12.5px;color:#5a4300;flex-wrap:wrap">
+            <span style="font-weight:600">New events available</span><span>{{ cmpLiveText }}</span>
+            <button type="button" onClick="{{ cmpRecompute }}" style="height:30px;padding:0 12px;border:1px solid #8a5a00;background:#fff;color:#5a4300;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer" style-hover="background:#fff3d6">Recompute comparison</button>
+            <span style="color:#8a5a00;font-size:11.5px;margin-left:auto" title="Pair IDs belong to one comparison. After recomputing, the selection is re-resolved by its primary node, then by its secondary node, otherwise cleared.">Pair IDs are per comparison; selection is re-resolved by node after recompute.</span>
+          </div>
+        </sc-if>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid #e1e6eb;background:#fff;flex-wrap:wrap">
+          <div role="tablist" aria-label="Comparison layout" style="display:flex;border:1px solid #d9dee5;border-radius:6px;overflow:hidden">
+            <sc-for list="{{ cmpLayouts }}" as="o" hint-placeholder-count="3"><button type="button" role="tab" aria-selected="{{ o.active }}" onClick="{{ o.onClick }}" style="height:30px;padding:0 9px;border:none;border-left:1px solid #e1e6eb;background:{{ o.bg }};color:{{ o.fg }};font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">{{ o.label }}</button></sc-for>
+          </div>
+          <input type="search" value="{{ cmpSearch }}" onChange="{{ cmpOnSearch }}" placeholder="Search path or component" aria-label="Search both sessions" style="height:30px;width:150px;max-width:100%;padding:0 10px;border:1px solid #d9dee5;border-radius:6px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:12px;background:#fff;color:#1b2430">
+          <div role="group" aria-label="Show" style="display:flex;border:1px solid #d9dee5;border-radius:6px;overflow:hidden">
+            <sc-for list="{{ cmpFilters }}" as="o" hint-placeholder-count="5"><button type="button" onClick="{{ o.onClick }}" aria-pressed="{{ o.active }}" title="{{ o.title }}" style="height:30px;padding:0 9px;border:none;border-left:1px solid #e1e6eb;background:{{ o.bg }};color:{{ o.fg }};font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">{{ o.label }}</button></sc-for>
+          </div>
+          <button type="button" onClick="{{ cmpToggleCollapse }}" aria-pressed="{{ cmpCollapseOn }}" style="height:30px;padding:0 10px;border:1px solid {{ cmpCollapseBorder }};background:{{ cmpCollapseBg }};color:{{ cmpCollapseFg }};border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">Collapse unchanged</button>
+          <div style="display:flex;align-items:center;border:1px solid #d9dee5;border-radius:6px;overflow:hidden">
+            <button type="button" onClick="{{ cmpPrev }}" aria-label="Previous difference" title="Previous difference ([)" style="height:30px;width:30px;border:none;background:#fff;cursor:pointer;font-size:14px;color:#3b4650" style-hover="background:#eef1f4">‹</button>
+            <span style="font-size:12px;color:#3b4650;padding:0 8px;white-space:nowrap;border-left:1px solid #e1e6eb;border-right:1px solid #e1e6eb;height:30px;display:inline-flex;align-items:center;font-variant-numeric:tabular-nums">{{ cmpStepLabel }}</span>
+            <button type="button" onClick="{{ cmpNext }}" aria-label="Next difference" title="Next difference (])" style="height:30px;width:30px;border:none;background:#fff;cursor:pointer;font-size:14px;color:#3b4650" style-hover="background:#eef1f4">›</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-bottom:1px solid #e1e6eb;background:#fff;flex-wrap:wrap;font-size:12px">
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;background:{{ cmpResultBg }};color:{{ cmpResultFg }}">{{ cmpResultLabel }}</span>
+          <sc-for list="{{ cmpCounts }}" as="k" hint-placeholder-count="6"><span title="{{ k.title }}" style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;border:1px solid #e1e6eb;background:#fff;color:#3b4650;white-space:nowrap"><span aria-hidden="true" style="width:8px;height:8px;border-radius:2px;background:{{ k.color }}"></span><span style="font-weight:600;font-variant-numeric:tabular-nums">{{ k.n }}</span> {{ k.label }}</span></sc-for>
+          <span style="color:#6b7580;margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">{{ cmpScopeLine }}</span>
+          <button type="button" onClick="{{ cmpToggleRules }}" aria-expanded="{{ cmpRulesOpen }}" style="height:28px;padding:0 10px;border:1px solid {{ cmpRulesBorder }};background:{{ cmpRulesBg }};color:#1b2430;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap" style-hover="background:#eef1f4">Comparison rules</button>
+          <button type="button" onClick="{{ cmpExport }}" style="height:28px;padding:0 10px;border:1px solid #d9dee5;background:#fff;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap" title="Downloads the engine result (http-sequence-diff 1.0). Snapshot and UI state are not part of the contract." style-hover="background:#eef1f4">Export JSON</button>
+        </div>
+        <div style="flex:1;min-height:0;position:relative;display:flex;flex-direction:column">
+          <sc-if value="{{ cmpRulesOpen }}" hint-placeholder-val="{{ false }}">
+            <div role="dialog" aria-label="Comparison rules" style="position:absolute;right:12px;top:8px;z-index:8;width:min(460px,92%);background:#fff;border:1px solid #e1e6eb;border-radius:10px;box-shadow:0 8px 28px rgba(27,36,48,.14);padding:14px 16px;display:flex;flex-direction:column;gap:12px;font-size:12.5px">
+              <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-weight:700;font-size:13px">Comparison rules</span><span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11px;color:#6b7580">{{ cmpEngineLine }}</span></div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <sc-for list="{{ cmpRuleToggles }}" as="t" hint-placeholder-count="2">
+                  <button type="button" onClick="{{ t.onClick }}" aria-pressed="{{ t.on }}" style="display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:center;text-align:left;padding:6px 8px;border:1px solid #e1e6eb;background:#fff;border-radius:6px;cursor:pointer;font-family:inherit" style-hover="background:#f4f6f8"><span aria-hidden="true" style="width:30px;height:16px;border-radius:999px;background:{{ t.track }};position:relative;display:inline-block"><span style="position:absolute;top:2px;left:{{ t.knob }}px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .15s"></span></span><span><span style="display:block;font-weight:600">{{ t.label }}</span><span style="display:block;font-size:11.5px;color:#6b7580;line-height:1.4">{{ t.sub }}</span></span></button>
+                </sc-for>
+              </div>
+              <div><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600;margin-bottom:4px">Ignored headers</div><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ cmpIgnoredHeaders }}" as="h" hint-placeholder-count="2"><span style="display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 8px;border:1px solid #d9dee5;border-radius:999px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px">{{ h.name }}<button type="button" onClick="{{ h.onRemove }}" aria-label="Stop ignoring {{ h.name }}" style="border:none;background:none;cursor:pointer;color:#6b7580;font-size:13px;padding:0 4px">×</button></span></sc-for><input type="text" value="{{ cmpNewHeader }}" onChange="{{ cmpOnNewHeader }}" onKeyDown="{{ cmpNewHeaderKey }}" placeholder="add header, Enter" aria-label="Header name to ignore" style="height:26px;padding:0 8px;border:1px solid #d9dee5;border-radius:999px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;width:150px"></div></div>
+              <div><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600;margin-bottom:4px">Ignored paths</div><div style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;color:#3b4650">{{ cmpIgnoredPaths }}</div></div>
+              <div><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600;margin-bottom:4px">Explicit matches</div><div style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;color:#3b4650;white-space:pre-line">{{ cmpMatchesText }}</div></div>
+              <div><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600;margin-bottom:4px">Scope</div><div style="color:#3b4650;line-height:1.5"><span style="font-weight:600">Included:</span> {{ cmpScopeIncluded }}</div><div style="color:#3b4650;line-height:1.5"><span style="font-weight:600">Excluded:</span> {{ cmpScopeExcluded }}</div></div>
+              <div style="font-size:11.5px;color:#6b7580;line-height:1.45">Matching is parent-scoped and signature-based; duplicates stay unresolved; there is no fuzzy aliasing. Changing a rule reruns the engine on the same snapshots. Presentation filters below never change the result.</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ cmpAligned }}" hint-placeholder-val="{{ true }}">
+            <div aria-label="Comparison overview" style="flex:none;border-bottom:1px solid #e1e6eb;background:#fff;padding:6px 12px 4px;display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:12px;align-items:baseline;font-size:11px;color:#6b7580"><span style="font-weight:600;letter-spacing:.06em;text-transform:uppercase">Overview</span><span>top-level flows in aligned order · one line = one side · lines merge where correspondence is equal, split where it changes, and stop where a side has nothing</span></div>
+              <div style="position:relative;height:40px">
+                <sc-for list="{{ cmpOverview }}" as="o" hint-placeholder-count="4">
+                  <button type="button" onClick="{{ o.onClick }}" title="{{ o.title }}" aria-label="{{ o.title }}" style="position:absolute;left:{{ o.left }};width:{{ o.width }};top:0;height:40px;border:none;background:transparent;padding:0;cursor:pointer;outline-offset:-2px">
+                    <span aria-hidden="true" style="position:absolute;left:1px;right:1px;top:{{ o.pTop }}px;height:5px;border-radius:2px;background:{{ o.pColor }};display:{{ o.pDisplay }}"></span>
+                    <span aria-hidden="true" style="position:absolute;left:1px;right:1px;top:{{ o.sTop }}px;height:5px;border-radius:2px;background:{{ o.sColor }};display:{{ o.sDisplay }}"></span>
+                    <span aria-hidden="true" style="position:absolute;left:0;right:0;bottom:0;height:14px;font-size:10px;line-height:14px;color:{{ o.labelColor }};font-family:'Source Code Pro',ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;padding:0 2px;border-left:1px solid #e1e6eb">{{ o.label }}</span>
+                    <span aria-hidden="true" style="position:absolute;left:0;right:0;top:0;bottom:0;border-radius:3px;background:{{ o.selBg }}"></span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+            <div ref="{{ cmpScrollRef }}" style="flex:1;min-height:0;overflow:auto;position:relative">
+              <div style="display:flex;align-items:flex-start;width:max-content">
+                <div style="width:{{ cmpSideW }}px;flex:none"><dc-import name="NLL Sequence" lay="{{ Lp }}" on-key-down="{{ cmpKey }}" hint-size="600px,480px"></dc-import></div>
+                <div style="width:56px;flex:none;position:relative;height:{{ cmpGutterH }}px;background:#f4f6f8;border-left:1px solid #e1e6eb;border-right:1px solid #e1e6eb">
+                  <div style="position:sticky;top:0;z-index:2;height:54px;background:rgba(244,246,248,.97);border-bottom:1px solid #e1e6eb;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px"><span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#5b6673;font-weight:600">Δ</span><span style="font-size:10px;color:#8a94a0">{{ cmpMarkerCount }}</span></div>
+                  <sc-for list="{{ cmpMarkers }}" as="m" hint-placeholder-count="0">
+                    <button type="button" onClick="{{ m.onClick }}" title="{{ m.title }}" aria-label="{{ m.title }}" aria-pressed="{{ m.selected }}" style="position:absolute;left:14px;top:{{ m.top }}px;width:28px;height:22px;border:1.5px solid {{ m.border }};background:{{ m.bg }};color:{{ m.fg }};border-radius:6px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:{{ m.shadow }}" style-hover="border-color:#1b6f8f">{{ m.glyph }}</button>
+                  </sc-for>
+                </div>
+                <div style="width:{{ cmpSideW }}px;flex:none"><dc-import name="NLL Sequence" lay="{{ Ls }}" on-key-down="{{ cmpKey }}" hint-size="600px,480px"></dc-import></div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ cmpOutline }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;overflow:auto;background:#fff" tabIndex="0" role="tree" aria-label="Change outline" onKeyDown="{{ cmpKey }}">
+              <div style="position:sticky;top:0;z-index:2;display:grid;grid-template-columns:minmax(260px,1fr) 64px 64px 110px 92px 92px 150px;gap:0 8px;padding:6px 12px;background:#fafbfc;border-bottom:1px solid #e1e6eb;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600">
+                <span>Recording → operation → call</span><span style="color:#2f6db5">Primary</span><span style="color:#c4651c">Secondary</span><span>Fields</span><span>Order</span><span>Unknown</span><span>Matched by</span>
+              </div>
+              <sc-for list="{{ cmpOutlineRows }}" as="r" hint-placeholder-count="8">
+                <div role="treeitem" aria-selected="{{ r.selected }}" aria-expanded="{{ r.expanded }}" onClick="{{ r.onClick }}" style="display:grid;grid-template-columns:minmax(260px,1fr) 64px 64px 110px 92px 92px 150px;gap:0 8px;align-items:center;min-height:30px;padding:3px 12px;border-bottom:1px solid #eef1f4;background:{{ r.bg }};animation:{{ r.anim }};cursor:pointer;font-size:12.5px;border-left:3px solid {{ r.accent }}" style-hover="background:#f4f6f8">
+                  <span style="display:flex;align-items:center;gap:6px;min-width:0;padding-left:{{ r.indent }}px">
+                    <button type="button" onClick="{{ r.onToggle }}" aria-label="{{ r.toggleAria }}" style="width:20px;height:20px;border:none;background:transparent;color:#1b6f8f;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11px;font-weight:700;cursor:pointer;visibility:{{ r.toggleVis }};padding:0">{{ r.toggle }}</button>
+                    <span aria-hidden="true" title="{{ r.kindTitle }}" style="font-size:11px;color:#6b7580;width:14px;text-align:center">{{ r.kindGlyph }}</span>
+                    <span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.labelColor }};font-weight:{{ r.weight }}" title="{{ r.title }}">{{ r.label }}</span>
+                    <span style="font-size:11px;color:#8a94a0;white-space:nowrap">{{ r.hint }}</span>
+                  </span>
+                  <span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;color:{{ r.pColor }};font-style:{{ r.pStyle }}">{{ r.pText }}</span>
+                  <span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;color:{{ r.sColor }};font-style:{{ r.sStyle }}">{{ r.sText }}</span>
+                  <span style="display:flex;gap:4px;align-items:center"><span style="display:{{ r.fieldsDisplay }};padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600;background:#f9e8f2;color:#a3357f;white-space:nowrap">{{ r.fields }}</span></span>
+                  <span style="display:flex;gap:4px;align-items:center"><span style="display:{{ r.orderDisplay }};padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600;background:#ecebf6;color:#4f4a8a;white-space:nowrap">{{ r.order }}</span></span>
+                  <span style="display:flex;gap:4px;align-items:center"><span style="display:{{ r.uncDisplay }};padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600;background:#fff3d6;color:#8a5a00;white-space:nowrap">{{ r.unc }}</span></span>
+                  <span style="font-size:11.5px;color:#6b7580;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.basis }}</span>
+                </div>
+              </sc-for>
+              <div style="padding:10px 12px;font-size:11.5px;color:#6b7580;line-height:1.5">Parent counts are per dimension and overlap: one call can be both changed and unknown. Hidden rows keep their original position labels (P# / S#) when revealed.</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ cmpConnections }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;overflow:auto;background:#fff" tabIndex="0" role="group" aria-label="Order connections" onKeyDown="{{ cmpKey }}">
+              <div style="position:sticky;top:0;z-index:2;display:grid;grid-template-columns:minmax(280px,1fr) 180px minmax(280px,1fr);padding:6px 12px;background:#fafbfc;border-bottom:1px solid #e1e6eb;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580;font-weight:600">
+                <span style="color:#2f6db5">Primary · original order</span>
+                <span style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;text-transform:none;letter-spacing:0;font-weight:400;font-size:10.5px"><span><span aria-hidden="true" style="display:inline-block;width:16px;border-top:2px solid #4f4a8a;vertical-align:middle;margin-right:3px"></span>reordered</span><span><span aria-hidden="true" style="display:inline-block;width:16px;border-top:2px dashed #4f4a8a;vertical-align:middle;margin-right:3px"></span>concurrency</span><span><span aria-hidden="true" style="display:inline-block;width:16px;border-top:2px dotted #8a94a0;vertical-align:middle;margin-right:3px"></span>start order only</span></span>
+                <span style="color:#c4651c;text-align:right">Secondary · original order</span>
+              </div>
+              <div style="position:relative;height:{{ cmpConnH }}px;min-width:740px">
+                <sc-for list="{{ cmpConnGroups }}" as="g" hint-placeholder-count="2">
+                  <button type="button" onClick="{{ g.onToggle }}" aria-expanded="{{ g.expanded }}" style="position:absolute;left:0;right:0;top:{{ g.top }}px;height:28px;display:flex;align-items:center;gap:8px;padding:0 12px;border:none;border-top:1px solid #e1e6eb;background:#f6f8fa;cursor:pointer;font-family:inherit;text-align:left" style-hover="background:#eef1f4"><span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11px;font-weight:700;color:#1b6f8f">{{ g.toggle }}</span><span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.label }}</span><span style="font-size:11px;color:#6b7580">{{ g.sub }}</span></button>
+                </sc-for>
+                <svg aria-hidden="true" viewBox="{{ cmpConnViewBox }}" preserveAspectRatio="none" style="position:absolute;left:{{ cmpConnSvgX }}px;top:0;width:calc(100% - {{ cmpConnSvgPad }}px);height:{{ cmpConnH }}px;overflow:visible;pointer-events:none">
+                  <sc-for list="{{ cmpConnLines }}" as="l" hint-placeholder-count="4">
+                    <path d="{{ l.d }}" vector-effect="non-scaling-stroke" style="fill:none;stroke:{{ l.color }};stroke-width:{{ l.sw }};stroke-dasharray:{{ l.dash }};opacity:{{ l.opacity }}"></path>
+                  </sc-for>
+                </svg>
+                <sc-for list="{{ cmpConnLeft }}" as="n" hint-placeholder-count="6">
+                  <button type="button" onClick="{{ n.onClick }}" onMouseEnter="{{ n.onEnter }}" onMouseLeave="{{ n.onLeave }}" onFocus="{{ n.onEnter }}" onBlur="{{ n.onLeave }}" aria-pressed="{{ n.selected }}" aria-label="{{ n.aria }}" style="position:absolute;left:12px;width:{{ cmpConnColW }}px;top:{{ n.top }}px;height:24px;display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:6px;align-items:center;padding:0 6px 0 {{ n.indent }}px;border:1px solid {{ n.border }};background:{{ n.bg }};animation:{{ n.anim }};border-radius:5px;cursor:pointer;font-family:inherit;text-align:left;opacity:{{ n.opacity }}" style-hover="border-color:#1b6f8f">
+                    <span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:10.5px;color:#2f6db5;font-weight:600">#{{ n.pos }}</span>
+                    <span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ n.color }}">{{ n.label }}</span>
+                    <span style="font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:{{ n.tagFg }};background:{{ n.tagBg }};padding:1px 5px;border-radius:3px;white-space:nowrap;display:{{ n.tagDisplay }}">{{ n.tag }}</span>
+                  </button>
+                </sc-for>
+                <sc-for list="{{ cmpConnRight }}" as="n" hint-placeholder-count="6">
+                  <button type="button" onClick="{{ n.onClick }}" onMouseEnter="{{ n.onEnter }}" onMouseLeave="{{ n.onLeave }}" onFocus="{{ n.onEnter }}" onBlur="{{ n.onLeave }}" aria-pressed="{{ n.selected }}" aria-label="{{ n.aria }}" style="position:absolute;right:12px;width:{{ cmpConnColW }}px;top:{{ n.top }}px;height:24px;display:grid;grid-template-columns:auto minmax(0,1fr) 30px;gap:6px;align-items:center;padding:0 {{ n.indent }}px 0 6px;border:1px solid {{ n.border }};background:{{ n.bg }};animation:{{ n.anim }};border-radius:5px;cursor:pointer;font-family:inherit;text-align:left;opacity:{{ n.opacity }}" style-hover="border-color:#1b6f8f">
+                    <span style="font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:{{ n.tagFg }};background:{{ n.tagBg }};padding:1px 5px;border-radius:3px;white-space:nowrap;display:{{ n.tagDisplay }}">{{ n.tag }}</span>
+                    <span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ n.color }}">{{ n.label }}</span>
+                    <span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:10.5px;color:#c4651c;font-weight:600;text-align:right">#{{ n.pos }}</span>
+                  </button>
+                </sc-for>
+              </div>
+              <div style="padding:10px 12px;font-size:11.5px;color:#6b7580;line-height:1.5">A crossing shows that observed order differs. Only a solid line is a confirmed reorder of completed, non-overlapping spans; dashed means the spans overlapped on one side only; dotted means only start order differed. None of these establish a changed causal dependency. Position numbers are each session's original ordinals and stay fixed when filters hide calls.</div>
+            </div>
+          </sc-if>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:6px 12px;border-top:1px solid #e1e6eb;background:#fff;font-size:11.5px;color:#6b7580;flex-wrap:wrap">
+          <span>{{ cmpFootNote }}</span>
+          <span style="margin-left:auto;font-family:'Source Code Pro',ui-monospace,monospace">↑↓ pair · [ ] difference · Enter open · Esc close</span>
+        </div>
+      </main>
+      <sc-if value="{{ cmpInspInline }}" hint-placeholder-val="{{ false }}">
+        <div role="separator" aria-orientation="vertical" aria-label="Resize inspector" onMouseDown="{{ onResizeStart }}" style="width:6px;cursor:col-resize;background:#e1e6eb;flex:none" style-hover="background:#1b6f8f"></div>
+        <aside style="width:{{ inspW }}px;flex:none;min-height:0;display:flex;flex-direction:column;background:#fff">
+          <dc-import name="NLL Pair Inspector" d="{{ cd }}" hint-size="100%,100%" style="flex:1;min-height:0"></dc-import>
+        </aside>
+      </sc-if>
+      <sc-if value="{{ cmpInspDrawer }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ cmpCloseInsp }}" style="position:absolute;inset:0;background:rgba(27,36,48,.18);z-index:5"></div>
+        <aside style="position:absolute;top:0;right:0;bottom:0;width:min(520px,92%);z-index:6;display:flex;flex-direction:column;background:#fff;box-shadow:-8px 0 24px rgba(27,36,48,.12)">
+          <dc-import name="NLL Pair Inspector" d="{{ cd }}" hint-size="100%,100%" style="flex:1;min-height:0"></dc-import>
+        </aside>
+      </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ pickerOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closePicker }}" style="position:absolute;inset:0;background:rgba(27,36,48,.24);z-index:30"></div>
+        <div role="dialog" aria-modal="true" aria-label="Choose a session to compare with" style="position:absolute;left:50%;top:48px;transform:translateX(-50%);width:min(680px,94%);max-height:calc(100% - 96px);z-index:31;background:#fff;border:1px solid #e1e6eb;border-radius:12px;box-shadow:0 16px 48px rgba(27,36,48,.18);display:flex;flex-direction:column;overflow:hidden">
+          <div style="padding:14px 16px 10px;border-bottom:1px solid #e1e6eb;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><div><div style="font-size:15px;font-weight:700">Compare with…</div><div style="font-size:12px;color:#6b7580;margin-top:2px">Primary: <span style="font-weight:600;color:#1b2430">{{ sessName }}</span> · the session you pick becomes secondary. Roles can be swapped later.</div></div><button type="button" onClick="{{ closePicker }}" aria-label="Close" style="width:36px;height:36px;border:none;background:transparent;font-size:18px;cursor:pointer;color:#3b4650;border-radius:6px" style-hover="background:#eef1f4">×</button></div>
+            <input type="search" value="{{ pickerQ }}" onChange="{{ onPickerQ }}" placeholder="Search name, session ID, namespace, platform, build" aria-label="Search sessions" style="height:36px;padding:0 12px;border:1px solid #d9dee5;border-radius:8px;font-family:inherit;font-size:13px">
+          </div>
+          <div style="overflow:auto;padding:8px;display:flex;flex-direction:column;gap:4px">
+            <sc-for list="{{ pickerRows }}" as="r" hint-placeholder-count="3">
+              <button type="button" onClick="{{ r.onPick }}" style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.4fr) minmax(0,1.3fr) auto;gap:14px;align-items:center;text-align:left;padding:10px 12px;border:1px solid #e1e6eb;background:#fff;border-radius:8px;cursor:pointer;font-family:inherit" style-hover="background:#f4f6f8;border-color:#1b6f8f">
+                <span style="min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span><span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;color:#5b6673;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.ns }} / {{ r.id }}</span></span>
+                <span style="font-size:12px;color:#5b6673;line-height:1.4;min-width:0"><span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.platform }}</span><span style="display:block;color:{{ r.buildColor }};font-style:{{ r.buildStyle }}">{{ r.build }}</span></span>
+                <span style="font-size:12px;color:#5b6673;line-height:1.4"><span style="display:block">{{ r.context }}</span><span style="display:block;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px">{{ r.time }}</span></span>
+                <span style="height:32px;padding:0 12px;border:1px solid #1b6f8f;background:#1b6f8f;color:#fff;border-radius:6px;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;white-space:nowrap">Compare</span>
+              </button>
+            </sc-for>
+            <sc-if value="{{ pickerEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:18px;text-align:center;font-size:12.5px;color:#6b7580">No other session matches “{{ pickerQ }}”.</div></sc-if>
+          </div>
+          <div style="padding:10px 16px;border-top:1px solid #e1e6eb;font-size:11.5px;color:#6b7580;line-height:1.45">Sessions are compared as fixed snapshots of the whole session (all recordings and sources). Metadata shown here is what the capture recorded; missing values read “not recorded”.</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ cmpToastOn }}" hint-placeholder-val="{{ false }}">
+        <div role="status" style="position:absolute;left:50%;bottom:44px;transform:translateX(-50%);z-index:40;background:#1b2430;color:#fff;padding:8px 14px;border-radius:8px;font-size:12.5px;box-shadow:0 8px 24px rgba(27,36,48,.25);max-width:80%">{{ cmpToast }}</div>
       </sc-if>
     </div>
   </sc-if>
@@ -271,20 +481,20 @@
   </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;viewport&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;auto&quot;,&quot;desktop&quot;,&quot;mobile&quot;],&quot;default&quot;:&quot;auto&quot;,&quot;tsType&quot;:&quot;'auto' | 'desktop' | 'mobile'&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;laneWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:164,&quot;min&quot;:120,&quot;max&quot;:240,&quot;step&quot;:4,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;workspace&quot;,&quot;import&quot;],&quot;default&quot;:&quot;workspace&quot;,&quot;tsType&quot;:&quot;'workspace' | 'import'&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;file&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sample&quot;,&quot;malformed&quot;,&quot;none&quot;],&quot;default&quot;:&quot;sample&quot;,&quot;tsType&quot;:&quot;'sample' | 'malformed' | 'none'&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;session&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:0,&quot;min&quot;:0,&quot;max&quot;:3,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;selection&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string | null&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;request&quot;,&quot;response&quot;,&quot;timing&quot;,&quot;attribution&quot;,&quot;raw&quot;],&quot;default&quot;:&quot;request&quot;,&quot;tsType&quot;:&quot;InspectorTab&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;search&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;mobileView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sequence&quot;,&quot;list&quot;],&quot;default&quot;:&quot;sequence&quot;,&quot;tsType&quot;:&quot;'sequence' | 'list'&quot;,&quot;section&quot;:&quot;Initial state&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;viewport&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;auto&quot;,&quot;desktop&quot;,&quot;mobile&quot;],&quot;default&quot;:&quot;auto&quot;,&quot;tsType&quot;:&quot;'auto' | 'desktop' | 'mobile'&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;laneWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:164,&quot;min&quot;:120,&quot;max&quot;:240,&quot;step&quot;:4,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;compareLaneWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:124,&quot;min&quot;:100,&quot;max&quot;:180,&quot;step&quot;:4,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;workspace&quot;,&quot;import&quot;],&quot;default&quot;:&quot;workspace&quot;,&quot;tsType&quot;:&quot;'workspace' | 'import'&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;file&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sample&quot;,&quot;malformed&quot;,&quot;none&quot;],&quot;default&quot;:&quot;sample&quot;,&quot;tsType&quot;:&quot;'sample' | 'malformed' | 'none'&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;session&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:0,&quot;min&quot;:0,&quot;max&quot;:6,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;selection&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string | null&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;request&quot;,&quot;response&quot;,&quot;timing&quot;,&quot;attribution&quot;,&quot;raw&quot;],&quot;default&quot;:&quot;request&quot;,&quot;tsType&quot;:&quot;InspectorTab&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;search&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;mobileView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sequence&quot;,&quot;list&quot;],&quot;default&quot;:&quot;sequence&quot;,&quot;tsType&quot;:&quot;'sequence' | 'list'&quot;,&quot;section&quot;:&quot;Initial state&quot;},&quot;pickerOpen&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Comparison&quot;},&quot;compareWith&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:-1,&quot;min&quot;:-1,&quot;max&quot;:6,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Comparison&quot;},&quot;compareLayout&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;aligned&quot;,&quot;outline&quot;,&quot;connections&quot;],&quot;default&quot;:&quot;aligned&quot;,&quot;tsType&quot;:&quot;'aligned' | 'outline' | 'connections'&quot;,&quot;section&quot;:&quot;Comparison&quot;},&quot;comparePair&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string | null&quot;,&quot;section&quot;:&quot;Comparison&quot;},&quot;simulateLive&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Comparison&quot;}}">
 class Component extends DCLogic {
   constructor(props) {
     super(props);
     const p = props || {};
-    this.state = { ready: false, loadError: null, width: 1440, screen: p.screen || 'workspace', fileKey: p.file || 'sample', file: null, sessionIdx: p.session ?? 0, sel: p.selection || null, hist: [], insp: !!p.selection, tab: p.tab || 'request', search: p.search || '', owner: 'all', outcome: 'all', origins: [], collapsed: [], recFocus: null, navOpen: true, inspW: 420, mobileView: p.mobileView || 'sequence', sheet: null, reqBodyOpen: false, resBodyOpen: true, jsonMode: 'pretty', copied: null, drag: false, searchOpen: !!p.search };
-    this.rootRef = React.createRef(); this.M = null;
+    this.state = { ready: false, loadError: null, width: 1440, screen: p.screen || 'workspace', fileKey: p.file || 'sample', file: null, sessionIdx: p.session ?? 0, sel: p.selection || null, hist: [], insp: !!p.selection, tab: p.tab || 'request', search: p.search || '', owner: 'all', outcome: 'all', origins: [], collapsed: [], recFocus: null, navOpen: true, inspW: 420, mobileView: p.mobileView || 'sequence', sheet: null, reqBodyOpen: false, resBodyOpen: true, jsonMode: 'pretty', copied: null, drag: false, searchOpen: !!p.search, cmp: null, picker: !!p.pickerOpen, pickerQ: '' };
+    this.rootRef = React.createRef(); this.cmpScrollRef = React.createRef(); this.M = null;
   }
   componentDidMount() {
-    Promise.all([import('./nll-data.js'), import('./nll-layout.js')]).then(([D, Lm]) => {
-      this.M = Object.assign({}, D, Lm);
+    Promise.all([import('./nll-data.js'), import('./nll-layout.js'), import('./nll-diff.js'), import('./nll-compare-layout.js')]).then(([D, Lm, Df, Cl]) => {
+      this.M = Object.assign({}, D, Lm, Df, Cl);
       const st = { ready: true };
       if (this.state.fileKey !== 'none') { const f = D.SAMPLE_FILES[this.state.fileKey]; if (f) st.file = D.importText(f.name, f.text); }
-      this.setState(st);
+      this.setState(st, () => { const p = this.props || {}; if (p.compareWith != null && p.compareWith >= 0) this.enterCompare(p.compareWith, { layout: p.compareLayout, sel: p.comparePair }); });
     }).catch((e) => this.setState({ ready: true, loadError: String(e) }));
     if (window.ResizeObserver && this.rootRef.current) {
       this.ro = new ResizeObserver((en) => { const w = en[0].contentRect.width; if (w && Math.abs(w - this.state.width) > 2) this.setState({ width: w }); });
@@ -302,13 +512,309 @@ class Component extends DCLogic {
     if (p.search !== pv.search && p.search != null) { st.search = p.search; st.searchOpen = !!p.search; }
     if (p.mobileView !== pv.mobileView && p.mobileView) st.mobileView = p.mobileView;
     if (Object.keys(st).length) this.setState(st);
+    if (this.M && this.state.ready) {
+      if (p.compareWith !== pv.compareWith) { if (p.compareWith != null && p.compareWith >= 0) this.enterCompare(p.compareWith, { layout: p.compareLayout, sel: p.comparePair }); else if (this.state.cmp) this.exitCompare(); }
+      else if (this.state.cmp && (p.compareLayout !== pv.compareLayout || p.comparePair !== pv.comparePair)) this.setCmp({ layout: p.compareLayout || this.state.cmp.layout, sel: p.comparePair || null, insp: !!p.comparePair });
+    }
+  }
+  // ---- comparison actions
+  setCmp(patch) { this.setState((s) => (s.cmp ? { cmp: Object.assign({}, s.cmp, typeof patch === 'function' ? patch(s.cmp) : patch) } : {})); }
+  computeDiff(primIdx, secIdx, profile) {
+    const M = this.M, sessions = this.state.file.sessions, P = sessions[primIdx], S = sessions[secIdx];
+    const diff = M.diffSessions(P, S, profile);
+    return { diff, idx: M.indexDiff(diff), treeP: M.buildTree(P), treeS: M.buildTree(S) };
+  }
+  enterCompare(secIdx, opts = {}) {
+    const s = this.state; if (!s.file || !s.file.sessions[secIdx] || secIdx === s.sessionIdx) return;
+    const profile = Object.assign({}, this.M.DEFAULT_PROFILE);
+    const r = this.computeDiff(s.sessionIdx, secIdx, profile);
+    const cmp = Object.assign({ primIdx: s.sessionIdx, secIdx, profile, snapAt: Date.now(), layout: opts.layout || 'aligned', sel: null, hist: [], insp: false, tab: 'changes', search: '', filter: 'all', collapseUnchanged: true, collapsedPairs: [], expandedRuns: [], connCollapsed: [], outlineCollapsed: [], rules: false, hover: null, showEqual: false, resolveChoice: null, toast: null, live: !!(this.props && this.props.simulateLive), liveDismissed: false, navWas: s.navOpen, newHeader: '' }, r);
+    if (opts.sel && r.idx.byId.has(opts.sel)) { cmp.sel = opts.sel; cmp.insp = true; }
+    this.setState({ cmp, picker: false, navOpen: s.width < 1700 ? false : s.navOpen, sheet: null });
+  }
+  exitCompare() { this.setState((s) => ({ cmp: null, navOpen: s.cmp ? s.cmp.navWas : s.navOpen })); }
+  recompute(c, patch) {
+    const next = Object.assign({}, c, patch || {});
+    const r = this.computeDiff(next.primIdx, next.secIdx, next.profile);
+    // re-resolve selection by node identity: primary first, then secondary
+    const old = c.sel ? c.idx.byId.get(c.sel) : null; let sel = null, how = '';
+    if (old) {
+      const swapped = next.primIdx !== c.primIdx;
+      const pid = swapped ? (old.secondary && old.secondary.node_id) : (old.primary && old.primary.node_id);
+      const sid = swapped ? (old.primary && old.primary.node_id) : (old.secondary && old.secondary.node_id);
+      const byP = pid && r.idx.byPrimary.get(pid), byS = sid && r.idx.bySecondary.get(sid);
+      if (byP) { sel = byP.id; how = `re-resolved to ${byP.id} by primary node ${pid}`; } else if (byS) { sel = byS.id; how = `re-resolved to ${byS.id} by secondary node ${sid}`; } else how = 'selection cleared — the selected node no longer has a pair';
+    }
+    return Object.assign(next, r, { sel, insp: !!sel && c.insp, resolveChoice: null, toast: (patch && patch.toastPrefix ? patch.toastPrefix + ' ' : 'Recomputed. ') + (how ? 'Selection ' + how + '.' : ''), toastPrefix: undefined });
+  }
+  recomputeCmp(patch) { this.setState((s) => (s.cmp ? { cmp: this.recompute(s.cmp, patch) } : {}), () => this.toastTimer()); }
+  toastTimer() { clearTimeout(this.toastT); this.toastT = setTimeout(() => this.setCmp({ toast: null }), 3200); }
+  cmpSelect(id, opts = {}) { this.setCmp((c) => ({ sel: id, hist: c.sel && c.sel !== id ? c.hist.concat([c.sel]).slice(-20) : c.hist, insp: opts.open !== false ? true : c.insp, resolveChoice: null, showEqual: false, layout: opts.layout || c.layout })); if (opts.scroll !== false) this.cmpScrollTo(id); }
+  cmpScrollTo(id) { setTimeout(() => { const c = this.state.cmp; const el = this.cmpScrollRef.current; if (!c || !el || !c.span) return; const sp = c.span.get(id); if (!sp) return; const target = sp.y0 + 54 - el.clientHeight / 3; if (Math.abs(el.scrollTop - target) > el.clientHeight / 3) el.scrollTop = Math.max(0, target); }, 30); }
+  cmpStep(dir) { const c = this.state.cmp; if (!c || !c.diffList || !c.diffList.length) return; const i = c.diffList.indexOf(c.sel); const n = i < 0 ? (dir > 0 ? 0 : c.diffList.length - 1) : (i + dir + c.diffList.length) % c.diffList.length; this.cmpSelect(c.diffList[n]); }
+  cmpKeyNav(e) {
+    const c = this.state.cmp; if (!c) return; const k = e.key;
+    if (k === 'Escape') { e.preventDefault(); this.setCmp({ insp: false, rules: false }); return; }
+    if (k === '[') { e.preventDefault(); this.cmpStep(-1); return; } if (k === ']') { e.preventDefault(); this.cmpStep(1); return; }
+    const ids = c.pairOrder || []; if (!ids.length) return; const cur = ids.indexOf(c.sel);
+    if (k === 'ArrowDown' || k === 'j') { e.preventDefault(); this.cmpSelect(cur < 0 ? ids[0] : ids[Math.min(ids.length - 1, cur + 1)], { open: false }); }
+    else if (k === 'ArrowUp' || k === 'k') { e.preventDefault(); this.cmpSelect(cur < 0 ? ids[ids.length - 1] : ids[Math.max(0, cur - 1)], { open: false }); }
+    else if (k === 'Enter') { e.preventDefault(); if (c.sel) this.setCmp({ insp: true }); }
+  }
+  toggleIn(key, id) { this.setCmp((c) => ({ [key]: c[key].includes(id) ? c[key].filter((x) => x !== id) : c[key].concat([id]) })); }
+  cmpDownload() { const c = this.state.cmp; if (!c) return; const text = JSON.stringify(c.diff, null, 2); const blob = new Blob([text], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${c.diff.inputs.primary.session.id}__vs__${c.diff.inputs.secondary.session.id}.diff.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); this.setCmp({ toast: 'Exported the engine result (http-sequence-diff 1.0). Snapshot time and UI state are not included; they are not part of the contract.' }); this.toastTimer(); }
+  findingFor(pair) { const c = this.state.cmp; return { comparison: { engine: c.diff.engine, inputs: c.diff.inputs, profile: c.diff.profile }, pair_id: pair.id, parent_pair_id: pair.parent_pair_id, presence: pair.presence, equivalence: pair.equivalence, matching: pair.matching, primary: pair.primary && { node_id: pair.primary.node_id, label: pair.primary.label, position: pair.primary.position, recording_id: pair.primary.recording_id, event_ids: pair.primary.event_ids, event_pointers: pair.primary.event_pointers }, secondary: pair.secondary && { node_id: pair.secondary.node_id, label: pair.secondary.label, position: pair.secondary.position, recording_id: pair.secondary.recording_id, event_ids: pair.secondary.event_ids, event_pointers: pair.secondary.event_pointers }, changes: pair.changes, uncertainties: pair.uncertainties, ignored_paths: pair.ignored_paths, order_changes: c.diff.order_changes.filter((o) => o.first_pair_id === pair.id || o.second_pair_id === pair.id), note: 'Observed differences; causal claims are hypotheses.' }; }
+
+  // ---- comparison view model
+  renderVals() {
+    const v = this.renderSingle();
+    const s = this.state, M = this.M;
+    Object.assign(v, { cmpOn: false, cmpOff: true, pickerOpen: false, canCompare: false, cmpToastOn: false });
+    if (!s.ready || !M || v.isImport || !s.file) return v;
+    const sessions = s.file.sessions, sessIdx = Math.min(s.sessionIdx, Math.max(0, sessions.length - 1)), sess = sessions[sessIdx]; if (!sess) return v;
+    const mode = v.isMobileWs ? 'mobile' : 'desktop';
+    v.canCompare = sessions.length > 1 && mode !== 'mobile';
+    v.openPicker = () => this.setState({ picker: true, pickerQ: '' }); v.closePicker = () => this.setState({ picker: false });
+    v.pickerOpen = s.picker && !s.cmp; v.pickerQ = s.pickerQ; v.onPickerQ = (e) => this.setState({ pickerQ: e.target.value });
+    const q = s.pickerQ.trim().toLowerCase();
+    const plat = (x) => (x.platform === 'android' ? 'Android' : x.platform === 'ios' ? 'iOS' : x.platform === 'web' ? 'Web' : 'platform not recorded');
+    v.pickerRows = sessions.map((x, i) => ({ x, i })).filter(({ x, i }) => i !== sessIdx && (!q || [x.name, x.id, M.sessionNamespace(x), x.platform, x.sdk, x.app, x.build].filter(Boolean).join(' ').toLowerCase().includes(q))).map(({ x, i }) => ({ name: x.name || x.id, id: x.id, ns: M.sessionNamespace(x), platform: `${plat(x)} · ${x.sdk || 'SDK not recorded'}`, build: x.build ? `${x.app || 'app'} · build ${x.build}` : (x.app ? `${x.app} · build not recorded` : 'app and build not recorded'), buildColor: x.build ? '#5b6673' : '#8a94a0', buildStyle: x.build ? 'normal' : 'italic', context: `${x.recordings.length} recording${x.recordings.length === 1 ? '' : 's'} · ${x.exchanges.length} exchanges${x.incomplete ? ' · incomplete' : ''} · ${x.source === 'customer' ? 'customer ID' : 'SDK ID'}`, time: M.fmtClock(x.startMs), onPick: () => this.enterCompare(i) }));
+    v.pickerEmpty = v.pickerRows.length === 0;
+    if (!s.cmp) return v;
+    v.cmpOn = true; v.cmpOff = false; v.pickerOpen = false;
+    Object.assign(v, this.renderCompare(s.cmp, sessions, mode));
+    return v;
+  }
+  renderCompare(c, sessions, mode) {
+    const s = this.state, M = this.M, p = this.props || {};
+    const P = sessions[c.primIdx], S = sessions[c.secIdx], diff = c.diff, idx = c.idx;
+    const K = { P: '#2f6db5', PBg: '#e8f0fa', S: '#c4651c', SBg: '#fbeee3', chg: '#a3357f', chgBg: '#f9e8f2', ord: '#4f4a8a', ordBg: '#ecebf6', unr: '#8a5a00', unrBg: '#fff3d6', eq: '#5b6673', eqBg: '#eceff3', acc: '#1b6f8f', accBg: '#e3f1f6' };
+    const mono = "'Source Code Pro',ui-monospace,monospace", sans = "'Source Sans 3',system-ui,sans-serif";
+    const kindOf = (pr) => (pr.primary || pr.secondary).kind;
+    const labelOf = (pr) => (pr.primary || pr.secondary).label;
+    const stateOf = (pr) => pr.presence === 'unresolved' ? 'unresolved' : pr.presence === 'primary_only' ? 'ponly' : pr.presence === 'secondary_only' ? 'sonly' : pr.changes.length ? 'changed' : idx.orderByPair.has(pr.id) ? 'order' : pr.uncertainties.length ? 'unknown' : 'equal';
+    const SC = { unresolved: { c: K.unr, bg: K.unrBg, g: '?', t: 'Unresolved correspondence' }, ponly: { c: K.P, bg: K.PBg, g: 'P', t: 'Primary only' }, sonly: { c: K.S, bg: K.SBg, g: 'S', t: 'Secondary only' }, changed: { c: K.chg, bg: K.chgBg, g: 'Δ', t: 'Field changes' }, order: { c: K.ord, bg: K.ordBg, g: '⇅', t: 'Order relation changed' }, unknown: { c: K.unr, bg: '#fff', g: '~', t: 'Unknown only — equal retained data, uncaptured content' }, equal: { c: '#9aa5b1', bg: '#fff', g: '=', t: 'Equal' } };
+    const flagged = (pr) => { const st = stateOf(pr); return st !== 'equal' && st !== 'unknown'; };
+    // presentation filter (never changes the result)
+    const q = c.search.trim().toLowerCase();
+    const matchSelf = (pr) => { const a = idx.agg.get(pr.id) || {}; const f = c.filter; let ok = f === 'all' || (f === 'changed' && pr.changes.length) || (f === 'onesided' && (pr.presence === 'primary_only' || pr.presence === 'secondary_only')) || (f === 'unresolved' && pr.presence === 'unresolved') || (f === 'order' && idx.orderByPair.has(pr.id)); if (ok && q) ok = labelOf(pr).toLowerCase().includes(q) || (pr.primary && pr.primary.label.toLowerCase().includes(q)) || (pr.secondary && pr.secondary.label.toLowerCase().includes(q)); return !!ok; };
+    const visMemo = new Map();
+    const visible = (pr) => { if (visMemo.has(pr.id)) return visMemo.get(pr.id); let ok = kindOf(pr) === 'recording' || matchSelf(pr); if (!ok) ok = (idx.children.get(pr.id) || []).some(visible); visMemo.set(pr.id, ok); return ok; };
+    const filtersActive = c.filter !== 'all' || q !== '';
+    // aligned rows (shared by all layouts for ordering / navigation)
+    const laneW = p.compareLaneWidth || 124;
+    const lanes = M.unionLanes(P, S, laneW);
+    const aligned = M.buildAlignedRows(diff, idx, c.treeP, c.treeS, { collapsedPairs: new Set(c.collapsedPairs), expandedRuns: new Set(c.expandedRuns), collapseUnchanged: c.collapseUnchanged, visible, selected: c.sel });
+    const pairOrder = []; aligned.rows.forEach((r) => { if (r.first && r.pairStart && !pairOrder.includes(r.pairStart)) pairOrder.push(r.pairStart); });
+    const diffList = pairOrder.filter((id) => flagged(idx.byId.get(id)));
+    c.pairOrder = pairOrder; c.diffList = diffList; c.span = aligned.span; // navigation caches (derived, not persisted)
+    const ghostLabel = (pid, side) => { const pr = idx.byId.get(pid); if (!pr) return ''; if (pr.matching.basis === 'unpaired_parent') return null; if (pr.presence === 'unresolved') return `unresolved · ${pr.matching.candidate_node_ids.length} candidate${pr.matching.candidate_node_ids.length === 1 ? '' : 's'} share this signature`; return pr.matching.basis === 'unpaired_parent' ? `not in ${side === 'p' ? 'primary' : 'secondary'} · parent unpaired` : `not in ${side === 'p' ? 'primary' : 'secondary'}`; };
+    const layP = M.layoutAlignedSide(P, aligned.rows, 'p', lanes, { laneWidth: laneW, height: aligned.height, span: aligned.span, ghostLabel });
+    const layS = M.layoutAlignedSide(S, aligned.rows, 's', lanes, { laneWidth: laneW, height: aligned.height, span: aligned.span, ghostLabel });
+    const selPair = c.sel ? idx.byId.get(c.sel) : null;
+    const Lp = this.decorateCmp(layP, P, 'p', selPair, idx, K, laneW, sans, mono), Ls = this.decorateCmp(layS, S, 's', selPair, idx, K, laneW, sans, mono);
+    const sideW = layP.width;
+    // gutter markers
+    const markers = []; pairOrder.forEach((id) => { const pr = idx.byId.get(id); const st = stateOf(pr); if (st === 'equal') return; const sp = aligned.span.get(id); if (!sp) return; const m = SC[st]; const selected = c.sel === id; markers.push({ top: sp.yMark + 54 - 11, glyph: m.g, border: selected ? K.acc : m.c, bg: selected ? K.acc : m.bg, fg: selected ? '#fff' : m.c, shadow: selected ? '0 0 0 3px rgba(27,111,143,.18)' : 'none', selected, title: `${m.t}: ${labelOf(pr)}${pr.changes.length ? ` · ${pr.changes.length} field change${pr.changes.length === 1 ? '' : 's'}` : ''}${pr.uncertainties.length ? ` · ${pr.uncertainties.length} unknown` : ''}`, onClick: () => this.cmpSelect(id, { scroll: false }) }); });
+    // overview: recording pairs and their direct children, x ∝ aligned y
+    const overview = []; const H = aligned.height;
+    const ovItems = []; (idx.children.get('(root)') || []).forEach((rp) => { ovItems.push(rp); (idx.children.get(rp.id) || []).forEach((k) => { const sp = aligned.span.get(k.id); const kids = (idx.children.get(k.id) || []).filter((x) => kindOf(x) !== 'http' && aligned.span.has(x.id)); if (sp && (sp.y1 - sp.y0) / H > 0.45 && kids.length > 1) kids.forEach((x) => ovItems.push(x)); else ovItems.push(k); }); });
+    ovItems.forEach((pr) => { const sp = aligned.span.get(pr.id); if (!sp) return; const st = stateOf(pr); const a = idx.agg.get(pr.id) || {}; const sub = st === 'equal' && (a.changed || a.oneSided || a.unresolved || a.order) ? 'mixed' : st; const left = (sp.y0 / H) * 100, width = Math.max(0.4, ((sp.y1 - sp.y0) / H) * 100); const eq = sub === 'equal' || sub === 'unknown'; const col = sub === 'mixed' ? K.chg : (SC[sub] ? SC[sub].c : '#9aa5b1'); overview.push({ left: `${left}%`, width: `${width}%`, label: kindOf(pr) === 'recording' ? '' : (pr.primary || pr.secondary).kind === 'http' ? labelOf(pr) : labelOf(pr).split('.').pop(), labelColor: c.sel === pr.id ? K.acc : '#6b7580', pDisplay: pr.primary ? 'block' : 'none', sDisplay: pr.secondary ? 'block' : 'none', pTop: eq ? 10 : 5, sTop: eq ? 10 : 15, pColor: eq ? '#9aa5b1' : (pr.secondary ? col : K.P), sColor: eq ? '#9aa5b1' : (pr.primary ? col : K.S), selBg: c.sel === pr.id ? 'rgba(27,111,143,.10)' : 'transparent', title: `${labelOf(pr)} · ${SC[st].t}${sub === 'mixed' ? ` · ${a.changed} changed, ${a.oneSided} one-sided, ${a.unresolved} unresolved, ${a.order} order` : ''}`, onClick: () => this.cmpSelect(pr.id) }); });
+    // identities
+    const ident = (x, side) => ({ name: x.name || x.id, idLine: `${M.sessionNamespace(x)} / ${x.id}`, meta: [x.platform === 'android' ? 'Android' : x.platform === 'ios' ? 'iOS' : (x.platform || 'platform not recorded'), x.sdk || 'SDK not recorded', x.build ? `build ${x.build}` : 'build not recorded', `${x.recordings.length} rec · ${diff.inputs[side].event_count} events`].join(' · ') });
+    const fmtClock = (ms) => new Date(ms).toISOString().slice(11, 19) + 'Z';
+    const layouts = [['aligned', 'Aligned sequences'], ['outline', 'Change outline'], ['connections', 'Order connections']].map(([id, label]) => { const active = c.layout === id; return { label, active, bg: active ? K.acc : '#fff', fg: active ? '#fff' : '#3b4650', onClick: () => this.setCmp({ layout: id }) }; });
+    const filters = [['all', 'All', 'Show every pair'], ['changed', 'Changed', 'Pairs with field changes (and their ancestors)'], ['onesided', 'One-sided', 'Present on one side only'], ['unresolved', 'Unresolved', 'Correspondence could not be established'], ['order', 'Order', 'Involved in a sibling order change']].map(([id, label, title]) => { const active = c.filter === id; return { label, title, active, bg: active ? K.acc : '#fff', fg: active ? '#fff' : '#3b4650', onClick: () => this.setCmp({ filter: id }) }; });
+    const sm = diff.summary;
+    const counts = [{ n: sm.matched, label: 'matched', color: '#9aa5b1', title: 'Pairs present on both sides (recordings, operations and calls)' }, { n: sm.primary_only, label: 'primary only', color: K.P, title: 'Nodes without a counterpart in secondary' }, { n: sm.secondary_only, label: 'secondary only', color: K.S, title: 'Nodes without a counterpart in primary' }, { n: sm.unresolved, label: 'unresolved', color: K.unr, title: 'Duplicate signatures or incomplete recordings; correspondence not established' }, { n: sm.changed_pairs, label: `changed · ${sm.field_changes} fields`, color: K.chg, title: 'Matched pairs with at least one field change' }, { n: sm.order_changes, label: 'order', color: K.ord, title: 'Sibling order relations that differ (counted separately from field changes)' }, { n: sm.uncertain_pairs, label: 'uncertain', color: '#c9a227', title: 'Pairs with unknown information; overlaps with changed pairs' }];
+    const resTone = diff.result === 'different' ? [K.chgBg, K.chg] : diff.result === 'inconclusive' ? [K.unrBg, K.unr] : ['#e4f3ea', '#1f7a4d'];
+    const di = diffList.indexOf(c.sel);
+    const ruleToggles = [{ key: 'json_fields', label: 'Compare JSON body fields', sub: 'Field-level paths for complete, unredacted UTF-8 JSON bodies. Raw body differences are reported either way.' }, { key: 'compare_timing', label: 'Compare durations', sub: 'Exact duration_ns comparison of completed spans. Clocks are never subtracted across sessions.' }].map((t) => { const on = !!c.profile[t.key]; return Object.assign(t, { on, track: on ? K.acc : '#c3cbd4', knob: on ? 16 : 2, onClick: () => this.recomputeCmp({ profile: Object.assign({}, c.profile, { [t.key]: !on }), toastPrefix: `${t.label}: ${!on ? 'on' : 'off'}.` }) }); });
+    const outline = this.outlineRows(c, idx, visible, stateOf, SC, K, labelOf, kindOf, filtersActive);
+    const conn = this.connectionRows(c, idx, visible, stateOf, SC, K, labelOf, kindOf);
+    const cd = selPair ? this.pairDetails(selPair, c, P, S, idx, K, SC, stateOf, mode, mono, sans, labelOf, kindOf) : null;
+    const inspOpen = c.insp && !!cd;
+    const navW = s.navOpen ? 236 : 0;
+    const inline = mode === 'desktop' && (s.width - navW - s.inspW - 6) >= 720;
+    const liveN = 3;
+    return {
+      cmpP: ident(P, 'primary'), cmpS: ident(S, 'secondary'), cmpSwap: () => this.recomputeCmp({ primIdx: c.secIdx, secIdx: c.primIdx, toastPrefix: 'Swapped roles.' }), cmpExit: () => this.exitCompare(),
+      cmpSnapshot: `Snapshot ${fmtClock(c.snapAt)} · whole session, both sides · ${diff.inputs.primary.event_count} vs ${diff.inputs.secondary.event_count} events`,
+      cmpLive: c.live && !c.liveDismissed, cmpLiveText: `${liveN} events arrived in ${S.name || S.id} after the snapshot. The current result stays as computed until you recompute.`, cmpRecompute: () => this.recomputeCmp({ live: false, snapAt: Date.now(), toastPrefix: 'Recomputed on a new snapshot.' }),
+      cmpLayouts: layouts, cmpSearch: c.search, cmpOnSearch: (e) => this.setCmp({ search: e.target.value }), cmpFilters: filters,
+      cmpToggleCollapse: () => this.setCmp({ collapseUnchanged: !c.collapseUnchanged }), cmpCollapseOn: c.collapseUnchanged, cmpCollapseBorder: c.collapseUnchanged ? K.acc : '#d9dee5', cmpCollapseBg: c.collapseUnchanged ? K.accBg : '#fff', cmpCollapseFg: c.collapseUnchanged ? K.acc : '#3b4650',
+      cmpPrev: () => this.cmpStep(-1), cmpNext: () => this.cmpStep(1), cmpStepLabel: diffList.length ? `${di < 0 ? '–' : di + 1} of ${diffList.length}` : 'no differences',
+      cmpToggleRules: () => this.setCmp({ rules: !c.rules }), cmpRulesOpen: c.rules, cmpRulesBorder: c.rules ? K.acc : '#d9dee5', cmpRulesBg: c.rules ? K.accBg : '#fff',
+      cmpExport: () => this.cmpDownload(), cmpCopyJson: () => { this.copy('cmpjson', JSON.stringify(diff, null, 2)); }, cmpCopyJsonLabel: s.copied === 'cmpjson' ? 'Copied' : 'Copy JSON',
+      cmpResultLabel: diff.result === 'different' ? 'Different' : diff.result === 'inconclusive' ? 'Inconclusive' : 'Equal within scope', cmpResultBg: resTone[0], cmpResultFg: resTone[1], cmpCounts: counts,
+      cmpScopeLine: `Rules: JSON fields ${c.profile.json_fields ? 'on' : 'off'} · timing ${c.profile.compare_timing ? 'on' : 'off'} · ${c.profile.ignore_headers.length} header${c.profile.ignore_headers.length === 1 ? '' : 's'} ignored · ${c.profile.matches.length} explicit match${c.profile.matches.length === 1 ? '' : 'es'}${filtersActive ? ' · view filtered (result unchanged)' : ''}`,
+      cmpEngineLine: `${diff.engine.name.split('/').pop()} ${diff.engine.version} · ${diff.engine.algorithm}`, cmpRuleToggles: ruleToggles,
+      cmpIgnoredHeaders: c.profile.ignore_headers.map((h) => ({ name: h, onRemove: () => this.recomputeCmp({ profile: Object.assign({}, c.profile, { ignore_headers: c.profile.ignore_headers.filter((x) => x !== h) }), toastPrefix: `Header ${h} is compared again.` }) })),
+      cmpNewHeader: c.newHeader || '', cmpOnNewHeader: (e) => this.setCmp({ newHeader: e.target.value }), cmpNewHeaderKey: (e) => { if (e.key === 'Enter' && (c.newHeader || '').trim()) { e.preventDefault(); const h = c.newHeader.trim().toLowerCase(); if (!c.profile.ignore_headers.includes(h)) this.recomputeCmp({ newHeader: '', profile: Object.assign({}, c.profile, { ignore_headers: c.profile.ignore_headers.concat([h]) }), toastPrefix: `Header ${h} ignored.` }); } },
+      cmpIgnoredPaths: c.profile.ignore_paths.length ? c.profile.ignore_paths.join('\n') : 'none — exact JSON pointers into the projected call data apply to whole subtrees',
+      cmpMatchesText: c.profile.matches.length ? c.profile.matches.map((m) => `${m.primary} ↔ ${m.secondary}`).join('\n') : 'none — add one from an unresolved pair in the inspector',
+      cmpScopeIncluded: diff.scope.included.join(', '), cmpScopeExcluded: diff.scope.excluded.join(', '),
+      cmpAligned: c.layout === 'aligned', cmpOutline: c.layout === 'outline', cmpConnections: c.layout === 'connections',
+      cmpOverview: overview, cmpScrollRef: this.cmpScrollRef, cmpSideW: sideW, cmpGutterH: aligned.height + 54, cmpMarkers: markers, cmpMarkerCount: `${markers.length}`, Lp, Ls, cmpKey: (e) => this.cmpKeyNav(e),
+      cmpOutlineRows: outline,
+      cmpConnGroups: conn.groups, cmpConnLines: conn.lines, cmpConnLeft: conn.left, cmpConnRight: conn.right, cmpConnH: conn.height, cmpConnColW: conn.colW, cmpConnSvgX: conn.svgX, cmpConnSvgPad: conn.svgX * 2, cmpConnViewBox: `0 0 180 ${conn.height}`,
+      cmpFootNote: c.layout === 'aligned' ? 'Vertical position = aligned sequence order (not elapsed time). Both sides share one scroll; rows take the larger height either side needs. Dashed boxes are explicit empty counterparts.' : c.layout === 'outline' ? 'One shared hierarchy. Presence, field changes, order and unknowns are shown independently.' : 'Each column keeps its own original order; connections show correspondence from the same diff as the other layouts.',
+      cmpInspInline: inspOpen && inline, cmpInspDrawer: inspOpen && !inline, cmpCloseInsp: () => this.setCmp({ insp: false }), cd,
+      cmpToastOn: !!c.toast, cmpToast: c.toast || '',
+    };
+  }
+  decorateCmp(lay, sess, side, selPair, idx, K, laneW, sans, mono) {
+    const C = { acc: '#1b6f8f', ok: '#1f7a4d', err: '#b9382c', warn: '#8a5a00', neu: '#5b6673' };
+    const toneC = { ok: C.ok, error: C.err, warn: C.warn, neutral: C.neu };
+    const byNode = side === 'p' ? idx.byPrimary : idx.bySecondary;
+    const pairOf = (nodeId) => byNode.get(nodeId);
+    const sel = (nodeId) => { const pr = pairOf(nodeId); if (pr) this.cmpSelect(pr.id, { scroll: false }); };
+    const selNode = selPair ? (side === 'p' ? selPair.primary && selPair.primary.node_id : selPair.secondary && selPair.secondary.node_id) : null;
+    const sideC = side === 'p' ? K.P : K.S;
+    // Resolve-match highlight: pulse the unresolved node on its side and the picked candidate on the other side; unpicked candidates get a static amber outline.
+    const cmpSt = this.state.cmp || {}; const pulses = [];
+    if (selPair && selPair.presence === 'unresolved' && selPair.matching.candidate_node_ids.length) {
+      const ownSide = selPair.primary ? 'p' : 's'; const AMB = '#c47a00';
+      const rectFor = (nodeId) => { const b = lay.bars.find((bb) => bb.opId === nodeId); if (b) return { x: b.x - 5, y: b.y - 5, w: b.w + 10, h: b.h + 10 }; const as = lay.arrows.filter((a) => a.exId === nodeId); if (!as.length) return null; const xs = as.flatMap((a) => [a.x1, a.x2]), ys = as.map((a) => a.y); return { x: Math.min(...xs) - 6, y: Math.min(...ys) - 24, w: Math.max(...xs) - Math.min(...xs) + 12, h: Math.max(...ys) - Math.min(...ys) + 32 }; };
+      const push = (nodeId, strong) => { const r = rectFor(nodeId); if (r) pulses.push(Object.assign({ key: `pulse:${nodeId}`, color: AMB, fill: strong ? 'rgba(196,122,0,.12)' : 'rgba(196,122,0,.04)', strong }, r)); };
+      if (side === ownSide) push(selNode, true);
+      else selPair.matching.candidate_node_ids.forEach((id) => push(id, cmpSt.resolveChoice === id));
+    }
+    return {
+      pulses,
+      width: lay.width, height: lay.height, laneW: lay.laneW, gapX: lay.left + 8, clientGroup: lay.clientGroup,
+      lanes: lay.lanes.map((l) => ({ id: l.id, x: l.x, left: l.x - lay.laneW / 2, label: l.label, title: l.title, sub: l.kind === 'client' ? (l.id === 'app' ? 'customer code' : 'SDK code') : l.scheme, font: l.kind === 'client' ? sans : mono, aria: `${l.kind === 'client' ? 'Client lane' : 'Server lane'} ${l.label}` })),
+      recs: lay.recs.map((r) => ({ y: r.y, top: r.y - 14, textTop: r.y - 7, label: r.label, sub: r.sub + (r.clockNote ? ` · ${r.clockNote}` : ''), fill: r.interrupted ? '#fff3d6' : '#eef1f4', subColor: r.interrupted ? C.warn : C.neu })),
+      gaps: [], serverBars: lay.serverBars.map((b) => ({ x: b.x, y: b.y, h: b.h, fill: b.open ? 'none' : '#fff', stroke: '#9aa5b1', dash: b.open ? '3 3' : 'none' })),
+      collapsedRows: lay.collapsedRows.map((cr) => ({ x: cr.x + 12, textTop: cr.y - 7, label: cr.label })),
+      bars: lay.bars.map((b) => { const isSel = selNode === b.opId; const pr = pairOf(b.opId); const st = pr ? (pr.presence !== 'both' ? 'one' : pr.changes.length ? 'chg' : 'eq') : 'eq'; const LOCAL = '#4f4a8a'; const hStroke = b.completion === 'threw' ? C.err : (b.stopped || b.open) ? C.warn : LOCAL; const hFill = b.completion === 'threw' ? '#fbe8e5' : (b.stopped || b.open) ? '#fff3d6' : '#ecebf6'; const stroke = isSel ? C.acc : st === 'one' ? sideC : st === 'chg' ? K.chg : b.handler ? hStroke : '#9fb3c2'; return { x: b.x, y: b.y, w: b.w, h: b.h, fill: b.handler ? hFill : b.owner === 'app' ? '#dbe4ec' : '#cfe4ee', stroke, sw: isSel ? 2.5 : st !== 'eq' ? 2 : b.handler ? 1.5 : 1, dash: b.open || b.stopped ? '4 3' : 'none', labelX: b.labelX, textTop: b.labelY - 11, hitY: b.labelY - 12, hitW: Math.min(laneW * 1.6, b.label.length * 7 + 40), maxW: laneW * 2.4, text: b.label, component: b.component + (b.open ? ' · end not recorded' : ''), textColor: isSel ? C.acc : st === 'one' ? sideC : st === 'chg' ? K.chg : b.handler ? hStroke : '#1b2430', toggle: pr && b.count > 0 ? (this.state.cmp.collapsedPairs.includes(pr.id) ? '[+]' : '[−]') : '', aria: `${b.handler ? 'Handler' : 'Operation'} ${b.label} in ${b.component}${pr ? ', pair ' + pr.id + ', ' + pr.presence.replace('_', ' ') : ''}. Enter to inspect.`, onClick: () => { if (pr && b.count > 0 && this.state.cmp.sel === pr.id) this.toggleIn('collapsedPairs', pr.id); sel(b.opId); }, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); sel(b.opId); } } }; }),
+      waits: lay.waitSegments.map((w) => ({ x: w.x, y: w.y, w: w.w, h: w.h, labelX: w.x + w.w + 8, textTop: w.y + Math.max(8, w.h / 2 - 7), label: w.label })),
+      localArrows: lay.localArrows.map((a) => { const selected = selNode === a.opId; const LOCAL = '#4f4a8a'; const color = selected ? C.acc : a.tone === 'error' ? C.err : a.tone === 'neutral' ? C.neu : a.tone === 'warn' ? C.warn : LOCAL; const right = a.x2 > a.x1; const hx = a.x2; return { key: a.key, x1: a.x1, x2: a.x2, y: a.y, selected, color, sw: selected ? 2.5 : 1.5, dash: a.kind === 'ret' ? '5 4' : 'none', head: right ? `${hx - 8},${a.y - 4} ${hx},${a.y} ${hx - 8},${a.y + 4}` : `${hx + 8},${a.y - 4} ${hx},${a.y} ${hx + 8},${a.y + 4}`, dotR: a.fromDot ? 3.5 : 0, hitX: Math.min(a.x1, a.x2) + 4, hitY: a.y - 18, hitW: Math.max(20, Math.abs(a.x2 - a.x1) - 8), hitFill: selected ? 'rgba(27,111,143,.10)' : 'transparent', labelX: Math.min(a.x1, a.x2) + 12, textTop: a.y - 18, text: a.label, sub: a.sub, textColor: color, weight: a.kind === 'call' ? 600 : 400, aria: `${a.full}${selected ? ' (selected)' : ''}.`, onClick: () => sel(a.opId), onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); sel(a.opId); } } }; }),
+      arrows: lay.arrows.map((a) => { const selected = selNode === a.exId; const pr = pairOf(a.exId); const st = pr ? (pr.presence !== 'both' ? 'one' : pr.changes.length ? 'chg' : 'eq') : 'eq'; const right = a.x2 > a.x1; const base = toneC[a.tone] || C.neu; const color = selected ? C.acc : base; const hx = a.x2; const sub = a.sub ? `  ·  ${a.sub}` : ''; return { key: a.key, x1: a.x1, x2: a.x2, y: a.y, selected, color, sw: selected ? 2.5 : 1.5, dash: a.dashed ? '5 4' : 'none', head: right ? `${hx},${a.y} ${hx - 8},${a.y - 4} ${hx - 8},${a.y + 4}` : `${hx},${a.y} ${hx + 8},${a.y - 4} ${hx + 8},${a.y + 4}`, hitX: Math.min(a.x1, a.x2) + 4, hitY: a.y - 20, hitW: Math.max(20, Math.abs(a.x2 - a.x1) - 8), hitFill: selected ? 'rgba(27,111,143,.10)' : st === 'chg' && a.kind === 'req' ? 'rgba(163,53,127,.06)' : 'transparent', labelX: Math.min(a.x1, a.x2) + 12, textTop: a.y - 20, text: (a.glyph ? a.glyph + ' ' : '') + a.label + sub, textColor: selected ? C.acc : a.kind === 'req' ? (st === 'one' ? sideC : st === 'chg' ? K.chg : '#1b2430') : color, weight: a.kind === 'req' ? 600 : 400, halo: Math.min(a.x1, a.x2) < lay.clientGroup.x + lay.clientGroup.w ? '#f1f4f7' : '#fafbfc', aria: `${a.kind === 'req' ? 'Request' : a.kind === 'res' ? 'Response' : 'Outcome'} ${a.exId}: ${a.full || a.label}${pr ? ', pair ' + pr.id : ''}${selected ? ' (selected)' : ''}`, onClick: () => sel(a.exId), onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); sel(a.exId); } } }; }),
+      ghosts: lay.ghosts.map((g) => { const pr = idx.byId.get(g.pairId); const selected = selPair && selPair.id === g.pairId; const stroke = selected ? C.acc : g.kind === 'moved' ? K.ord : pr && pr.presence === 'unresolved' ? K.unr : (side === 'p' ? K.P : K.S); return { x: g.x, y: g.y, w: g.w, h: g.h, label: g.label, ws: g.kind === 'moved' ? 'nowrap' : 'normal', stroke, fill: selected ? 'rgba(27,111,143,.06)' : 'rgba(255,255,255,.6)', aria: `${g.label}. Selects pair ${g.pairId}.`, onClick: () => this.cmpSelect(g.pairId, { scroll: false }) }; }),
+    };
+  }
+  outlineRows(c, idx, visible, stateOf, SC, K, labelOf, kindOf, filtersActive) {
+    const rows = []; const collapsed = new Set(c.outlineCollapsed); const rhl = this.resolveHL(c, idx);
+    const KG = { recording: '▣', operation: '▭', handler: '↦', http: '→' };
+    const walk = (pr, depth) => {
+      if (!visible(pr)) return;
+      const kids = idx.children.get(pr.id) || []; const shown = kids.filter(visible); const hidden = kids.length - shown.length;
+      const st = stateOf(pr); const m = SC[st]; const a = idx.agg.get(pr.id) || {}; const selected = c.sel === pr.id; const isCollapsed = collapsed.has(pr.id);
+      const self = (n, own) => (own ? n : Math.max(0, n));
+      const fields = pr.changes.length ? `${pr.changes.length} field${pr.changes.length === 1 ? '' : 's'}` : a.changed ? `${a.changed} changed below` : '';
+      const ord = idx.orderByPair.has(pr.id) ? idx.orderByPair.get(pr.id).map((o) => o.interpretation.replace(/_/g, ' ')).filter((v, i, arr) => arr.indexOf(v) === i).join(', ') : a.order ? `${a.order} below` : '';
+      const unc = pr.uncertainties.length ? `${pr.uncertainties.length} unknown` : a.uncertain ? `${a.uncertain} below` : '';
+      const basisText = { source_identity: 'source identity', signature: 'exact signature', explicit: 'explicit match', unmatched: 'no counterpart', ambiguous: `ambiguous · ${pr.matching.candidate_node_ids.length} candidate${pr.matching.candidate_node_ids.length === 1 ? '' : 's'}`, unpaired_parent: 'parent unpaired' }[pr.matching.basis];
+      const presText = (ref, side) => ref ? `#${ref.position}` : (pr.presence === 'unresolved' ? 'unresolved' : 'absent');
+      rows.push({ depth, indent: depth * 18, toggle: isCollapsed ? '[+]' : '[−]', toggleVis: kids.length ? 'visible' : 'hidden', toggleAria: isCollapsed ? 'Expand' : 'Collapse', expanded: !isCollapsed, onToggle: (e) => { e.stopPropagation(); this.toggleIn('outlineCollapsed', pr.id); }, kindGlyph: KG[kindOf(pr)], kindTitle: kindOf(pr), label: labelOf(pr), title: `${labelOf(pr)} · ${m.t}`, hint: a.oneSided && pr.presence === 'both' ? `${a.oneSided} one-sided below` : (a.unresolved && pr.presence === 'both' ? `${a.unresolved} unresolved below` : ''), labelColor: st === 'ponly' ? K.P : st === 'sonly' ? K.S : st === 'unresolved' ? K.unr : '#1b2430', weight: kindOf(pr) === 'http' ? 400 : 600, pText: presText(pr.primary, 'p'), sText: presText(pr.secondary, 's'), pColor: pr.primary ? K.P : '#8a94a0', sColor: pr.secondary ? K.S : '#8a94a0', pStyle: pr.primary ? 'normal' : 'italic', sStyle: pr.secondary ? 'normal' : 'italic', fields, fieldsDisplay: fields ? 'inline-block' : 'none', order: ord, orderDisplay: ord ? 'inline-block' : 'none', unc, uncDisplay: unc ? 'inline-block' : 'none', basis: basisText, selected, bg: selected ? '#e3f1f6' : rhl.get(pr.id) ? '#fff6e5' : '#fff', anim: rhl.get(pr.id) === 'strong' ? 'nll-row-pulse 1.1s ease-in-out infinite' : 'none', accent: selected ? K.acc : rhl.get(pr.id) ? '#c47a00' : (st === 'equal' ? 'transparent' : m.c), onClick: () => this.cmpSelect(pr.id, { scroll: false }) });
+      if (isCollapsed) return;
+      shown.forEach((k) => walk(k, depth + 1));
+      if (hidden) rows.push({ depth: depth + 1, indent: (depth + 1) * 18, toggle: '', toggleVis: 'hidden', expanded: false, onToggle: () => {}, kindGlyph: '', kindTitle: '', label: `${hidden} hidden by filters`, hint: `original positions ${kids.filter((k) => !visible(k)).map((k) => (k.primary ? 'P#' + k.primary.position : 'S#' + k.secondary.position)).join(', ')}`, labelColor: '#8a94a0', weight: 400, title: '', pText: '', sText: '', pColor: '#8a94a0', sColor: '#8a94a0', pStyle: 'italic', sStyle: 'italic', fields: '', fieldsDisplay: 'none', order: '', orderDisplay: 'none', unc: '', uncDisplay: 'none', basis: '', selected: false, bg: '#fff', accent: 'transparent', onClick: () => this.setCmp({ filter: 'all', search: '' }) });
+    };
+    (idx.children.get('(root)') || []).forEach((r) => walk(r, 0));
+    return rows;
+  }
+  // Pairs to highlight while the Resolve match UI is open: the unresolved pair itself (strong) and the pairs holding its candidates (picked = strong, others = weak).
+  resolveHL(c, idx) {
+    const m = new Map(); const pr = c.sel && idx.byId.get(c.sel);
+    if (!pr || pr.presence !== 'unresolved' || !pr.matching.candidate_node_ids.length) return m;
+    m.set(pr.id, 'strong'); const byNode = pr.primary ? idx.bySecondary : idx.byPrimary;
+    pr.matching.candidate_node_ids.forEach((id) => { const cp = byNode.get(id); if (cp) m.set(cp.id, c.resolveChoice === id ? 'strong' : 'weak'); });
+    return m;
+  }
+  connectionRows(c, idx, visible, stateOf, SC, K, labelOf, kindOf) {
+    const RH = 26, GH = 28, colW = 300, svgX = 12 + colW, svgW = 0; // svg spans between the columns; width set from container by percentage in markup
+    const collapsed = new Set(c.connCollapsed); const rhl = this.resolveHL(c, idx);
+    const groups = [], left = [], right = [], lines = [];
+    let y = 0;
+    const hover = c.hover, sel = c.sel; const focus = hover || sel;
+    const related = new Set(); if (focus) { related.add(focus); (idx.orderByPair.get(focus) || []).forEach((o) => { related.add(o.first_pair_id); related.add(o.second_pair_id); }); }
+    const descend = (pr, out) => { (idx.children.get(pr.id) || []).forEach((k) => { if (!visible(k)) return; out.push(k); descend(k, out); }); };
+    const topLevel = []; (idx.children.get('(root)') || []).forEach((rp) => { topLevel.push(rp); });
+    const groupsList = []; topLevel.forEach((rp) => { groupsList.push({ pair: rp, label: labelOf(rp), isRec: true }); (idx.children.get(rp.id) || []).filter(visible).forEach((k) => groupsList.push({ pair: k, label: labelOf(k), isRec: false })); });
+    const depthOf = (pr, root) => { let d = 0, cur = pr; while (cur && cur.parent_pair_id && cur.parent_pair_id !== root.id) { d++; cur = idx.byId.get(cur.parent_pair_id); } return d; };
+    groupsList.forEach((g) => {
+      const pr = g.pair; const isCollapsed = collapsed.has(pr.id);
+      const members = g.isRec ? [] : [pr].concat([]); if (!g.isRec) descend(pr, members);
+      const pm = members.filter((m) => m.primary).sort((a, b) => a.primary.position - b.primary.position);
+      const smm = members.filter((m) => m.secondary).sort((a, b) => a.secondary.position - b.secondary.position);
+      const a = idx.agg.get(pr.id) || {};
+      groups.push({ top: y, label: g.label, toggle: g.isRec ? '' : (isCollapsed ? '[+]' : '[−]'), expanded: !isCollapsed, sub: g.isRec ? `${pr.presence === 'both' ? 'paired recording' : pr.presence.replace('_', ' ')}` : `${members.length} node${members.length === 1 ? '' : 's'} · ${a.changed || 0} changed · ${a.oneSided || 0} one-sided · ${a.unresolved || 0} unresolved · ${a.order || 0} order`, onToggle: () => { if (!g.isRec) this.toggleIn('connCollapsed', pr.id); } });
+      y += GH;
+      if (g.isRec || isCollapsed) { y += 4; return; }
+      const pos = new Map();
+      const mk = (m, side, i) => { const st = stateOf(m); const sc = SC[st]; const selected = sel === m.id; const dim = focus && !related.has(m.id); const ref = side === 'p' ? m.primary : m.secondary; const tag = m.presence === 'unresolved' ? `? ${m.matching.candidate_node_ids.length} cand.` : m.presence === 'primary_only' ? 'P only' : m.presence === 'secondary_only' ? 'S only' : ''; const top = y + i * RH + 1; pos.set(`${side}:${m.id}`, top + 12); return { top, pos: ref.position, label: ref.label, indent: 6 + depthOf(m, pr) * 10, color: st === 'unresolved' ? K.unr : '#1b2430', border: selected ? K.acc : (hover === m.id ? K.acc : rhl.get(m.id) ? '#c47a00' : '#e1e6eb'), bg: selected ? '#e3f1f6' : rhl.get(m.id) ? '#fff6e5' : (st === 'changed' ? K.chgBg : '#fff'), anim: rhl.get(m.id) === 'strong' ? 'nll-row-pulse 1.1s ease-in-out infinite' : 'none', opacity: dim && !rhl.get(m.id) ? 0.35 : 1, selected, tag, tagDisplay: tag ? 'inline-block' : 'none', tagFg: m.presence === 'unresolved' ? K.unr : (side === 'p' ? K.P : K.S), tagBg: m.presence === 'unresolved' ? K.unrBg : (side === 'p' ? K.PBg : K.SBg), aria: `${side === 'p' ? 'Primary' : 'Secondary'} #${ref.position} ${ref.label}, ${sc.t}${tag ? ', ' + tag : ''}`, onClick: () => this.cmpSelect(m.id, { scroll: false }), onEnter: () => this.setCmp({ hover: m.id }), onLeave: () => this.setCmp({ hover: null }) }; };
+      pm.forEach((m, i) => left.push(mk(m, 'p', i)));
+      smm.forEach((m, i) => right.push(mk(m, 's', i)));
+      members.forEach((m) => { if (m.presence !== 'both') return; const y1 = pos.get(`p:${m.id}`), y2 = pos.get(`s:${m.id}`); if (y1 == null || y2 == null) return; const ocs = idx.orderByPair.get(m.id) || []; const interp = ocs.some((o) => o.interpretation === 'reordered') ? 'reordered' : ocs.some((o) => o.interpretation === 'concurrency_changed') ? 'concurrency_changed' : ocs.length ? 'observed_order_only' : null; const color = interp === 'reordered' || interp === 'concurrency_changed' ? K.ord : interp ? '#8a94a0' : m.changes.length ? K.chg : m.uncertainties.length ? '#c9a227' : '#c3cbd4'; const dash = interp === 'concurrency_changed' ? '6 4' : interp === 'observed_order_only' ? '2 4' : 'none'; const em = focus && related.has(m.id); const dim = focus && !related.has(m.id); lines.push({ d: `M0,${y1} C80,${y1} 100,${y2} 180,${y2}`, color: em && sel === m.id ? K.acc : color, sw: em ? 2.5 : (interp || m.changes.length ? 1.8 : 1.2), dash, opacity: dim ? 0.12 : 1 }); });
+      y += Math.max(pm.length, smm.length) * RH + 6;
+    });
+    return { groups, left, right, lines, height: y + 8, colW, svgX, svgW: 180 };
+  }
+  pairDetails(pair, c, P, S, idx, K, SC, stateOf, mode, mono, sans, labelOf, kindOf) {
+    const M = this.M; const missing = '#8a94a0';
+    const kind = kindOf(pair); const st = stateOf(pair); const m = SC[st];
+    const np = pair.primary ? c.treeP.nodes.get(pair.primary.node_id) : null, ns = pair.secondary ? c.treeS.nodes.get(pair.secondary.node_id) : null;
+    const xp = np && np.ref, xs = ns && ns.ref;
+    const presMeta = { both: ['Both sides', K.eqBg, K.eq], primary_only: ['Primary only', K.PBg, K.P], secondary_only: ['Secondary only', K.SBg, K.S], unresolved: ['Unresolved', K.unrBg, K.unr] }[pair.presence];
+    const eqMeta = { equal: ['Equal', '#e4f3ea', '#1f7a4d'], different: [`Different · ${pair.changes.length} field${pair.changes.length === 1 ? '' : 's'}`, K.chgBg, K.chg], unknown: ['Equality unknown', K.unrBg, K.unr] }[pair.equivalence];
+    const basisText = { source_identity: 'matched by source identity', signature: 'matched by unique exact signature (not proof of equivalent behaviour)', explicit: 'matched by explicit override in profile.matches', unmatched: 'no counterpart with this signature under the paired parent', ambiguous: 'duplicate signatures — not matched by occurrence', unpaired_parent: 'parent is one-sided; inherited' }[pair.matching.basis];
+    const fmtV = (side) => { if (!side.present) return { text: 'absent', font: sans, color: missing }; const v = side.value; if (v === null) return { text: 'null', font: mono, color: '#6b7580' }; if (v === '') return { text: '""', font: mono, color: '#6b7580' }; if (Array.isArray(v) && v.every((x) => typeof x === 'string')) return { text: v.join('\n'), font: mono, color: /\[REDACTED\]/.test(v.join()) ? K.unr : '#1b2430' }; if (typeof v === 'object') return { text: JSON.stringify(v, null, 1), font: mono, color: '#1b2430' }; return { text: String(v), font: mono, color: /\[REDACTED\]/.test(String(v)) ? K.unr : '#1b2430' }; };
+    const DIM = { content: [K.chgBg, K.chg], outcome: ['#fbe8e5', '#b9382c'], capture: [K.unrBg, K.unr], metadata: [K.eqBg, K.eq], timing: [K.accBg, K.acc], structure: [K.ordBg, K.ord] };
+    const changes = pair.changes.map((ch) => { const a = fmtV(ch.primary), b = fmtV(ch.secondary); return { path: ch.path, dim: ch.dimension, dimBg: DIM[ch.dimension][0], dimFg: DIM[ch.dimension][1], pVal: a.text, pFont: a.font, pColor: a.color, sVal: b.text, sFont: b.font, sColor: b.color }; });
+    const tabs = (kind === 'http' ? [['changes', 'Changes', pair.changes.length || ''], ['request', 'Request', ''], ['response', 'Response', ''], ['context', 'Context', ''], ['evidence', 'Evidence', '']] : [['changes', 'Changes', pair.changes.length || ''], ['details', 'Details', ''], ['context', 'Context', ''], ['evidence', 'Evidence', '']]).map(([id, label, count]) => { const active = c.tab === id || (c.tab === 'request' && kind !== 'http' && id === 'details') || (c.tab === 'response' && kind !== 'http' && id === 'details') || (c.tab === 'details' && kind === 'http' && id === 'request'); return { label, count: count === '' ? '' : `${count}`, active, line: active ? K.acc : 'transparent', color: active ? K.acc : '#5b6673', onClick: () => this.setCmp({ tab: id }) }; });
+    const activeTab = tabs.find((t) => t.active) ? tabs.find((t) => t.active).label.toLowerCase() : 'changes';
+    const row = (label, pv, sv, opts = {}) => { const f = (v) => (v == null || v === '' ? { text: opts.missingText || 'not recorded', font: sans, color: missing } : { text: typeof v === 'object' ? JSON.stringify(v, null, 1) : String(v), font: opts.sans ? sans : mono, color: /\[REDACTED\]/.test(String(v)) ? K.unr : '#1b2430' }); const a = xp ? f(pv) : { text: '— not present', font: sans, color: missing }, b = xs ? f(sv) : { text: '— not present', font: sans, color: missing }; const changed = xp && xs && JSON.stringify(pv ?? null) !== JSON.stringify(sv ?? null); return { label, p: a.text, pFont: a.font, pColor: a.color, s: b.text, sFont: b.font, sColor: b.color, bg: changed ? '#fdf4f9' : '#fff' }; };
+    const hdrRows = (a, b) => { const names = []; const map = (list) => { const mm = new Map(); (list || []).forEach(([k, v]) => { const key = k.toLowerCase(); if (!names.includes(key)) names.push(key); if (!mm.has(key)) mm.set(key, { name: k, vals: [] }); mm.get(key).vals.push(v); }); return mm; }; const ma = map(a), mb = map(b); return names.sort().map((k) => { const ea = ma.get(k), eb = mb.get(k); const ign = c.profile.ignore_headers.includes(k); const r = row((ea || eb).name + (ign ? ' (ignored)' : ''), ea ? ea.vals.join('\n') : null, eb ? eb.vals.join('\n') : null, { missingText: 'absent' }); if (ign) r.bg = '#fff'; return r; }); };
+    const bodyRows = (which, a, b) => { const stA = a ? (which === 'req' ? a.reqBodyState : a.resBodyState) : null, stB = b ? (which === 'req' ? b.reqBodyState : b.resBodyState) : null; const tA = a ? (which === 'req' ? a.reqBody : a.resBody) : null, tB = b ? (which === 'req' ? b.reqBody : b.resBody) : null; const unk = (stt) => (stt && stt !== 'captured' ? `unknown — ${M.STATE_LABEL[stt] || stt}` : null); const pj = (t) => (t == null ? null : (M.prettyJson(t).ok ? M.prettyJson(t).text : t)); const r1 = row('capture', stA ? (M.STATE_LABEL[stA] || stA) + (unk(stA) ? '' : '') : null, stB ? (M.STATE_LABEL[stB] || stB) : null, { sans: true }); const r2 = row('bytes', a ? (which === 'req' ? a.reqBytes : a.resBytes) : null, b ? (which === 'req' ? b.reqBytes : b.resBytes) : null); const r3 = row('content', pj(tA), pj(tB), { missingText: 'unknown — not captured' }); if (unk(stA)) { r3.pColor = K.unr; } if (unk(stB)) { r3.sColor = K.unr; } return [r1, r2, r3]; };
+    let sideSections = [];
+    if (kind === 'http' && activeTab === 'request') sideSections = [{ title: 'Request line', note: '', rows: [row('method', xp && xp.method, xs && xs.method), row('url', xp && xp.url, xs && xs.url), row('origin', xp && xp.origin, xs && xs.origin)] }, { title: 'Query', note: '· repeats preserved in order', rows: (() => { const keys = []; [xp, xs].forEach((x) => (x ? x.query : []).forEach(([k]) => { if (!keys.includes(k)) keys.push(k); })); return keys.length ? keys.map((k) => row(k, xp ? xp.query.filter(([kk]) => kk === k).map(([, v]) => v).join('\n') || null : null, xs ? xs.query.filter(([kk]) => kk === k).map(([, v]) => v).join('\n') || null : null, { missingText: 'absent' })) : [row('(none)', '—', '—', { sans: true })]; })() }, { title: 'Request headers', note: xp && xs && (!xp.reqHeaders || !xs.reqHeaders) ? '· not captured on one side — equality unknown' : '', rows: (xp && xp.reqHeaders) || (xs && xs.reqHeaders) ? hdrRows(xp && xp.reqHeaders, xs && xs.reqHeaders) : [row('headers', xp && xp.reqHeaders ? 'captured' : null, xs && xs.reqHeaders ? 'captured' : null, { sans: true, missingText: 'unknown — not recorded' })] }, { title: 'Request body', note: '', rows: bodyRows('req', xp, xs) }];
+    if (kind === 'http' && activeTab === 'response') sideSections = [{ title: 'Status and terminal outcome', note: '· a 200 can still fail while the body is read', rows: [row('HTTP status', xp && xp.status != null ? `${xp.status} ${xp.statusText || ''}`.trim() : null, xs && xs.status != null ? `${xs.status} ${xs.statusText || ''}`.trim() : null, { missingText: 'no response received' }), row('terminal outcome', xp && (M.OUTCOME_META[xp.outcome] || {}).label, xs && (M.OUTCOME_META[xs.outcome] || {}).label, { sans: true }), row('error', xp && xp.error, xs && xs.error, { missingText: 'none' }), row('headers at', xp && xp.headersMs != null ? M.fmtTime(xp.headersMs) : null, xs && xs.headersMs != null ? M.fmtTime(xs.headersMs) : null), row('ended at', xp && xp.endMs != null ? M.fmtTime(xp.endMs) : null, xs && xs.endMs != null ? M.fmtTime(xs.endMs) : null)] }, { title: 'Response headers', note: '', rows: (xp && xp.resHeaders) || (xs && xs.resHeaders) ? hdrRows(xp && xp.resHeaders, xs && xs.resHeaders) : [row('headers', null, null, { sans: true, missingText: 'unknown — not captured' })] }, { title: 'Response body', note: '', rows: bodyRows('res', xp, xs) }];
+    if (kind !== 'http' && activeTab === 'details') { const inv = (xp && xp.invocation) || (xs && xs.invocation); sideSections = [{ title: kind === 'recording' ? 'Recording' : (inv ? 'Handler invocation' : 'Operation'), note: '', rows: kind === 'recording' ? [row('trigger', xp && xp.trigger, xs && xs.trigger), row('stop reason', xp && xp.stopReason, xs && xs.stopReason, { missingText: 'interrupted — no recording.stop' }), row('started', xp && M.fmtTime(xp.startMs), xs && M.fmtTime(xs.startMs)), row('stopped', xp && xp.stopMs != null ? M.fmtTime(xp.stopMs) : null, xs && xs.stopMs != null ? M.fmtTime(xs.stopMs) : null)] : [row('component', xp && xp.component, xs && xs.component), row('method', xp && xp.method, xs && xs.method), row('owner', xp && xp.owner, xs && xs.owner, { sans: true }), row('result', xp && xp.result, xs && xs.result, { missingText: 'end not recorded' }), inv ? row('completion', xp && xp.completion, xs && xs.completion, { missingText: 'end not recorded' }) : null, inv ? row('error', xp && xp.error, xs && xs.error, { missingText: 'none' }) : null, inv ? row('caller', xp && xp.invocation && xp.invocation.caller ? `${xp.invocation.caller.component}.${xp.invocation.caller.method}` : null, xs && xs.invocation && xs.invocation.caller ? `${xs.invocation.caller.component}.${xs.invocation.caller.method}` : null) : null, row('callsite', xp && xp.callsite, xs && xs.callsite), row('started', xp && M.fmtTime(xp.startMs), xs && M.fmtTime(xs.startMs)), row('ended', xp && xp.endMs != null ? M.fmtTime(xp.endMs) : null, xs && xs.endMs != null ? M.fmtTime(xs.endMs) : null, { missingText: 'not recorded' }), row('duration', xp && xp.startMs != null && xp.endMs != null ? M.fmtMs(xp.endMs - xp.startMs) : null, xs && xs.startMs != null && xs.endMs != null ? M.fmtMs(xs.endMs - xs.startMs) : null, { sans: true, missingText: 'not computed' }), inv ? Object.assign(row('arguments', null, null, { sans: true, missingText: 'not captured' }), { bg: '#fff' }) : null, inv ? Object.assign(row('return value', null, null, { sans: true, missingText: 'not captured' }), { bg: '#fff' }) : null].filter(Boolean) }]; }
+    // context
+    const anc = []; let cur = pair; while (cur) { anc.unshift(cur); cur = cur.parent_pair_id ? idx.byId.get(cur.parent_pair_id) : null; }
+    const KG = { recording: '▣', operation: '▭', handler: '↦', http: '→' };
+    const ancestors = anc.map((a, i) => ({ indent: i * 14, glyph: KG[kindOf(a)], label: labelOf(a), sub: `${a.primary ? 'P#' + a.primary.position : 'P —'} · ${a.secondary ? 'S#' + a.secondary.position : 'S —'}${a.id === pair.id ? ' · this pair' : ''}`, color: a.id === pair.id ? K.acc : '#3b4650', onClick: () => this.cmpSelect(a.id) }));
+    const ctxRow = (label, value, isMono) => ({ label, value: value == null || value === '' ? 'none' : value, font: value == null || value === '' ? sans : isMono ? mono : sans, color: value == null || value === '' ? missing : '#1b2430' });
+    const contextRows = [ctxRow('Pair ID', pair.id, true), ctxRow('Parent pair', pair.parent_pair_id, true), ctxRow('Presence', pair.presence.replace('_', ' ')), ctxRow('Matching', `${pair.matching.basis} · confidence ${pair.matching.confidence}`, true), ctxRow('Candidates', pair.matching.candidate_node_ids.join(', '), true), ctxRow('Primary node', pair.primary ? `${pair.primary.node_id} · position #${pair.primary.position} · ${pair.primary.recording_id}` : null, true), ctxRow('Primary events', pair.primary ? pair.primary.event_ids.join(', ') : null, true), ctxRow('Secondary node', pair.secondary ? `${pair.secondary.node_id} · position #${pair.secondary.position} · ${pair.secondary.recording_id}` : null, true), ctxRow('Secondary events', pair.secondary ? pair.secondary.event_ids.join(', ') : null, true), ctxRow('Position meaning', 'ordinal in each session’s own event sequence (recordings: recording ordinal) — not a shared timestamp')];
+    const locate = [['aligned', 'Aligned sequences'], ['outline', 'Change outline'], ['connections', 'Order connections']].filter(([id]) => id !== c.layout).map(([id, label]) => ({ label, onClick: () => this.cmpSelect(pair.id, { layout: id }) }));
+    // evidence
+    const evs = (n, side) => { if (!n) return []; const ref = n.ref; const list = ref.events ? ref.events : [{ line: ref.line, type: 'recording.start', tsMs: ref.startMs, raw: { recordingId: ref.id, trigger: ref.trigger } }]; return list.map((ev) => ({ type: ev.type, pointer: `/events/${ev.line - 1} · L${ev.line}`, ts: ev.tsMs != null ? M.fmtTime(ev.tsMs) : 'no timestamp', text: M.prettyJson(typeof ev.raw === 'string' ? ev.raw : JSON.stringify(ev.raw)).text })); };
+    const evidence = [{ title: 'Primary', color: K.P, note: pair.primary ? `${pair.primary.event_ids.length} events · ${P.id}` : P.id, empty: !pair.primary, emptyText: 'No primary node for this pair.', events: evs(np) }, { title: 'Secondary', color: K.S, note: pair.secondary ? `${pair.secondary.event_ids.length} events · ${S.id}` : S.id, empty: !pair.secondary, emptyText: 'No secondary node for this pair.', events: evs(ns) }];
+    // orders
+    const orders = (idx.orderByPair.get(pair.id) || []).map((o) => { const otherId = o.first_pair_id === pair.id ? o.second_pair_id : o.first_pair_id; const other = idx.byId.get(otherId); const txt = { reordered: 'Both spans completed without overlap on both sides and their order is inverted. A confirmed reorder of observed completion; not a causal claim.', concurrency_changed: 'The two spans overlapped on one side and were sequential on the other. Observed concurrency changed; dependency unknown.', observed_order_only: 'Only the observed start order differs; at least one span overlapped or did not finish. Not evidence of a changed dependency.' }[o.interpretation]; return { kind: o.interpretation.replace(/_/g, ' '), other: other ? labelOf(other) : otherId, text: `primary: ${o.primary_relation} · secondary: ${o.secondary_relation}. ${txt}`, onOther: () => this.cmpSelect(otherId) }; });
+    // resolve
+    const cands = pair.presence === 'unresolved' ? pair.matching.candidate_node_ids.map((id) => { const otherTree = pair.primary ? c.treeS : c.treeP; const n = otherTree.nodes.get(id); const picked = c.resolveChoice === id; return { id, label: n ? n.label : id, sub: n ? `${pair.primary ? 'secondary' : 'primary'} #${n.position} · ${n.kind} · ${n.recording_id}` : '', effect: picked ? 'will pair with this node' : '', picked, border: picked ? K.acc : '#e1e6eb', bg: picked ? '#e3f1f6' : '#fff', dot: picked ? K.acc : '#9aa5b1', dotFill: picked ? K.acc : '#fff', onPick: () => this.setCmp({ resolveChoice: id }) }; }) : [];
+    const equalFields = kind === 'http' && xp && xs ? [['/request/method', xp.method], ['/request/url', xp.url], ['/response/status', xp.status], ['/outcome', xp.outcome], ['/attribution/adapter', xp.adapter], ['/request_body/state', xp.reqBodyState], ['/response_body/state', xp.resBodyState]].filter(([pth]) => !pair.changes.some((ch) => ch.path === pth)).map(([pth, vv]) => ({ path: pth, value: vv == null ? 'null' : String(vv) })) : [];
+    const presenceNote = pair.presence === 'primary_only' ? 'This node has no counterpart in secondary under the paired parent. Field comparison is not possible; the engine does not guess a match. If the signature changed (component, method, path or attempt), the equivalent call appears as a secondary-only node nearby.' : pair.presence === 'secondary_only' ? 'This node has no counterpart in primary under the paired parent. Field comparison is not possible; the engine does not guess a match.' : pair.presence === 'unresolved' ? `${pair.matching.candidate_node_ids.length} node${pair.matching.candidate_node_ids.length === 1 ? '' : 's'} on the other side share this exact signature. V1 does not match by occurrence; choose a candidate below or pair ancestors first.` : '';
+    const pLine = pair.primary ? `#${pair.primary.position} ${pair.primary.label}` : (pair.presence === 'unresolved' ? 'unresolved — see candidates' : 'absent — explicit empty counterpart');
+    const sLine = pair.secondary ? `#${pair.secondary.position} ${pair.secondary.label}` : (pair.presence === 'unresolved' ? 'unresolved — see candidates' : 'absent — explicit empty counterpart');
+    const sub = (n, x) => (n ? (n.kind === 'http' ? `${x.label} · ${x.owner === 'app' ? 'Sample App' : 'DemoAuth SDK'} · ${x.status != null ? x.status : (M.OUTCOME_META[x.outcome] || {}).label}` : n.kind === 'recording' ? (x.interrupted ? 'interrupted' : `stopped: ${x.stopReason}`) : `${x.owner === 'app' ? 'Sample App' : 'DemoAuth SDK'} · ${x.result || 'end not recorded'}`) : '');
+    const noteText = st === 'unknown' ? 'Retained data is equal, but at least one compared value was not captured. Equal retained data alone does not prove equal uncaptured data.' : (pair.presence === 'both' && pair.changes.some((ch) => ch.path === '/response/status') && pair.changes.some((ch) => ch.path === '/outcome') ? 'Status and terminal outcome both changed; they are separate observations.' : '');
+    return {
+      title: labelOf(pair), subtitle: `${kind === 'http' ? 'HTTP exchange' : kind === 'handler' ? 'Local handler invocation' : kind === 'recording' ? 'Recording period' : 'Operation'} · ${m.t}`, onClose: () => this.setCmp({ insp: false }), hasPrev: c.hist.length > 0, prevTitle: `Back to ${c.hist[c.hist.length - 1] || ''}`, onBack: () => this.setCmp((cc) => { const h = cc.hist.slice(); const prev = h.pop(); return prev ? { sel: prev, hist: h } : {}; }),
+      presLabel: presMeta[0], presBg: presMeta[1], presFg: presMeta[2], eqLabel: eqMeta[0], eqBg: eqMeta[1], eqFg: eqMeta[2], basisLine: basisText,
+      pLine, pSub: sub(np, xp), pColor: pair.primary ? '#1b2430' : missing, sLine, sSub: sub(ns, xs), sColor: pair.secondary ? '#1b2430' : missing,
+      hasNote: !!noteText, note: noteText, tabs,
+      isChanges: activeTab === 'changes', isSide: sideSections.length > 0, isContext: activeTab === 'context', isEvidence: activeTab === 'evidence',
+      showResolve: pair.presence === 'unresolved' && cands.length > 0, resolveIntro: 'Choose which node on the other side this one corresponds to. Candidates are outlined in amber in the sequence view; the picked one pulses. The override is written to profile.matches and the same engine recomputes; the pair must be one-to-one, the same kind and under paired parents. Pair missing ancestors first.', candidates: cands, onApplyMatch: () => { if (!c.resolveChoice) return; const mt = pair.primary ? { primary: pair.primary.node_id, secondary: c.resolveChoice } : { primary: c.resolveChoice, secondary: pair.secondary.node_id }; this.recomputeCmp({ profile: Object.assign({}, c.profile, { matches: c.profile.matches.concat([mt]) }), toastPrefix: `Explicit match ${mt.primary} ↔ ${mt.secondary} applied.` }); }, applyDisabled: !c.resolveChoice, applyBg: c.resolveChoice ? K.acc : '#fff', applyFg: c.resolveChoice ? '#fff' : '#8a94a0', applyNote: c.resolveChoice ? 'Recomputes the whole comparison with this override.' : 'Pick a candidate to enable.',
+      hasExplicit: pair.matching.basis === 'explicit', onRemoveMatch: () => this.recomputeCmp({ profile: Object.assign({}, c.profile, { matches: c.profile.matches.filter((mt) => !(pair.primary && mt.primary === pair.primary.node_id && pair.secondary && mt.secondary === pair.secondary.node_id)) }), toastPrefix: 'Explicit match removed.' }),
+      hasPresenceNote: !!presenceNote, presenceNote,
+      changesNote: pair.presence !== 'both' ? 'not applicable — no counterpart' : pair.changes.length ? `${pair.changes.length} · values from both sides; absent, null, "" and 0 are distinct` : 'none within the applied rules', hasChanges: changes.length > 0, changes, noChanges: changes.length === 0, noChangesText: pair.presence !== 'both' ? 'Nothing to compare.' : (pair.uncertainties.length ? 'No change in retained data. See unknowns below.' : 'All compared fields are equal.'),
+      uncNote: pair.uncertainties.length ? 'what could not be observed, and why' : '', hasUnc: pair.uncertainties.length > 0, uncertainties: pair.uncertainties.map((u) => ({ path: u.path || '(node)', reason: u.reason })), noUnc: pair.uncertainties.length === 0,
+      hasOrder: orders.length > 0, orders, hasIgnored: pair.ignored_paths.length > 0, ignoredText: pair.ignored_paths.join('\n'),
+      hasEqualFields: equalFields.length > 0 && pair.presence === 'both', equalToggleLabel: c.showEqual ? 'Hide unchanged fields' : `Show ${equalFields.length} unchanged fields`, showEqual: c.showEqual, onToggleEqual: () => this.setCmp({ showEqual: !c.showEqual }), equalFields,
+      sideSections, ancestors, contextRows, locate, evidence,
+      copyFindingLabel: this.state.copied === 'finding' ? 'Copied finding' : 'Copy finding', onCopyFinding: () => this.copy('finding', JSON.stringify(this.findingFor(pair), null, 2)),
+    };
   }
   // ---- actions
   select(id) { this.setState((s) => ({ sel: id, hist: s.sel && s.sel !== id ? s.hist.concat([s.sel]).slice(-20) : s.hist, insp: true, copied: null, sheet: null })); }
   back() { this.setState((s) => { const h = s.hist.slice(); const prev = h.pop(); return prev ? { sel: prev, hist: h } : {}; }); }
   closeInsp() { this.setState({ insp: false }); }
   toggleCollapse(opId) { this.setState((s) => ({ collapsed: s.collapsed.includes(opId) ? s.collapsed.filter((x) => x !== opId) : s.collapsed.concat([opId]) })); }
-  setSession(i) { this.setState({ sessionIdx: i, sel: null, hist: [], insp: false, recFocus: null, origins: [], collapsed: [], screen: 'workspace', sheet: null }); }
+  setSession(i) { this.setState({ sessionIdx: i, sel: null, hist: [], insp: false, recFocus: null, origins: [], collapsed: [], screen: 'workspace', sheet: null, picker: false }); }
   loadFile(file, key) { this.setState({ file, fileKey: key, sessionIdx: 0, sel: null, hist: [], insp: false, recFocus: null, origins: [], collapsed: [], drag: false, search: '' }); }
   loadSample(key) { const f = this.M.SAMPLE_FILES[key]; this.loadFile(this.M.importText(f.name, f.text), key); }
   readFile(file) { if (!file) return; const r = new FileReader(); r.onload = () => this.loadFile(this.M.importText(file.name, String(r.result)), 'custom'); r.readAsText(file); }
@@ -333,8 +839,8 @@ class Component extends DCLogic {
   }
   stopResize() { if (this.onMove) document.removeEventListener('mousemove', this.onMove); if (this.onUp) document.removeEventListener('mouseup', this.onUp); this.onMove = this.onUp = null; }
 
-  // ---- view model
-  renderVals() {
+  // ---- single-session view model
+  renderSingle() {
     const s = this.state, M = this.M, p = this.props || {};
     const C = { acc: '#1b6f8f', accBg: '#e3f1f6', ok: '#1f7a4d', okBg: '#e4f3ea', err: '#b9382c', errBg: '#fbe8e5', warn: '#8a5a00', warnBg: '#fff3d6', neu: '#5b6673', neuBg: '#eceff3' };
     const toneC = { ok: C.ok, error: C.err, warn: C.warn, neutral: C.neu }, toneBg = { ok: C.okBg, error: C.errBg, warn: C.warnBg, neutral: C.neuBg };
@@ -458,7 +964,7 @@ class Component extends DCLogic {
     if (x.outcome === 'timeout' && x.status != null) statusNote = `Response headers arrived (${x.status}) but the transfer failed while reading the body: ${x.error || 'timeout'}. Header arrival is not completion; this exchange is a failure.`;
     else if (x.outcome === 'transport_failure') statusNote = `No HTTP response was received. ${x.error || ''}`.trim();
     else if (x.outcome === 'unknown') statusNote = 'Observation was stopped explicitly while this request was in flight. It may have completed afterwards; the log cannot tell.';
-    else if (x.outcome === 'unfinished') statusNote = 'The recording was interrupted (the file ended without recording.stop). An interrupted file does not establish a network failure.';
+    else if (x.outcome === 'unfinished') statusNote = 'The recording was interrupted (the file ended without recording.stop). An interrupted file does not prove a network failure.';
     else if (x.outcome === 'cancelled') statusNote = `Cancelled by the caller${x.error ? ': ' + x.error : ''}.`;
     else if (x.statusInvalid) statusNote = 'The log reported status 0, which is not an HTTP status. Shown as “no response received”.';
     else if (x.outcome === 'http_error') statusNote = `The server answered with ${x.status} ${x.statusText || ''}. Transfer completed; the outcome is an HTTP error.`;

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div role="region" aria-label="Paired details inspector" style="display:flex;flex-direction:column;height:100%;min-height:0;background:#fff;font-family:'Source Sans 3',system-ui,sans-serif;color:#1b2430;font-size:13px">
+  <div style="display:flex;align-items:center;gap:6px;padding:8px 10px 8px 8px;border-bottom:1px solid #e1e6eb;min-height:44px">
+    <button type="button" onClick="{{ d.onClose }}" aria-label="Close inspector" style="min-width:36px;height:36px;border:none;background:transparent;border-radius:6px;color:#3b4650;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#eef1f4">×</button>
+    <div style="flex:1;min-width:0">
+      <div style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="{{ d.title }}">{{ d.title }}</div>
+      <div style="font-size:11.5px;color:#6b7580;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.subtitle }}</div>
+    </div>
+    <sc-if value="{{ d.hasPrev }}" hint-placeholder-val="{{ false }}">
+      <button type="button" onClick="{{ d.onBack }}" title="{{ d.prevTitle }}" style="height:36px;padding:0 10px;border:1px solid #d9dee5;background:#fff;border-radius:6px;color:#3b4650;font-size:12px;cursor:pointer;white-space:nowrap;font-family:inherit" style-hover="background:#eef1f4">← prior</button>
+    </sc-if>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #e1e6eb;flex-wrap:wrap">
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;background:{{ d.presBg }};color:{{ d.presFg }};white-space:nowrap">{{ d.presLabel }}</span>
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;background:{{ d.eqBg }};color:{{ d.eqFg }};white-space:nowrap">{{ d.eqLabel }}</span>
+    <span style="font-size:12px;color:#6b7580">{{ d.basisLine }}</span>
+  </div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border-bottom:1px solid #e1e6eb">
+    <div style="padding:8px 14px;border-right:1px solid #e1e6eb;min-width:0">
+      <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:#2f6db5">Primary</div>
+      <div style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ d.pColor }}" title="{{ d.pLine }}">{{ d.pLine }}</div>
+      <div style="font-size:11px;color:#6b7580;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.pSub }}</div>
+    </div>
+    <div style="padding:8px 14px;min-width:0">
+      <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:#c4651c">Secondary</div>
+      <div style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ d.sColor }}" title="{{ d.sLine }}">{{ d.sLine }}</div>
+      <div style="font-size:11px;color:#6b7580;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.sSub }}</div>
+    </div>
+  </div>
+  <sc-if value="{{ d.hasNote }}" hint-placeholder-val="{{ false }}">
+    <div style="padding:8px 14px;font-size:12px;line-height:1.45;color:#5a4300;background:#fff8e6;border-bottom:1px solid #f0e2b8">{{ d.note }}</div>
+  </sc-if>
+  <div role="tablist" style="display:flex;gap:2px;padding:6px 8px 0;border-bottom:1px solid #e1e6eb;overflow-x:auto">
+    <sc-for list="{{ d.tabs }}" as="t" hint-placeholder-count="5">
+      <button type="button" role="tab" aria-selected="{{ t.active }}" onClick="{{ t.onClick }}" style="height:36px;padding:0 10px;border:none;border-bottom:2px solid {{ t.line }};background:transparent;color:{{ t.color }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap">{{ t.label }}<span style="font-weight:400;color:#8a94a0"> {{ t.count }}</span></button>
+    </sc-for>
+  </div>
+  <div style="flex:1;min-height:0;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:16px">
+
+    <sc-if value="{{ d.isChanges }}" hint-placeholder-val="{{ true }}">
+      <sc-if value="{{ d.showResolve }}" hint-placeholder-val="{{ false }}">
+        <section style="border:1px solid #e8d9a8;background:#fffaf0;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><h3 style="margin:0;font-size:12.5px;font-weight:700;white-space:nowrap">Resolve match</h3><span style="font-size:10.5px;color:#8a5a00;font-weight:600;letter-spacing:.04em;text-transform:uppercase">Planned viewer control · engine already supports profile.matches</span></div>
+          <div style="font-size:12px;line-height:1.5;color:#3b4650">{{ d.resolveIntro }}</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <sc-for list="{{ d.candidates }}" as="c" hint-placeholder-count="2">
+              <button type="button" onClick="{{ c.onPick }}" aria-pressed="{{ c.picked }}" style="display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;padding:8px 10px;border:1px solid {{ c.border }};background:{{ c.bg }};border-radius:6px;cursor:pointer;font-family:inherit" style-hover="background:#f4f6f8">
+                <span aria-hidden="true" style="width:14px;height:14px;border-radius:50%;border:1.5px solid {{ c.dot }};background:{{ c.dotFill }};box-sizing:border-box"></span>
+                <span style="min-width:0"><span style="display:block;font-family:'Source Code Pro',ui-monospace,monospace;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.label }}</span><span style="display:block;font-size:11px;color:#6b7580">{{ c.sub }}</span></span>
+                <span style="font-size:11px;color:#6b7580;white-space:nowrap">{{ c.effect }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button type="button" onClick="{{ d.onApplyMatch }}" disabled="{{ d.applyDisabled }}" style="height:34px;padding:0 12px;border:1px solid #1b6f8f;background:{{ d.applyBg }};color:{{ d.applyFg }};border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">Apply explicit match and recompute</button>
+            <span style="font-size:11.5px;color:#6b7580">{{ d.applyNote }}</span>
+          </div>
+        </section>
+      </sc-if>
+      <sc-if value="{{ d.hasExplicit }}" hint-placeholder-val="{{ false }}">
+        <section style="border:1px solid #e1e6eb;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:#3b4650"><span>Paired by an explicit match in <span style="font-family:'Source Code Pro',ui-monospace,monospace">profile.matches</span>.</span><button type="button" onClick="{{ d.onRemoveMatch }}" style="height:30px;padding:0 10px;border:1px solid #d9dee5;background:#fff;border-radius:6px;font-family:inherit;font-size:12px;cursor:pointer" style-hover="background:#eef1f4">Remove match and recompute</button></section>
+      </sc-if>
+      <sc-if value="{{ d.hasPresenceNote }}" hint-placeholder-val="{{ false }}">
+        <section style="font-size:12.5px;line-height:1.5;color:#3b4650;background:#f6f8fa;border-radius:8px;padding:10px 14px">{{ d.presenceNote }}</section>
+      </sc-if>
+      <section>
+        <h3 style="margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580">Field changes <span style="font-weight:400;text-transform:none;letter-spacing:0">· {{ d.changesNote }}</span></h3>
+        <sc-if value="{{ d.hasChanges }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ d.changes }}" as="c" hint-placeholder-count="3">
+              <div style="border:1px solid #e1e6eb;border-radius:6px;overflow:hidden">
+                <div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:#f6f8fa;border-bottom:1px solid #e1e6eb"><span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;word-break:break-all;flex:1">{{ c.path }}</span><span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border-radius:999px;background:{{ c.dimBg }};color:{{ c.dimFg }}">{{ c.dim }}</span></div>
+                <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+                  <div style="padding:6px 10px;border-right:1px solid #e1e6eb;font-family:{{ c.pFont }};font-size:11.5px;color:{{ c.pColor }};word-break:break-all;white-space:pre-wrap;border-left:3px solid #2f6db5">{{ c.pVal }}</div>
+                  <div style="padding:6px 10px;font-family:{{ c.sFont }};font-size:11.5px;color:{{ c.sColor }};word-break:break-all;white-space:pre-wrap;border-left:3px solid #c4651c">{{ c.sVal }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ d.noChanges }}" hint-placeholder-val="{{ false }}"><div style="font-size:12.5px;color:#6b7580">{{ d.noChangesText }}</div></sc-if>
+      </section>
+      <section>
+        <h3 style="margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580">Unknown <span style="font-weight:400;text-transform:none;letter-spacing:0">· {{ d.uncNote }}</span></h3>
+        <sc-if value="{{ d.hasUnc }}" hint-placeholder-val="{{ false }}">
+          <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px">
+            <sc-for list="{{ d.uncertainties }}" as="u" hint-placeholder-count="1">
+              <li style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:6px 10px;border-radius:6px;background:#fff8e6;font-size:12px;line-height:1.45"><span style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;color:#8a5a00;font-weight:600">{{ u.path }}</span><span style="color:#5a4300">{{ u.reason }}</span></li>
+            </sc-for>
+          </ul>
+        </sc-if>
+        <sc-if value="{{ d.noUnc }}" hint-placeholder-val="{{ true }}"><div style="font-size:12.5px;color:#6b7580">No unknown information for this pair.</div></sc-if>
+      </section>
+      <sc-if value="{{ d.hasOrder }}" hint-placeholder-val="{{ false }}">
+        <section>
+          <h3 style="margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580">Order relations with siblings</h3>
+          <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px">
+            <sc-for list="{{ d.orders }}" as="o" hint-placeholder-count="1">
+              <li style="padding:6px 10px;border-radius:6px;background:#f1effa;font-size:12px;line-height:1.45;display:flex;flex-direction:column;gap:2px"><span><span style="font-weight:700;color:#4f4a8a">{{ o.kind }}</span> · with <button type="button" onClick="{{ o.onOther }}" style="border:none;background:none;padding:0;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;color:#1b6f8f;cursor:pointer;text-decoration:underline">{{ o.other }}</button></span><span style="color:#5b6673">{{ o.text }}</span></li>
+            </sc-for>
+          </ul>
+        </section>
+      </sc-if>
+      <sc-if value="{{ d.hasIgnored }}" hint-placeholder-val="{{ false }}">
+        <section><h3 style="margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580">Excluded by profile</h3><div style="font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;color:#6b7580;line-height:1.6">{{ d.ignoredText }}</div></section>
+      </sc-if>
+      <sc-if value="{{ d.hasEqualFields }}" hint-placeholder-val="{{ false }}">
+        <section>
+          <button type="button" onClick="{{ d.onToggleEqual }}" style="height:30px;padding:0 10px;border:1px solid #d9dee5;background:#fff;border-radius:6px;font-family:inherit;font-size:12px;cursor:pointer" style-hover="background:#eef1f4">{{ d.equalToggleLabel }}</button>
+          <sc-if value="{{ d.showEqual }}" hint-placeholder-val="{{ false }}">
+            <dl style="display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:10px 0 0;font-size:12px">
+              <sc-for list="{{ d.equalFields }}" as="f" hint-placeholder-count="3"><dt style="font-family:'Source Code Pro',ui-monospace,monospace;color:#6b7580;font-size:11.5px">{{ f.path }}</dt><dd style="margin:0;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;word-break:break-all;color:#3b4650">{{ f.value }}</dd></sc-for>
+            </dl>
+          </sc-if>
+        </section>
+      </sc-if>
+    </sc-if>
+
+    <sc-if value="{{ d.isSide }}" hint-placeholder-val="{{ false }}">
+      <sc-for list="{{ d.sideSections }}" as="sec" hint-placeholder-count="3">
+        <section>
+          <h3 style="margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580">{{ sec.title }} <span style="font-weight:400;text-transform:none;letter-spacing:0">{{ sec.note }}</span></h3>
+          <div style="border:1px solid #e1e6eb;border-radius:6px;overflow:hidden">
+            <sc-for list="{{ sec.rows }}" as="r" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:minmax(72px,auto) minmax(0,1fr) minmax(0,1fr);border-top:1px solid #eef1f4;background:{{ r.bg }}">
+                <div style="padding:5px 8px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11px;color:#5b6673;word-break:break-all">{{ r.label }}</div>
+                <div style="padding:5px 8px;border-left:1px solid #eef1f4;font-family:{{ r.pFont }};font-size:11.5px;color:{{ r.pColor }};word-break:break-all;white-space:pre-wrap;max-height:220px;overflow:auto">{{ r.p }}</div>
+                <div style="padding:5px 8px;border-left:1px solid #eef1f4;font-family:{{ r.sFont }};font-size:11.5px;color:{{ r.sColor }};word-break:break-all;white-space:pre-wrap;max-height:220px;overflow:auto">{{ r.s }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+    </sc-if>
+
+    <sc-if value="{{ d.isContext }}" hint-placeholder-val="{{ false }}">
+      <section>
+        <h3 style="margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580">Hierarchy</h3>
+        <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ d.ancestors }}" as="a" hint-placeholder-count="2">
+            <li style="padding-left:{{ a.indent }}px"><button type="button" onClick="{{ a.onClick }}" style="border:none;background:none;padding:2px 4px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11.5px;color:{{ a.color }};cursor:pointer;text-align:left;border-radius:4px" style-hover="background:#eef1f4">{{ a.glyph }} {{ a.label }} <span style="font-family:'Source Sans 3',system-ui,sans-serif;color:#8a94a0">{{ a.sub }}</span></button></li>
+          </sc-for>
+        </ol>
+      </section>
+      <section>
+        <h3 style="margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580">Correspondence</h3>
+        <dl style="display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 14px;margin:0;font-size:12.5px">
+          <sc-for list="{{ d.contextRows }}" as="r" hint-placeholder-count="5"><dt style="color:#6b7580">{{ r.label }}</dt><dd style="margin:0;font-family:{{ r.font }};word-break:break-all;white-space:pre-line;color:{{ r.color }}">{{ r.value }}</dd></sc-for>
+        </dl>
+      </section>
+      <section>
+        <h3 style="margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#6b7580">Locate in</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <sc-for list="{{ d.locate }}" as="l" hint-placeholder-count="3"><button type="button" onClick="{{ l.onClick }}" style="height:32px;padding:0 12px;border:1px solid #d9dee5;background:#fff;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer" style-hover="background:#eef1f4">{{ l.label }}</button></sc-for>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ d.isEvidence }}" hint-placeholder-val="{{ false }}">
+      <section style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button type="button" onClick="{{ d.onCopyFinding }}" style="height:34px;padding:0 12px;border:1px solid #1b6f8f;background:#1b6f8f;color:#fff;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">{{ d.copyFindingLabel }}</button>
+        <span style="font-size:11.5px;color:#6b7580">Finding = pair ID, presence, changes, unknowns and source event pointers for both sides.</span>
+      </section>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px">
+        <sc-for list="{{ d.evidence }}" as="side" hint-placeholder-count="2">
+          <section style="min-width:0">
+            <h3 style="margin:0 0 6px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:{{ side.color }}">{{ side.title }} <span style="font-weight:400;color:#8a94a0;letter-spacing:0;text-transform:none">· {{ side.note }}</span></h3>
+            <sc-if value="{{ side.empty }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:#8a94a0;font-style:italic">{{ side.emptyText }}</div></sc-if>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ side.events }}" as="ev" hint-placeholder-count="2">
+                <div style="border:1px solid #e1e6eb;border-radius:6px;overflow:hidden">
+                  <div style="display:flex;gap:8px;align-items:baseline;padding:4px 8px;background:#f6f8fa;border-bottom:1px solid #e1e6eb;font-family:'Source Code Pro',ui-monospace,monospace;font-size:11px"><span style="font-weight:600">{{ ev.type }}</span><span style="color:#6b7580">{{ ev.pointer }}</span><span style="color:#6b7580;margin-left:auto">{{ ev.ts }}</span></div>
+                  <pre style="margin:0;padding:6px 8px;font-family:'Source Code Pro',ui-monospace,monospace;font-size:10.5px;line-height:1.45;white-space:pre-wrap;word-break:break-all;max-height:180px;overflow:auto;color:#3b4650">{{ ev.text }}</pre>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:720},&quot;d&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;PairInspectorView&quot;,&quot;default&quot;:null}}"></script>
+</body>
+</html>

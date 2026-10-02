@@ -4,7 +4,9 @@
 
 [Claude Design comparison prompt](CLAUDE-COMPARISON-DESIGN-PROMPT.md) is the copy-ready brief for completing high-fidelity mockups from the current viewer, with an attachment checklist, all three layouts, shared inspector behavior and the implemented diff contract.
 
-The files in `claude-export/` are the unmodified Project HTML archive exported through the owner's Chrome session on 2026-09-28 from [Network Log Lab deliverables review](https://claude.ai/design/p/09dc9ea8-677e-4967-b421-c9b890af09c0?file=Mockups.dc.html). The archive's thumbnail is omitted. These are source design references, not application runtime dependencies. They include the original prototype, component/style specification, mockup sheet, support runtime, and its copied fixtures.
+The files in `claude-export/` are the unmodified Project HTML archive exported through the owner's Chrome session on **2026-10-02** from [Network Log Lab deliverables review](https://claude.ai/design/p/09dc9ea8-677e-4967-b421-c9b890af09c0?file=Mockups.dc.html). This refresh replaces the 2026-09-28 export and includes all three comparison layouts, a paired inspector, match-resolution highlighting and example diffs. The archive's thumbnail is omitted. These are source design references, not application runtime dependencies. [The import record](CLAUDE-IMPORT-2026-10-02.md) documents provenance and compatibility limits; [the manifest](CLAUDE-EXPORT-MANIFEST.json) records the exact file hashes.
+
+[Session comparison UI specification](SESSION-COMPARISON-UI.md) incorporates the current mockups and interactions into the repository plan. Start there for comparison implementation. The exported `Spec.dc.html` is unchanged from the earlier archive and still contains historical version/support claims; it is not the current comparison specification. The exported `nll-diff.js` is a prototype implementation and must not replace the standalone module.
 
 The implemented viewer is `viewer/`. The repository contract wins where the design conflicts:
 

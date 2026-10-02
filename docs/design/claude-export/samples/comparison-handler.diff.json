@@ -1,0 +1,924 @@
+{
+  "format": "http-sequence-diff",
+  "schema_version": "1.0",
+  "engine": {
+    "name": "@http-sequence-logger/sequence-diff",
+    "version": "0.1.0",
+    "algorithm": "conservative-tree-v1"
+  },
+  "inputs": {
+    "primary": {
+      "session": {
+        "namespace": "sample-app/android",
+        "id": "sess_25cc-demo-handler"
+      },
+      "event_count": 33,
+      "recording_count": 1
+    },
+    "secondary": {
+      "session": {
+        "namespace": "sample-app/android",
+        "id": "sess_7e02-demo-handler-rerun"
+      },
+      "event_count": 37,
+      "recording_count": 1
+    }
+  },
+  "profile": {
+    "ignore_paths": [],
+    "ignore_headers": [
+      "x-request-id",
+      "date"
+    ],
+    "compare_timing": false,
+    "json_fields": true,
+    "matches": [],
+    "recording_matches": []
+  },
+  "scope": {
+    "included": [
+      "recordings",
+      "operations",
+      "handler invocations",
+      "HTTP exchanges",
+      "request/response metadata",
+      "ordered repeated headers and query values",
+      "raw bodies",
+      "JSON body fields (complete, unredacted UTF-8 JSON only)",
+      "outcomes and attempts",
+      "sibling order relations"
+    ],
+    "excluded": [
+      "wall-clock timestamps",
+      "monotonic clock origins",
+      "native transport metrics (compared as metadata only)",
+      "handler arguments and return values (not captured)",
+      "timing (compare_timing=false)",
+      "header x-request-id",
+      "header date"
+    ]
+  },
+  "result": "different",
+  "summary": {
+    "matched": 8,
+    "primary_only": 2,
+    "secondary_only": 2,
+    "unresolved": 3,
+    "changed_pairs": 3,
+    "equal_pairs": 5,
+    "uncertain_pairs": 9,
+    "order_changes": 2,
+    "field_changes": 12
+  },
+  "pairs": [
+    {
+      "id": "p001",
+      "parent_pair_id": null,
+      "primary": {
+        "recording_id": "rec_e1",
+        "node_id": "rec_e1",
+        "kind": "recording",
+        "label": "Recording rec_e1",
+        "position": 0,
+        "parent_node_id": null,
+        "event_ids": [
+          "L172"
+        ],
+        "event_pointers": [
+          "/events/171"
+        ]
+      },
+      "secondary": {
+        "recording_id": "rec_g1",
+        "node_id": "rec_g1",
+        "kind": "recording",
+        "label": "Recording rec_g1",
+        "position": 0,
+        "parent_node_id": null,
+        "event_ids": [
+          "L251"
+        ],
+        "event_pointers": [
+          "/events/250"
+        ]
+      },
+      "presence": "both",
+      "matching": {
+        "basis": "signature",
+        "confidence": "exact",
+        "candidate_node_ids": []
+      },
+      "equivalence": "equal",
+      "changes": [],
+      "uncertainties": [],
+      "ignored_paths": []
+    },
+    {
+      "id": "p002",
+      "parent_pair_id": "p001",
+      "primary": {
+        "recording_id": "rec_e1",
+        "node_id": "op_signin",
+        "kind": "operation",
+        "label": "SampleApp.signIn(handler)",
+        "position": 0,
+        "parent_node_id": "rec_e1",
+        "event_ids": [
+          "L173",
+          "L202"
+        ],
+        "event_pointers": [
+          "/events/172",
+          "/events/201"
+        ]
+      },
+      "secondary": {
+        "recording_id": "rec_g1",
+        "node_id": "op_signin",
+        "kind": "operation",
+        "label": "SampleApp.signIn(handler)",
+        "position": 0,
+        "parent_node_id": "rec_g1",
+        "event_ids": [
+          "L252",
+          "L285"
+        ],
+        "event_pointers": [
+          "/events/251",
+          "/events/284"
+        ]
+      },
+      "presence": "both",
+      "matching": {
+        "basis": "signature",
+        "confidence": "exact",
+        "candidate_node_ids": []
+      },
+      "equivalence": "equal",
+      "changes": [],
+      "uncertainties": [],
+      "ignored_paths": []
+    },
+    {
+      "id": "p003",
+      "parent_pair_id": "p002",
+      "primary": {
+        "recording_id": "rec_e1",
+        "node_id": "op_auth",
+        "kind": "operation",
+        "label": "DemoAuthSdk.authenticate(handler)",
+        "position": 1,
+        "parent_node_id": "op_signin",
+        "event_ids": [
+          "L174",
+          "L195"
+        ],
+        "event_pointers": [
+          "/events/173",
+          "/events/194"
+        ]
+      },
+      "secondary": {
+        "recording_id": "rec_g1",
+        "node_id": "op_auth",
+        "kind": "operation",
+        "label": "DemoAuthSdk.authenticate(handler)",
+        "position": 1,
+        "parent_node_id": "op_signin",
+        "event_ids": [
+          "L253",
+          "L280"
+        ],
+        "event_pointers": [
+          "/events/252",
+          "/events/279"
+        ]
+      },
+      "presence": "both",
+      "matching": {
+        "basis": "signature",
+        "confidence": "exact",
+        "candidate_node_ids": []
+      },
+      "equivalence": "equal",
+      "changes": [],
+      "uncertainties": [],
+      "ignored_paths": []
+    },
+    {
+      "id": "p004",
+      "parent_pair_id": "p003",
+      "primary": {
+        "recording_id": "rec_e1",
+        "node_id": "r1",
+        "kind": "http",
+        "label": "GET /uuid",
+        "position": 2,
+        "parent_node_id": "op_auth",
+        "event_ids": [
+          "L175",
+          "L176",
+          "L177",
+          "L178"
+        ],
+        "event_pointers": [
+          "/events/174",
+          "/events/175",
+          "/events/176",
+          "/events/177"
+        ]
+      },
+      "secondary": {
+        "recording_id": "rec_g1",
+        "node_id": "r1",
+        "kind": "http",
+        "label": "GET /uuid",
+        "position": 3,
+        "parent_node_id": "op_auth",
+        "event_ids": [
+          "L258",
+          "L259",
+          "L260",
+          "L261"
+        ],
+        "event_pointers": [
+          "/events/257",
+          "/events/258",
+          "/events/259",
+          "/events/260"
+        ]
+      },
+      "presence": "both",
+      "matching": {
+        "basis": "signature",
+        "confidence": "exact",
+        "candidate_node_ids": []
+      },
+      "equivalence": "different",
+      "changes": [
+        {
+          "path": "/request/headers/User-Agent",
+          "dimension": "content",
+          "primary": {
+            "present": true,
+            "value": [
+              "DemoAuth/2.4.0 (Android 14; okhttp/4.12.0)"
+            ]
+          },
+          "secondary": {
+            "present": true,
+            "value": [
+              "DemoAuth/2.4.1 (Android 14; okhttp/4.12.0)"
+            ]
+          }
+        },
+        {
+          "path": "/response_body/raw",
+          "dimension": "content",
+          "primary": {
+            "present": true,
+            "value": "{\"uuid\":\"ee324ee9-21bb-47d2-a0a1-41d71cbb468f\"}"
+          },
+          "secondary": {
+            "present": true,
+            "value": "{\"uuid\":\"0b7c2d6e-5f21-4e7a-9c3b-2a1d4f6e8b90\"}"
+          }
+        },
+        {
+          "path": "/response_body/json/uuid",
+          "dimension": "content",
+          "primary": {
+            "present": true,
+            "value": "ee324ee9-21bb-47d2-a0a1-41d71cbb468f"
+          },
+          "secondary": {
+            "present": true,
+            "value": "0b7c2d6e-5f21-4e7a-9c3b-2a1d4f6e8b90"
+          }
+        }
+      ],
+      "uncertainties": [],
+      "ignored_paths": []
+    },
+    {
+      "id": "p005",
+      "parent_pair_id": "p003",
+      "primary": {
+        "recording_id": "rec_e1",
+        "node_id": "r2",
+        "kind": "http",
+        "label": "POST /auth/login",
+        "position": 3,
+        "parent_node_id": "op_auth",
+        "event_ids": [
+          "L179",
+          "L180",
+          "L181",
+          "L182"
+        ],
+        "event_pointers": [
+          "/events/178",
+          "/events/179",
+          "/events/180",
+          "/events/181"
+        ]
+      },
+      "secondary": {
+        "recording_id": "rec_g1",
+        "node_id": "r2",
+        "kind": "http",
+        "label": "POST /auth/login",
+        "position": 2,
+        "parent_node_id": "op_auth",
+        "event_ids": [
+          "L254",
+          "L255",
+          "L256",
+          "L257"
+        ],
+        "event_pointers": [
+          "/events/253",
+          "/events/254",
+          "/events/255",
+          "/events/256"
+        ]
+      },
+      "presence": "both",
+      "matching": {
+        "basis": "signature",
+        "confidence": "exact",
+        "candidate_node_ids": []
+      },
+      "equivalence": "different",
+      "changes": [
+        {
+          "path": "/request/headers/User-Agent",
+          "dimension": "content",
+          "primary": {
+            "present": true,
+            "value": [
+              "DemoAuth/2.4.0 (Android 14; okhttp/4.12.0)"
+            ]
+          },
+          "secondary": {
+            "present": true,
+            "value": [
+              "DemoAuth/2.4.1 (Android 14; okhttp/4.12.0)"
+            ]
+          }
+        }
+      ],
+      "uncertainties": [
+        {
+          "path": "/request_body/raw",
+          "reason": "redaction markers replace original values; identical markers do not establish equal originals (primary: redacted, secondary: redacted)."
+        },
+        {
+          "path": "/response_body/raw",
+          "reason": "redaction markers replace original values; identical markers do not establish equal originals (primary: redacted, secondary: redacted)."
+        }
+      ],
+      "ignored_paths": []
+    },
+    {
+      "id": "p006",
+      "parent_pair_id": "p003",
+      "primary": {
+        "recording_id": "rec_e1",
+        "node_id": "r3",
+        "kind": "http",
+        "label": "GET /auth/me",
+        "position": 4,
+        "parent_node_id": "op_auth",
+        "event_ids": [
+          "L183",
+          "L184",
+          "L185",
+          "L186"
+        ],
+        "event_pointers": [
+          "/events/182",
+          "/events/183",
+          "/events/184",
+          "/events/185"
+        ]
+      },
+      "secondary": null,
+      "presence": "unresolved",
+      "matching": {
+        "basis": "ambiguous",
+        "confidence": "none",
+        "candidate_node_ids": [
+          "r3",
+          "r3b"
+        ]
+      },
+      "equivalence": "unknown",
+      "changes": [],
+      "uncertainties": [
+        {
+          "path": "",
+          "reason": "2 nodes on the other side share this signature; correspondence cannot be established without source identity or an explicit match."
+        }
+      ],
+      "ignored_paths": []
+    },
+    {
+      "id": "p007",
+      "parent_pair_id": "p003",
+      "primary": null,
+      "secondary": {
+        "recording_id": "rec_g1",
+        "node_id": "r3",
+        "kind": "http",
+        "label": "GET /auth/me",
+        "position": 4,
+        "parent_node_id": "op_auth",
+        "event_ids": [
+          "L262",
+          "L264",
+          "L265",
+          "L266"
+        ],
+        "event_pointers": [
+          "/events/261",
+          "/events/263",
+          "/events/264",
+          "/events/265"
+        ]
+      },
+      "presence": "unresolved",
+      "matching": {
+        "basis": "ambiguous",
+        "confidence": "none",
+        "candidate_node_ids": [
+          "r3"
+        ]
+      },
+      "equivalence": "unknown",
+      "changes": [],
+      "uncertainties": [
+        {
+          "path": "",
+          "reason": "1 node on the other side share this signature; correspondence cannot be established without source identity or an explicit match."
+        }
+      ],
+      "ignored_paths": []
+    },
+    {
+      "id": "p008",
+      "parent_pair_id": "p003",
+      "primary": {
+        "recording_id": "rec_e1",
+        "node_id": "op_handler",
+        "kind": "handler",
+        "label": "CustomerTaskHandler.loadTask()",
+        "position": 5,
+        "parent_node_id": "op_auth",
+        "event_ids": [
+          "L187",
+          "L192"
+        ],
+        "event_pointers": [
+          "/events/186",
+          "/events/191"
+        ]
+      },
+      "secondary": null,
+      "presence": "primary_only",
+      "matching": {
+        "basis": "unmatched",
+        "confidence": "none",
+        "candidate_node_ids": []
+      },
+      "equivalence": "unknown",
+      "changes": [],
+      "uncertainties": [],
+      "ignored_paths": []
+    },
+    {
+      "id": "p009",
+      "parent_pair_id": "p008",
+      "primary": {
+        "recording_id": "rec_e1",
+        "node_id": "r4",
+        "kind": "http",
+        "label": "GET /todos/1",
+        "position": 6,
+        "parent_node_id": "op_handler",
+        "event_ids": [
+          "L188",
+          "L189",
+          "L190",
+          "L191"
+        ],
+        "event_pointers": [
+          "/events/187",
+          "/events/188",
+          "/events/189",
+          "/events/190"
+        ]
+      },
+      "secondary": null,
+      "presence": "primary_only",
+      "matching": {
+        "basis": "unpaired_parent",
+        "confidence": "none",
+        "candidate_node_ids": []
+      },
+      "equivalence": "unknown",
+      "changes": [],
+      "uncertainties": [
+        {
+          "path": "",
+          "reason": "Parent is one-sided, so this node inherits the unpaired state; a changed parent signature can hide an otherwise equal subtree."
+        }
+      ],
+      "ignored_paths": []
+    },
+    {
+      "id": "p010",
+      "parent_pair_id": "p003",
+      "primary": null,
+      "secondary": {
+        "recording_id": "rec_g1",
+        "node_id": "r3b",
+        "kind": "http",
+        "label": "GET /auth/me",
+        "position": 5,
+        "parent_node_id": "op_auth",
+        "event_ids": [
+          "L263",
+          "L267",
+          "L268",
+          "L269"
+        ],
+        "event_pointers": [
+          "/events/262",
+          "/events/266",
+          "/events/267",
+          "/events/268"
+        ]
+      },
+      "presence": "unresolved",
+      "matching": {
+        "basis": "ambiguous",
+        "confidence": "none",
+        "candidate_node_ids": [
+          "r3"
+        ]
+      },
+      "equivalence": "unknown",
+      "changes": [],
+      "uncertainties": [
+        {
+          "path": "",
+          "reason": "1 node on the other side share this signature; correspondence cannot be established without source identity or an explicit match."
+        }
+      ],
+      "ignored_paths": []
+    },
+    {
+      "id": "p011",
+      "parent_pair_id": "p003",
+      "primary": null,
+      "secondary": {
+        "recording_id": "rec_g1",
+        "node_id": "op_handler",
+        "kind": "handler",
+        "label": "CustomerTaskHandler.loadTaskAsync()",
+        "position": 6,
+        "parent_node_id": "op_auth",
+        "event_ids": [
+          "L270",
+          "L275"
+        ],
+        "event_pointers": [
+          "/events/269",
+          "/events/274"
+        ]
+      },
+      "presence": "secondary_only",
+      "matching": {
+        "basis": "unmatched",
+        "confidence": "none",
+        "candidate_node_ids": []
+      },
+      "equivalence": "unknown",
+      "changes": [],
+      "uncertainties": [],
+      "ignored_paths": []
+    },
+    {
+      "id": "p012",
+      "parent_pair_id": "p011",
+      "primary": null,
+      "secondary": {
+        "recording_id": "rec_g1",
+        "node_id": "r4",
+        "kind": "http",
+        "label": "GET /todos/1",
+        "position": 7,
+        "parent_node_id": "op_handler",
+        "event_ids": [
+          "L271",
+          "L272",
+          "L273",
+          "L274"
+        ],
+        "event_pointers": [
+          "/events/270",
+          "/events/271",
+          "/events/272",
+          "/events/273"
+        ]
+      },
+      "presence": "secondary_only",
+      "matching": {
+        "basis": "unpaired_parent",
+        "confidence": "none",
+        "candidate_node_ids": []
+      },
+      "equivalence": "unknown",
+      "changes": [],
+      "uncertainties": [
+        {
+          "path": "",
+          "reason": "Parent is one-sided, so this node inherits the unpaired state; a changed parent signature can hide an otherwise equal subtree."
+        }
+      ],
+      "ignored_paths": []
+    },
+    {
+      "id": "p013",
+      "parent_pair_id": "p003",
+      "primary": {
+        "recording_id": "rec_e1",
+        "node_id": "op_accept",
+        "kind": "operation",
+        "label": "DemoAuthSdk.acceptTask()",
+        "position": 7,
+        "parent_node_id": "op_auth",
+        "event_ids": [
+          "L193",
+          "L194"
+        ],
+        "event_pointers": [
+          "/events/192",
+          "/events/193"
+        ]
+      },
+      "secondary": {
+        "recording_id": "rec_g1",
+        "node_id": "op_accept",
+        "kind": "operation",
+        "label": "DemoAuthSdk.acceptTask()",
+        "position": 10,
+        "parent_node_id": "op_auth",
+        "event_ids": [
+          "L278",
+          "L279"
+        ],
+        "event_pointers": [
+          "/events/277",
+          "/events/278"
+        ]
+      },
+      "presence": "both",
+      "matching": {
+        "basis": "signature",
+        "confidence": "exact",
+        "candidate_node_ids": []
+      },
+      "equivalence": "equal",
+      "changes": [],
+      "uncertainties": [],
+      "ignored_paths": []
+    },
+    {
+      "id": "p014",
+      "parent_pair_id": "p002",
+      "primary": {
+        "recording_id": "rec_e1",
+        "node_id": "op_complete",
+        "kind": "operation",
+        "label": "DemoAuthSdk.completeDemo()",
+        "position": 8,
+        "parent_node_id": "op_signin",
+        "event_ids": [
+          "L196",
+          "L201"
+        ],
+        "event_pointers": [
+          "/events/195",
+          "/events/200"
+        ]
+      },
+      "secondary": {
+        "recording_id": "rec_g1",
+        "node_id": "op_complete",
+        "kind": "operation",
+        "label": "DemoAuthSdk.completeDemo()",
+        "position": 8,
+        "parent_node_id": "op_signin",
+        "event_ids": [
+          "L276",
+          "L284"
+        ],
+        "event_pointers": [
+          "/events/275",
+          "/events/283"
+        ]
+      },
+      "presence": "both",
+      "matching": {
+        "basis": "signature",
+        "confidence": "exact",
+        "candidate_node_ids": []
+      },
+      "equivalence": "equal",
+      "changes": [],
+      "uncertainties": [],
+      "ignored_paths": []
+    },
+    {
+      "id": "p015",
+      "parent_pair_id": "p014",
+      "primary": {
+        "recording_id": "rec_e1",
+        "node_id": "r5",
+        "kind": "http",
+        "label": "POST /anything/receipt",
+        "position": 9,
+        "parent_node_id": "op_complete",
+        "event_ids": [
+          "L197",
+          "L198",
+          "L199",
+          "L200"
+        ],
+        "event_pointers": [
+          "/events/196",
+          "/events/197",
+          "/events/198",
+          "/events/199"
+        ]
+      },
+      "secondary": {
+        "recording_id": "rec_g1",
+        "node_id": "r5",
+        "kind": "http",
+        "label": "POST /anything/receipt",
+        "position": 9,
+        "parent_node_id": "op_complete",
+        "event_ids": [
+          "L277",
+          "L281",
+          "L282",
+          "L283"
+        ],
+        "event_pointers": [
+          "/events/276",
+          "/events/280",
+          "/events/281",
+          "/events/282"
+        ]
+      },
+      "presence": "both",
+      "matching": {
+        "basis": "signature",
+        "confidence": "exact",
+        "candidate_node_ids": []
+      },
+      "equivalence": "different",
+      "changes": [
+        {
+          "path": "/request/headers/User-Agent",
+          "dimension": "content",
+          "primary": {
+            "present": true,
+            "value": [
+              "DemoAuth/2.4.0 (Android 14; okhttp/4.12.0)"
+            ]
+          },
+          "secondary": {
+            "present": true,
+            "value": [
+              "DemoAuth/2.4.1 (Android 14; okhttp/4.12.0)"
+            ]
+          }
+        },
+        {
+          "path": "/request_body/bytes",
+          "dimension": "capture",
+          "primary": {
+            "present": true,
+            "value": 83
+          },
+          "secondary": {
+            "present": true,
+            "value": 95
+          }
+        },
+        {
+          "path": "/request_body/raw",
+          "dimension": "content",
+          "primary": {
+            "present": true,
+            "value": "{\"challengeId\":\"ee324ee9-21bb-47d2-a0a1-41d71cbb468f\",\"completed\":true,\"demo\":true}"
+          },
+          "secondary": {
+            "present": true,
+            "value": "{\"challengeId\":\"0b7c2d6e-5f21-4e7a-9c3b-2a1d4f6e8b90\",\"completed\":false,\"demo\":true,\"retries\":0}"
+          }
+        },
+        {
+          "path": "/request_body/json/challengeId",
+          "dimension": "content",
+          "primary": {
+            "present": true,
+            "value": "ee324ee9-21bb-47d2-a0a1-41d71cbb468f"
+          },
+          "secondary": {
+            "present": true,
+            "value": "0b7c2d6e-5f21-4e7a-9c3b-2a1d4f6e8b90"
+          }
+        },
+        {
+          "path": "/request_body/json/completed",
+          "dimension": "content",
+          "primary": {
+            "present": true,
+            "value": true
+          },
+          "secondary": {
+            "present": true,
+            "value": false
+          }
+        },
+        {
+          "path": "/request_body/json/retries",
+          "dimension": "content",
+          "primary": {
+            "present": false,
+            "value": null
+          },
+          "secondary": {
+            "present": true,
+            "value": 0
+          }
+        },
+        {
+          "path": "/response_body/state",
+          "dimension": "capture",
+          "primary": {
+            "present": true,
+            "value": "redacted"
+          },
+          "secondary": {
+            "present": true,
+            "value": "truncated"
+          }
+        },
+        {
+          "path": "/response_body/raw",
+          "dimension": "content",
+          "primary": {
+            "present": true,
+            "value": "{\"json\":{\"challengeId\":\"ee324ee9-21bb-47d2-a0a1-41d71cbb468f\",\"completed\":true,\"demo\":true},\"origin\":\"[REDACTED]\",\"url\":\"https://httpbin.org/anything/receipt\"}"
+          },
+          "secondary": {
+            "present": true,
+            "value": "{\"json\":{\"challengeId\":\"0b7c2d6e-5f21-4e7a-9c3b-2a1d4f6e8b90\",\"completed\":false,\"demo\":true,\"ret"
+          }
+        }
+      ],
+      "uncertainties": [
+        {
+          "path": "/response_body/raw",
+          "reason": "redaction markers replace original values; identical markers do not establish equal originals; truncated at the capture limit; remaining bytes are not in the log (primary: redacted, secondary: truncated)."
+        }
+      ],
+      "ignored_paths": []
+    }
+  ],
+  "order_changes": [
+    {
+      "parent_pair_id": "p003",
+      "first_pair_id": "p004",
+      "second_pair_id": "p005",
+      "primary_relation": "before",
+      "secondary_relation": "after",
+      "interpretation": "reordered"
+    },
+    {
+      "parent_pair_id": "p002",
+      "first_pair_id": "p003",
+      "second_pair_id": "p014",
+      "primary_relation": "before",
+      "secondary_relation": "overlap",
+      "interpretation": "concurrency_changed"
+    }
+  ],
+  "diagnostics": []
+}
