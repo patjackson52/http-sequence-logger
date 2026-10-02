@@ -1,5 +1,9 @@
 # Viewer design history
 
+[Session comparison plan](SESSION-COMPARISON.md) retains all three accepted layouts: aligned sequences, change outline and order connections. The standalone module, CLI and JSON contracts are implemented first; viewer integration follows the shared diff contract.
+
+[Claude Design comparison prompt](CLAUDE-COMPARISON-DESIGN-PROMPT.md) is the copy-ready brief for completing high-fidelity mockups from the current viewer, with an attachment checklist, all three layouts, shared inspector behavior and the implemented diff contract.
+
 The files in `claude-export/` are the unmodified Project HTML archive exported through the owner's Chrome session on 2026-09-28 from [Network Log Lab deliverables review](https://claude.ai/design/p/09dc9ea8-677e-4967-b421-c9b890af09c0?file=Mockups.dc.html). The archive's thumbnail is omitted. These are source design references, not application runtime dependencies. They include the original prototype, component/style specification, mockup sheet, support runtime, and its copied fixtures.
 
 The implemented viewer is `viewer/`. The repository contract wins where the design conflicts:

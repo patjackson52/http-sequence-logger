@@ -4,6 +4,8 @@ Current **1.2** capture format and **version 2** source-aware transfer for mobil
 
 Repository: [patjackson52/http-sequence-logger](https://github.com/patjackson52/http-sequence-logger) · [MIT license](LICENSE).
 
+Compare sessions independently of the viewer with the [standalone sequence diff module and CLI](sequence-diff/README.md). It accepts canonical captures or schema-defined session JSON and emits a versioned diff for people, agents and CI. The [comparison plan](docs/design/SESSION-COMPARISON.md) includes aligned sequences, a change outline and order connections.
+
 ## FOR AGENTS
 
 Start with **[AGENTS.md — agent directions](AGENTS.md)**, then the [existing-app integration guide](docs/integration/README.md). These identify the implemented SDK APIs, JSON specs, log locations, connection commands and production-build boundaries. The [full agent prompt](docs/integration/AGENT-PROMPT.md) supplies more detail.

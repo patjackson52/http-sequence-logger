@@ -1,0 +1,16 @@
+{
+  "name": "@http-sequence-logger/sequence-diff",
+  "version": "0.1.0",
+  "description": "Standalone canonical HTTP sequence comparison for humans and agents",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=24.13.0 <25" },
+  "exports": {
+    ".": "./index.mjs",
+    "./schema/sequence": "./schema/sequence.schema.json",
+    "./schema/diff": "./schema/diff.schema.json"
+  },
+  "bin": { "sequence-diff": "./cli.mjs" },
+  "files": ["*.mjs", "generated", "schema", "README.md"],
+  "dependencies": { "ajv": "8.20.0", "ajv-formats": "3.0.1" }
+}

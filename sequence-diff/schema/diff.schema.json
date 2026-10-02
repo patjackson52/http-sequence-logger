@@ -1,0 +1,737 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:http-sequence:diff:1.0",
+  "title": "Canonical sequence diff",
+  "type": "object",
+  "properties": {
+    "format": {
+      "const": "http-sequence-diff"
+    },
+    "schema_version": {
+      "const": "1.0"
+    },
+    "engine": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "const": "@http-sequence-logger/sequence-diff"
+        },
+        "version": {
+          "const": "0.1.0"
+        },
+        "algorithm": {
+          "const": "conservative-tree-v1"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "algorithm"
+      ],
+      "additionalProperties": false
+    },
+    "inputs": {
+      "type": "object",
+      "properties": {
+        "primary": {
+          "type": "object",
+          "properties": {
+            "session": {
+              "type": "object",
+              "properties": {
+                "namespace": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "namespace",
+                "id"
+              ],
+              "additionalProperties": false
+            },
+            "event_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "recording_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "session",
+            "event_count",
+            "recording_count"
+          ],
+          "additionalProperties": false
+        },
+        "secondary": {
+          "type": "object",
+          "properties": {
+            "session": {
+              "type": "object",
+              "properties": {
+                "namespace": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "namespace",
+                "id"
+              ],
+              "additionalProperties": false
+            },
+            "event_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "recording_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "session",
+            "event_count",
+            "recording_count"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "primary",
+        "secondary"
+      ],
+      "additionalProperties": false
+    },
+    "profile": {
+      "type": "object",
+      "properties": {
+        "ignore_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(|(/([^~]|~[01])*))$"
+          },
+          "uniqueItems": true
+        },
+        "ignore_headers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "compare_timing": {
+          "type": "boolean"
+        },
+        "json_fields": {
+          "type": "boolean"
+        },
+        "matches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "primary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "secondary": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "primary",
+              "secondary"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "recording_matches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "primary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "secondary": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "primary",
+              "secondary"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "ignore_paths",
+        "ignore_headers",
+        "compare_timing",
+        "json_fields",
+        "matches",
+        "recording_matches"
+      ],
+      "additionalProperties": false
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "included": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "included",
+        "excluded"
+      ],
+      "additionalProperties": false
+    },
+    "result": {
+      "enum": [
+        "equal",
+        "different",
+        "inconclusive"
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "matched": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "primary_only": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "secondary_only": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "changed_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "equal_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uncertain_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "order_changes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "field_changes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "matched",
+        "primary_only",
+        "secondary_only",
+        "unresolved",
+        "changed_pairs",
+        "equal_pairs",
+        "uncertain_pairs",
+        "order_changes",
+        "field_changes"
+      ],
+      "additionalProperties": false
+    },
+    "pairs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pair"
+      }
+    },
+    "order_changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "parent_pair_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "first_pair_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "second_pair_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "primary_relation": {
+            "enum": [
+              "before",
+              "after",
+              "overlap",
+              "unknown"
+            ]
+          },
+          "secondary_relation": {
+            "enum": [
+              "before",
+              "after",
+              "overlap",
+              "unknown"
+            ]
+          },
+          "interpretation": {
+            "enum": [
+              "reordered",
+              "concurrency_changed",
+              "observed_order_only"
+            ]
+          }
+        },
+        "required": [
+          "parent_pair_id",
+          "first_pair_id",
+          "second_pair_id",
+          "primary_relation",
+          "secondary_relation",
+          "interpretation"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "side": {
+            "enum": [
+              "primary",
+              "secondary"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "warning"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "side",
+          "severity",
+          "message"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "format",
+    "schema_version",
+    "engine",
+    "inputs",
+    "profile",
+    "scope",
+    "result",
+    "summary",
+    "pairs",
+    "order_changes",
+    "diagnostics"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "source": {
+      "type": "object",
+      "properties": {
+        "recording_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "recording",
+            "operation",
+            "handler",
+            "http"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "parent_node_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "event_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "event_pointers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(|(/([^~]|~[01])*))$"
+          }
+        }
+      },
+      "required": [
+        "recording_id",
+        "node_id",
+        "kind",
+        "label",
+        "position",
+        "parent_node_id",
+        "event_ids",
+        "event_pointers"
+      ],
+      "additionalProperties": false
+    },
+    "change": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(|(/([^~]|~[01])*))$"
+        },
+        "dimension": {
+          "enum": [
+            "structure",
+            "content",
+            "outcome",
+            "timing",
+            "metadata",
+            "capture"
+          ]
+        },
+        "primary": {
+          "type": "object",
+          "properties": {
+            "present": {
+              "type": "boolean"
+            },
+            "value": true
+          },
+          "required": [
+            "present",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        "secondary": {
+          "type": "object",
+          "properties": {
+            "present": {
+              "type": "boolean"
+            },
+            "value": true
+          },
+          "required": [
+            "present",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "path",
+        "dimension",
+        "primary",
+        "secondary"
+      ],
+      "additionalProperties": false
+    },
+    "uncertainty": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(|(/([^~]|~[01])*))$"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "path",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "pair": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_pair_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "primary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/source"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "secondary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/source"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "presence": {
+          "enum": [
+            "both",
+            "primary_only",
+            "secondary_only",
+            "unresolved"
+          ]
+        },
+        "matching": {
+          "type": "object",
+          "properties": {
+            "basis": {
+              "enum": [
+                "source_identity",
+                "signature",
+                "explicit",
+                "unmatched",
+                "ambiguous",
+                "unpaired_parent"
+              ]
+            },
+            "confidence": {
+              "enum": [
+                "exact",
+                "explicit",
+                "none"
+              ]
+            },
+            "candidate_node_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "basis",
+            "confidence",
+            "candidate_node_ids"
+          ],
+          "additionalProperties": false
+        },
+        "equivalence": {
+          "enum": [
+            "equal",
+            "different",
+            "unknown"
+          ]
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/change"
+          }
+        },
+        "uncertainties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/uncertainty"
+          }
+        },
+        "ignored_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(|(/([^~]|~[01])*))$"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "parent_pair_id",
+        "primary",
+        "secondary",
+        "presence",
+        "matching",
+        "equivalence",
+        "changes",
+        "uncertainties",
+        "ignored_paths"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "presence": {
+                "const": "both"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "primary": {
+                "$ref": "#/$defs/source"
+              },
+              "secondary": {
+                "$ref": "#/$defs/source"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "presence": {
+                "const": "primary_only"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "primary": {
+                "$ref": "#/$defs/source"
+              },
+              "secondary": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "presence": {
+                "const": "secondary_only"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "primary": {
+                "type": "null"
+              },
+              "secondary": {
+                "$ref": "#/$defs/source"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "presence": {
+                "const": "unresolved"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "equivalence": {
+                "const": "unknown"
+              }
+            },
+            "oneOf": [
+              {
+                "properties": {
+                  "primary": {
+                    "$ref": "#/$defs/source"
+                  },
+                  "secondary": {
+                    "type": "null"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "primary": {
+                    "type": "null"
+                  },
+                  "secondary": {
+                    "$ref": "#/$defs/source"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

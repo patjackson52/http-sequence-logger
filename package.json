@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node collector/cli.mjs --open",
     "android:live": "node scripts/android-live.mjs",
-    "generate": "node scripts/build-schema.mjs && node scripts/build-validator.mjs && node scripts/build-examples.mjs",
+    "generate": "node scripts/build-schema.mjs && node scripts/build-validator.mjs && node scripts/build-diff-schema.mjs && node scripts/build-examples.mjs",
+    "generate:diff": "node scripts/build-diff-schema.mjs",
+    "diff:sequence": "node sequence-diff/cli.mjs",
     "validate": "node validate.mjs examples/*.ndjson",
     "test": "node --test test/*.test.mjs",
     "viewer": "vite --config viewer/vite.config.mjs",
