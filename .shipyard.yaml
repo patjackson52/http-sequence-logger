@@ -1,0 +1,17 @@
+# Shipyard per-project config — read SERVER-SIDE at dispatch time.
+# WARNING: invalid YAML here PAUSES the project (classifier + doc indexing
+# halt until fixed). Validate after editing:
+#   uv run --no-sync python -c "from shipyard.usecases.projconfig import parse_project_config; parse_project_config(open('.shipyard.yaml').read(), 8000)"
+
+# Exact test invocation for this project. Single source of truth for WI
+# Landing Runbook sections and the landing verify-gate.
+verify_command: npm test && npm run build:viewer
+
+constraints:
+  - "[onboard:commit-before-verify] Commit durable work to the wi/ branch BEFORE running final full-suite verification; never end a session with uncommitted work."
+
+# Globs (fnmatch, `*` crosses `/`) whose diffs always require human review.
+protected_paths: []
+
+# doc_dirs: omitted on purpose — the defaults (docs/specs, docs/adr,
+# docs/prompts, docs/agents, docs/design, docs/research) apply automatically.

@@ -7,7 +7,7 @@ cd "$ROOT"
 mkdir -p artifacts/release-audit
 ./android/gradlew -p android :logger-api:test :logger:testDebugUnitTest \
   :demo-auth:testDebugUnitTest :demo-auth:testReleaseUnitTest \
-  :app:assembleDebug :app:assembleRelease :app:assembleReleaseUnminified \
+  :app:assembleDebug :app:assembleDevDebug :app:assembleRelease :app:assembleReleaseUnminified \
   :demo-auth:bundleReleaseAar :app:verifyReleaseDependencies \
   --console=plain > artifacts/release-audit/build.txt 2>&1
 python3 android/scripts/verify-release.py

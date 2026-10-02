@@ -1,4 +1,8 @@
-plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("works.sloop.shipyard.deploy")
+}
 android {
     namespace = "dev.networklog.app"
     compileSdk = 35
@@ -7,6 +11,12 @@ android {
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     buildTypes {
+        // Distribution has a separate install slot; ordinary debug remains the USB fixture.
+        create("devDebug") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".dev"
+            matchingFallbacks += "debug"
+        }
         release {
             isDebuggable = false
             isMinifyEnabled = true
@@ -22,9 +32,15 @@ android {
         }
     }
     sourceSets.getByName("releaseUnminified").java.srcDir("src/release/kotlin")
+    sourceSets.getByName("devDebug") {
+        java.srcDir("src/debug/kotlin")
+        res.srcDir("src/debug/res")
+        manifest.srcFile("src/debug/AndroidManifest.xml")
+    }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 kotlin { jvmToolchain(17) }
+configurations.getByName("devDebugImplementation").extendsFrom(configurations.getByName("debugImplementation"))
 dependencies {
     implementation(project(":logger-api")); debugImplementation(project(":logger")); implementation(project(":demo-auth")); androidTestImplementation("androidx.test:runner:1.6.2"); androidTestImplementation("androidx.test.ext:junit:1.2.1")
     testImplementation("junit:junit:4.13.2")

@@ -62,7 +62,7 @@ def verify_backup_rules(apk, app, variant):
 
 
 results = {}
-for variant, filename in [('debug', 'app-debug.apk'), ('release', 'app-release-unsigned.apk'), ('releaseUnminified', 'app-releaseUnminified-unsigned.apk')]:
+for variant, filename in [('debug', 'app-debug.apk'), ('devDebug', 'app-devDebug.apk'), ('release', 'app-release-unsigned.apk'), ('releaseUnminified', 'app-releaseUnminified-unsigned.apk')]:
     apk = root / 'android/app/build/outputs/apk' / variant / filename
     packages = subprocess.check_output([str(analyzer), 'dex', 'packages', '--defined-only', str(apk)], text=True)
     manifest = subprocess.check_output([str(analyzer), 'manifest', 'print', str(apk)], text=True)
@@ -77,9 +77,24 @@ for variant, filename in [('debug', 'app-debug.apk'), ('release', 'app-release-u
         assert payloads
         hits = [marker.decode() for marker in forbidden if any(marker in data for data in payloads)]
         assert not any(name.startswith('lib/') for name in names), 'Unexpected native dependency'
-    app = ET.fromstring(manifest).find('application')
+        shipyard_assets = [name for name in names if name.startswith('assets/shipyard/')]
+    manifest_root = ET.fromstring(manifest)
+    app = manifest_root.find('application')
+    shipyard_metadata = [item for item in app.findall('meta-data') if item.get(android + 'name', '').startswith('works.sloop.shipyard.')]
+    shipyard_receivers = [item for item in app.findall('receiver') if item.get(android + 'name', '').startswith('works.sloop.shipyard.')]
+    shipyard_classes = [name for name in classes if name.startswith('works.sloop.shipyard.')]
+    if variant == 'devDebug':
+        assert manifest_root.get('package') == 'dev.networklog.sample.dev'
+        assert shipyard_assets == ['assets/shipyard/provenance.json']
+        assert len(shipyard_metadata) == 3 and len(shipyard_receivers) == 1 and shipyard_classes
+        permission = next(item for item in manifest_root.findall('permission') if item.get(android + 'name') == 'dev.networklog.sample.dev.shipyard.MARKER')
+        assert int(permission.get(android + 'protectionLevel'), 0) == 2
+        assert shipyard_receivers[0].get(android + 'permission') == 'dev.networklog.sample.dev.shipyard.MARKER'
+    else:
+        assert manifest_root.get('package') == 'dev.networklog.sample'
+        assert not shipyard_assets and not shipyard_metadata and not shipyard_receivers and not shipyard_classes, variant
     verify_backup_rules(apk, app, variant)
-    if variant == 'debug':
+    if variant in ('debug', 'devDebug'):
         assert recorder and hits and debug_resource, 'Missing positive control: debug recorder/resources'
         assert app.get(android + 'debuggable') == 'true'
     else:
@@ -88,7 +103,7 @@ for variant, filename in [('debug', 'app-debug.apk'), ('release', 'app-release-u
         assert app.get(android + 'networkSecurityConfig') is None
         assert app.get(android + 'usesCleartextTraffic') == 'false'
     package_line = next((line for line in packages.splitlines() if line.startswith('P ') and line.endswith('\tdev.networklog.api')), None)
-    results[variant] = {'apk_bytes': apk.stat().st_size, 'recorder_classes': len(recorder), 'api_classes': len([n for n in classes if n.startswith('dev.networklog.api.')]), 'api_dex_bytes': int(package_line.split('\t')[-2]) if package_line else 0, 'debug_resources': debug_resource, 'backup_policy_verified': True}
+    results[variant] = {'apk_bytes': apk.stat().st_size, 'recorder_classes': len(recorder), 'api_classes': len([n for n in classes if n.startswith('dev.networklog.api.')]), 'api_dex_bytes': int(package_line.split('\t')[-2]) if package_line else 0, 'debug_resources': debug_resource, 'backup_policy_verified': True, 'shipyard_identity': bool(shipyard_metadata)}
 configuration = (root / 'android/app/build/outputs/mapping/release/configuration.txt').read_text()
 assert '-checkdiscard class dev.networklog.logger.**' in configuration
 assert '-keep,allowshrinking class dev.networklog.logger.**' in configuration

@@ -4,6 +4,10 @@ Current **1.2** capture format and **version 2** source-aware transfer for mobil
 
 Repository: [patjackson52/http-sequence-logger](https://github.com/patjackson52/http-sequence-logger) · [MIT license](LICENSE).
 
+Shipyard project **P-11** manages this repository. The Android sample's separate
+`dev.networklog.sample.dev` install slot publishes through Shipyard Deploy;
+see [onboarding, build and publication commands](docs/integration/SHIPYARD.md).
+
 Compare sessions through the viewer's **Compare with…** workflow or the [standalone sequence diff module and CLI](sequence-diff/README.md). Both use the same engine. The [viewer guide](viewer/README.md#compare-two-sessions) covers all three production layouts, paired inspection, explicit matching, frozen collector snapshots and reproducible exports.
 
 ## FOR AGENTS

@@ -1,0 +1,24 @@
+# Shipyard Deploy project configuration.
+# Schema: contracts/schemas/project-config.schema.json
+#
+# This file is a default, never an authority. Precedence, weakest first:
+#   built-in default < this file < SHIPYARD_DEPLOY_* env < command-line flag
+# The Gradle plugin adds one rung: this file < shipyardDeploy { } DSL.
+version: 1
+
+# Control plane. SHIPYARD_DEPLOY_SERVER and --server both override it.
+server: https://shipyard-deploy-dev.patjackson52.workers.dev
+
+project: http-sequence-logger
+
+# What this repository publishes. `signer` is documentation: the CLI checks
+# the real signature against the fingerprints registered on the package.
+packages:
+  dev.networklog.sample.dev: { variant: devDebug, signer: dev }
+
+# Branch to channel routing. An exact `branch` match wins; otherwise the
+# first `branch: "*"` rule does. {branch_slug} is the branch lowercased,
+# non-alphanumerics collapsed to '-', truncated to 40 characters.
+channels:
+  main: { branch: main, mode: AUTO_INSTALL_WHEN_ALLOWED, ttl: 7d }
+  default: { branch: "*", channel: "dev-{branch_slug}", mode: NOTIFY, ttl: 48h }
