@@ -1,6 +1,6 @@
 # Viewer design history
 
-[Session comparison plan](SESSION-COMPARISON.md) retains all three accepted layouts: aligned sequences, change outline and order connections. The standalone module, CLI and JSON contracts are implemented first; viewer integration follows the shared diff contract.
+[Session comparison plan](SESSION-COMPARISON.md) records all three implemented layouts: aligned sequences, change outline and order connections. The production viewer consumes the standalone module's shared diff contract. For use, start with the [viewer guide](../../viewer/README.md) or [module/CLI guide](../../sequence-diff/README.md); [comparison verification](SESSION-COMPARISON-VERIFICATION.md) records current evidence and limits.
 
 [Claude Design comparison prompt](CLAUDE-COMPARISON-DESIGN-PROMPT.md) is the copy-ready brief for completing high-fidelity mockups from the current viewer, with an attachment checklist, all three layouts, shared inspector behavior and the implemented diff contract.
 

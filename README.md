@@ -4,11 +4,20 @@ Current **1.2** capture format and **version 2** source-aware transfer for mobil
 
 Repository: [patjackson52/http-sequence-logger](https://github.com/patjackson52/http-sequence-logger) · [MIT license](LICENSE).
 
-Compare sessions independently of the viewer with the [standalone sequence diff module and CLI](sequence-diff/README.md). It accepts canonical captures or schema-defined session JSON and emits a versioned diff for people, agents and CI. The [comparison plan](docs/design/SESSION-COMPARISON.md) includes aligned sequences, a change outline and order connections.
+Compare sessions through the viewer's **Compare with…** workflow or the [standalone sequence diff module and CLI](sequence-diff/README.md). Both use the same engine. The [viewer guide](viewer/README.md#compare-two-sessions) covers all three production layouts, paired inspection, explicit matching, frozen collector snapshots and reproducible exports.
 
 ## FOR AGENTS
 
-Start with **[AGENTS.md — agent directions](AGENTS.md)**, then the [existing-app integration guide](docs/integration/README.md). These identify the implemented SDK APIs, JSON specs, log locations, connection commands and production-build boundaries. The [full agent prompt](docs/integration/AGENT-PROMPT.md) supplies more detail.
+Start with **[AGENTS.md — task routes and agent directions](AGENTS.md)**. Read only the route needed:
+
+| Agent task | Entry point |
+| --- | --- |
+| Integrate SDK capture/transfer into an existing client | [Integration guide](docs/integration/README.md), then Android, iOS or web guide and its callable API index |
+| Start/diagnose collector or retrieve logs | [Collector guide](collector/README.md) and `npm run collector -- --help` |
+| Compare captures in a script/CI/agent | [Diff module/CLI](sequence-diff/README.md) and `npm run diff:sequence -- --help` |
+| Inspect captures or compare sessions visually | [Viewer guide](viewer/README.md) |
+
+The integration guides identify implemented APIs, formats, locations, connection commands and shipping-build boundaries. The [full client-integration agent prompt](docs/integration/AGENT-PROMPT.md) supplies more detail. The prompt below is for agents working in an app repository; collection/comparison tasks can use their direct routes above.
 
 **Copy and paste this into your coding agent while it is working in your app's repository:**
 
@@ -17,7 +26,8 @@ Integrate https://github.com/patjackson52/http-sequence-logger into this app's
 development builds and connect real captures to its local sequence viewer.
 
 Read the logger repository's AGENTS.md and docs/integration/README.md, then the
-relevant platform guide, TRANSPORT.md and SPECS.md. Inspect this app, infer its
+relevant platform guide, docs/integration/TRANSPORT.md and
+docs/integration/SPECS.md. Inspect this app, infer its
 platform and HTTP clients, and pin the source revision. Support existing/custom
 HTTP clients, manual observations and SDK → app handler → SDK tracing. Production
 should retain only the small logging abstraction/no-op; exclude recorder and
@@ -66,11 +76,12 @@ The collector discovers participating apps on all authorized Android devices and
 | Filter to an instrumented Android app | `npm run collector -- --android YOUR_APPLICATION_ID --open` |
 | Disable Android or simulator discovery | `npm start -- --no-android --no-ios` |
 | Inspect status or diagnose setup | `npm run collector -- status` or `npm run collector -- doctor` |
+| Show collector/sample options | `npm run collector -- --help` or `npm run android:live -- --help` |
 | File import without collector | `npm run viewer` at port `4173` |
 
 Open **http://127.0.0.1:4319/** normally after refresh. Devices and environments → Apps → Sessions groups sources without changing logical session identities. **Follow newest session** follows arrivals until you inspect/filter. **Pause live** and file import pause viewer updates while collection continues.
 
-The collector retains captures in `artifacts/collector-v2/capture.sqlite`; **Save capture** downloads NDJSON and **Download SVG** saves the current diagram. Native originals stay in private canonical journals; browser originals stay in IndexedDB. Earlier state/captures are left untouched, with no migration or compatibility requirement. Keep pairing, manifest, credentials and TLS files private. [Locations and retrieval](docs/integration/TRANSPORT.md#where-every-file-lives) · [Troubleshooting](docs/integration/TRANSPORT.md#troubleshooting-by-symptom) · [Viewer controls](viewer/README.md).
+The collector retains captures in `artifacts/collector-v2/capture.sqlite`; **Save capture** downloads NDJSON and **Download SVG** saves the current diagram. Native originals stay in private canonical journals; browser originals stay in IndexedDB. Earlier state/captures are left untouched, with no migration or compatibility requirement. Keep pairing, manifest, credentials and TLS files private. [Collector defaults and diagnostics](collector/README.md) · [Locations and retrieval](docs/integration/TRANSPORT.md#where-every-file-lives) · [Troubleshooting](docs/integration/TRANSPORT.md#troubleshooting-by-symptom) · [Viewer controls](viewer/README.md).
 
 ## Desktop viewer examples
 
@@ -117,9 +128,8 @@ The [browser SDK](web-sdk/README.md) includes manual customer-client recording, 
 
 See [Android setup and integration](android/README.md). The MIT-licensed sample makes real HTTPS requests to three free public services, records both SDK-owned and manually instrumented app requests, and exports local NDJSON. No service registration is required.
 
-- [Successful live capture](samples/live/successful-sign-in.ndjson): 8 successful requests.
-- [Recovered live capture](samples/live/recovered-sign-in.ndjson): 9 requests with an expected 401 followed by refresh/retry.
-- [Both sessions in one file](samples/live/multi-session.ndjson).
+- [Current schema-1.2 native captures](samples/realtime/README.md): Android emulator and iOS simulator delivery evidence.
+- Historical Android schema-1.1 captures: [success](samples/live/successful-sign-in.ndjson), [recovery](samples/live/recovered-sign-in.ndjson), [both sessions](samples/live/multi-session.ndjson). These preserve previous evidence and are unsupported by the current importer/collector.
 - [End-to-end verification](E2E.md).
 - [Native captures delivered through the collector](samples/transfer/README.md): Android recovery and iOS HTTP/TLS/offline recovery.
 - [SDK → app handler → SDK tracing](HANDLER-TRACING.md): local calls, nested HTTP, explicit return/throw/cancel, and incomplete observation.
@@ -146,6 +156,7 @@ npm ci
 npm run validate
 npm test
 node validate.mjs /absolute/path/to/capture.ndjson
+node validate.mjs --help
 ```
 
 Validation performs JSON Schema checks and additional relationship, timing, body-byte, retry, and outcome checks. Exit code `0` means no detected contradictions; warnings can still identify missing data. Exit code `1` means invalid input; `2` means the CLI was called without a filename.
@@ -192,8 +203,8 @@ npm test
 
 The tests check generated-file reproducibility, all reference examples, import recovery, and rejection of contradictory records. Modify the authoring sources and regenerate; do not edit generated files independently.
 
-Version `1.1` adds explicit synchronous handler calls and returns; `1.2` adds browser producers and explicitly awaited handler settlement. Older recordings retain their original semantics. SDKs are source-integrated development prototypes, not published production releases. Dependencies and lockfile are scoped to this repository, independent of the surrounding application.
+Version `1.1` introduced synchronous handler calls and returns; current `1.2` adds browser producers and explicitly awaited handler settlement. Historical recordings retain their original bytes as evidence, but current tools accept only schema `1.2`. SDKs are source-integrated development prototypes, not published production releases. Dependencies and lockfile are scoped to this repository, independent of the surrounding application.
 
 ## Interactive viewer
 
-Use [the streaming quick start](#stream-logs-into-the-viewer) for live captures at port `4319`. For file import only, run `npm ci && npm run viewer`, then open http://127.0.0.1:4173. Import NDJSON or open a bundled sample to inspect HTTP exchanges and SDK/app handler calls. **Download SVG** saves the current sequence for sharing or documentation, including lane headings, filters, collapsed methods and selection, with interactive controls omitted. See [viewer setup and controls](viewer/README.md), [design history](docs/design/README.md), and [verification evidence](docs/VIEWER-REVIEW.md).
+Use [the streaming quick start](#stream-logs-into-the-viewer) for live captures at port `4319`. For file import only, run `npm ci && npm run viewer`, then open [the file viewer](http://127.0.0.1:4173). Import NDJSON or open a bundled sample to inspect HTTP exchanges and SDK/app handler calls. **Download SVG** saves the current sequence for sharing or documentation, including lane headings, filters, collapsed methods and selection, with interactive controls omitted. **Compare with…** selects a secondary imported/retained session; all three layouts share paired inspection and explicit matching. See [viewer setup and controls](viewer/README.md), [comparison verification](docs/design/SESSION-COMPARISON-VERIFICATION.md), and [design history](docs/design/README.md).

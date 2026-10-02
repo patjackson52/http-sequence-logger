@@ -2,6 +2,8 @@
 
 A filesystem-independent ESM module and local CLI for comparing canonical HTTP sequence captures. The module has no viewer, collector, React, filesystem or network dependency. The CLI supplies file I/O. Node 24.13.x is the supported CLI runtime.
 
+Use this route when you already have captures and want a reproducible comparison or CI result. For app capture hooks, start with [existing-app integration](../docs/integration/README.md); for acquiring live captures, use the [collector guide](../collector/README.md). To inspect the same engine result visually, use the [viewer comparison workflow](../viewer/README.md#compare-two-sessions).
+
 The formats are **project-defined, versioned interchange contracts**, not OTLP, HAR or an RFC JSON Patch. A diff explains correspondence and observations; it is not an executable or reversible patch.
 
 ## Use from this checkout
@@ -9,6 +11,10 @@ The formats are **project-defined, versioned interchange contracts**, not OTLP, 
 Run commands from the repository root after its normal dependency installation:
 
 ```sh
+node sequence-diff/cli.mjs --help
+node sequence-diff/cli.mjs normalize --help
+node sequence-diff/cli.mjs compare --help
+
 node sequence-diff/cli.mjs compare examples/success.ndjson examples/retry.ndjson --format text
 
 node sequence-diff/cli.mjs normalize examples/success.ndjson --output success.sequence.json
@@ -16,7 +22,7 @@ node sequence-diff/cli.mjs normalize examples/success.ndjson --output success.se
 node sequence-diff/cli.mjs compare primary.sequence.json secondary.sequence.json --output comparison.diff.json --check
 ```
 
-JSON is the default output. stdout contains only the requested result; errors go to stderr. Output files are created exclusively: existing files are never overwritten. Inputs are regular local files, bounded to 16 MiB each; URLs and stdin are not supported in v1. Incomplete final JSON lines are rejected rather than silently discarded.
+JSON is the default output. stdout contains only the requested result; fatal errors go to stderr. Nonfatal capture warnings are included in `diff.diagnostics`, or as warning lines in text output; empty stderr does not establish complete capture. Output files are created exclusively: existing files are never overwritten. Inputs are regular local files, bounded to 16 MiB each; URLs and stdin are not supported in v1. Incomplete final JSON lines are rejected rather than silently discarded. `--help` works globally or within either command, without reading captures/profiles or creating output. Use `--` before positional filenames that begin with `--`.
 
 For captures containing multiple sessions, use `--primary-session` / `--secondary-session` and the corresponding `--primary-namespace` / `--secondary-namespace` when needed. Normalization uses `--session` and `--namespace`. Ambiguous selection returns the available session identities and exits without producing a diff.
 
@@ -30,6 +36,29 @@ Without `--check`, successfully producing a comparison exits 0 regardless of its
 | 3 | Inconclusive: no known difference, but unknown data or correspondence remains |
 
 Differences and uncertainties can coexist. Always inspect `summary.uncertain_pairs`, individual uncertainties and diagnostics, even when `result` is `different`. A difference is not a determination that secondary is defective.
+
+Use the direct `node` command above when piping JSON to another tool. `npm run diff:sequence -- compare ...` is also available from this checkout, but npm normally adds its own command banners to stdout.
+
+## Replay a viewer export
+
+The viewer exports the diff as `comparison.diff.json` and the exact input documents as `comparison.snapshots.json`. Place both files in the repository root, then extract both sides and the recorded profile using the supported Node runtime:
+
+```sh
+node --input-type=module <<'JS'
+import { readFile, writeFile } from 'node:fs/promises';
+const snapshots = JSON.parse(await readFile('comparison.snapshots.json', 'utf8'));
+const diff = JSON.parse(await readFile('comparison.diff.json', 'utf8'));
+for (const [name, value] of [
+  ['primary.sequence.json', snapshots.primary],
+  ['secondary.sequence.json', snapshots.secondary],
+  ['comparison.profile.json', diff.profile],
+]) await writeFile(name, JSON.stringify(value, null, 2) + '\n', { flag: 'wx' });
+JS
+node sequence-diff/cli.mjs compare primary.sequence.json secondary.sequence.json \
+  --options comparison.profile.json --output replay.diff.json
+```
+
+These commands refuse to overwrite existing files. Reusing `diff.profile` preserves explicit matches, exclusions, JSON projection and timing rules; default CLI rules can produce a different result. The extracted documents preserve the exact acquired event set, including any source-limited snapshot. The schema-defined diff does not include the viewer's snapshot timestamp, collector boundary or presentation filters.
 
 ## Standalone package and module
 

@@ -25,7 +25,29 @@ const args = process.argv.slice(2),
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--help") {
     console.log(
-      "npm run android:live — build/install the debug sample, pair USB, open the live viewer, and run a sign-in.\nOptional: --device SERIAL --adb PATH --port PORT --dir PATH --recovery --no-run --no-open\nRequires Node dependencies (npm ci), JDK 17, Android SDK 35, and an authorized USB device or emulator.",
+      `Android sample live viewer
+Usage: npm run android:live -- [options]
+Run from the repository root after npm ci, with Node 24.13.x, JDK 17,
+Android SDK Platform 35/platform-tools and an authorized API 26+ device/emulator.
+
+Builds/installs/launches the repository debug sample, builds the viewer, starts
+or reuses the collector for the same directory/port, and runs a sign-in flow.
+This installs the sample, not a customer app. For an integrated customer app use
+npm run collector -- --android ACTUAL_DEBUG_APPLICATION_ID --open instead.
+
+  --device SERIAL   Select device (or ANDROID_SERIAL); required if multiple attached
+  --adb PATH        Override adb executable
+  --port PORT       Collector/viewer HTTP port (default 4319)
+  --dir PATH        Collector directory (default artifacts/collector-v2;
+                    relative paths resolve from this checkout)
+  --recovery        Run the expected failure/refresh/retry flow instead of success
+  --no-run          Launch the sample without triggering the automatic flow
+  --no-open         Do not open the browser
+  --help            Show help without building, installing or contacting devices
+
+Open http://127.0.0.1:4319/ normally; USB pairing/reconnect is automatic.
+Leave the terminal open when this command starts a collector; Ctrl+C stops it.
+Guide: android/README.md; existing-app integration: docs/integration/ANDROID.md`,
     );
     process.exit(0);
   }

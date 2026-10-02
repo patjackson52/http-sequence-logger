@@ -75,7 +75,7 @@ Booted simulators are paired privately by the collector after it finds the descr
 
 Pairing refresh/rebind fences old sender ACK/cursor/status while canonical capture continues. ACK never deletes canonical records. `status()` exposes retained backlog; `deliverNow()` attempts current delivery; `refresh()` runs on foreground return. Close stops admission, flushes the accepted prefix and releases disk ownership when jobs finish. Suspended/terminated apps do not promise continuous delivery.
 
-The lower-level `NDJSONTransferSink` remains available for already-sanitized lines and explicit canonical journal ownership. Its directory holds the sole canonical `capture.ndjson`, durable-prefix metadata and delivery cursor despite historical spool type names. `appendSanitizedLine` admits memory, `flushPersistence` establishes local durability, `deliverNow` attempts delivery and `rebind` fences old transfer state. Do not use a separate export journal plus upload spool.
+The lower-level `NDJSONTransferSink` remains available for already-sanitized lines and explicit canonical journal ownership. Its directory holds the sole canonical `capture.ndjson`, durable-prefix metadata and delivery cursor despite historical spool type names. Call `try await sink.appendSanitizedLine(line)` for bounded admission, `try await sink.flush()` for local durability, `await sink.deliverNow()` for a delivery attempt, and `try await sink.rebind(connection)` to fence old transfer state. `flushPersistence` is an internal journal method, not a public sink API. Do not use a separate export journal plus upload spool.
 
 ## 6. If an event producer is needed
 
@@ -105,7 +105,7 @@ cp "$APP_DATA/Library/Application Support/HTTPSequenceLogger/journals/$JOURNAL_I
 node validate.mjs customer-capture.ndjson
 ```
 
-Physical devices use a development share sheet for `captureURL`; no unrestricted physical iPhone sandbox reader is provided. Physical sources register after authorized HTTPS pairing, not installed-app enumeration. Confirm real arriving events in Devices and environments → Apps → Sessions, actual HTTP/handler facts and redaction. **Save capture** exports collector NDJSON. Viewer pause/import pauses only reads; canonical capture and collector storage continue.
+Physical devices use a development share sheet for `await capture.captureURLs`, including every retained generation; `captureURL` alone identifies the initial generation and can omit later events after rotation. No unrestricted physical iPhone sandbox reader is provided. Physical sources register after authorized HTTPS pairing, not installed-app enumeration. Confirm real arriving events in Devices and environments → Apps → Sessions, actual HTTP/handler facts and redaction. **Save capture** exports collector NDJSON. Viewer pause/import pauses only reads; canonical capture and collector storage continue.
 
 The offline viewer at port `4173` imports current NDJSON without adopting a source into collector history. Do not export private pairing/cursor/installation files. See [TRANSPORT.md](TRANSPORT.md) for recovery, ownership, trust and troubleshooting.
 

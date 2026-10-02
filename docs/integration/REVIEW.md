@@ -17,7 +17,9 @@ The onboarding plan was reviewed independently for Android and iOS before implem
 
 ## Executed checks
 
-- `npm ci`, all **161 JavaScript tests**, and the production viewer build passed. The package engine now matches the viewer's minimum supported Node 22.12.
+This is historical onboarding evidence. Counts and runtime below describe that review; current task routes, Node requirements and verification commands are in [AGENTS.md](../../AGENTS.md). Current comparison evidence is recorded [separately](../design/SESSION-COMPARISON-VERIFICATION.md).
+
+- `npm ci`, all **161 JavaScript tests**, and the production viewer build passed. At that review the package engine matched the viewer's then-minimum supported Node 22.12; current desktop tooling requires Node 24.13.x.
 - `scripts/check-android-integration.sh` built a separate source consumer in Debug and minified Release; **seven test executions** passed (five Debug, two Release). Its synthetic handler/request NDJSON validated; Debug includes recorder classes and Release dependency/class checks exclude them. No original app or demo-auth module is imported. The fixture also tests business/no-op behavior and capture-failure isolation.
 - `scripts/check-ios-integration.sh` compiled the actual Debug local-package consumer and tested its empty-spool lifecycle. A separate production package built, tested and ran with zero package dependencies and no transfer/adapter symbols. Accidental Release compilation of the development consumer failed as intended.
 - Local Markdown file links were checked; `git diff --check` passed. Platform reviewers found no remaining blocking documentation issue after clarifying Swift replay and demo capture wording.
@@ -25,3 +27,29 @@ The onboarding plan was reviewed independently for Android and iOS before implem
 Reports and synthetic captures are under ignored `artifacts/android-integration/` and `artifacts/integration-ios/`. The root desktop verification logs are also in ignored `artifacts/`. These checks establish that the supplied source-consumption recipes compile and that the documented repository components work together at their tested boundaries.
 
 They do **not** establish a customer's native integration: the Android consumer uses a controlled response, the Swift check runs on macOS without HTTP requests, and neither check substitutes for a customer's own iOS archive, real-device permissions, real app capture or viewer inspection. Follow the [customer acceptance checks](README.md#acceptance-evidence) before reporting an app integrated.
+
+## Documentation and CLI audit — 2 October 2026
+
+The root README's **FOR AGENTS** section and `AGENTS.md` now route client integration, collection/diagnostics, machine comparison and visual inspection independently. The collector has its own command/default/ownership guide; platform guides and the API/spec index link current canonical evidence separately from historical captures. All logger commands identify their checkout context and required runtime.
+
+Source-backed corrections include the public Swift sink's `flush()` API, exporting all rotated `captureURLs`, the IndexedDB default name and owner-lock behavior, explicit customer Android namespaces, maintained Android instrumentation commands/output, and the browser consumer's denied-storage/duplicate-tab fallback. SDK implementations and native capture behavior were unchanged.
+
+CLI help covers collector start/status/doctor, Android sample installation, validation, diff normalization/comparison and the comparison browser check. Scoped diff `--help` works without reading inputs or profiles; capture warnings remain in results rather than fatal-error stderr. The viewer export replay recipe supplies the exact exported profile as well as both extracted session documents.
+
+Verification with Node 24.13.0:
+
+```sh
+node --test test/cli-help.test.mjs test/sequence-diff.test.mjs
+npm test
+npm run build:viewer
+npm run check:web-types
+npm run collector -- --help
+npm run diff:sequence -- compare --help
+git diff --check
+```
+
+The focused suite passed **22 tests**, and the full repository suite passed **362 tests** with no failures/skips. Help tests include missing device executables, absent manifests/captures/profiles and requested output paths, asserting successful help without new state or output files. Validation exit semantics, CLI warnings and explicit-profile replay are tested. The documented extraction recipe reproduced an actual exported viewer diff exactly. The production build and typed browser consumer passed; local Markdown link/anchor and JavaScript snippet checks passed.
+
+An independent reviewer who authored none of this audit's edits checked the task routes, platform API/default claims, collector help and comparison replay against source, reran the focused suite and checked local links. No actionable findings remained.
+
+This audit does not claim fresh Android/iOS device execution or a new customer integration. Existing release/device acceptance requirements still apply when those integrations change.

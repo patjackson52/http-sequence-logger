@@ -20,7 +20,8 @@ The sample offers successful sign-in, 401/retry, canonical export and pairing. O
 // Bootstrap on the host's worker. Keep this process journal across sessions.
 DebugTransfer.initialize(context) // Discovery descriptor exists without a collector/events.
 val sink = DebugTransfer.open(context)
-val logger = NetworkLog(sink, appId = context.packageName)
+val logger = NetworkLog(sink, appId = context.packageName,
+    namespace = "${context.packageName}/development")
 val session = logger.startSession("Checkout")
 // Wire the host's existing capture hooks.
 session.end()
@@ -87,7 +88,7 @@ For code shared with production, use the [small API and lazy metadata suppliers]
 
 ```kotlin
 val sink = DebugTransfer.open(context) // Keep open across concurrent sessions.
-val logger = NetworkLog(sink, appId = "your.app")
+val logger = NetworkLog(sink, appId = "your.app", namespace = "your.app/development")
 val session = logger.startSession("Checkout", sessionId = existingSessionId)
 val exchange = session.startRequest("GET", requestUrl)
 try {
@@ -134,11 +135,11 @@ From the repository root, with the selected device connected:
 
 ```sh
 npm ci
-JAVA_HOME=/path/to/jdk17 ANDROID_SERIAL=emulator-5554 scripts/run-android-e2e.sh
+JAVA_HOME=/path/to/jdk17 ANDROID_SERIAL=SELECTED_DEVICE scripts/run-android-e2e.sh
 npm test
-node validate.mjs artifacts/live/*.ndjson
+node validate.mjs artifacts/android-instrumentation/ACTUAL_RUN_UUID/*.ndjson
 ```
 
-The script builds APKs, runs the deterministic Kotlin tests, installs the sample/test APKs on the selected device, then performs the two real network flows. It extracts the NDJSON via `run-as`, validates it, and separates the recordings without changing event contents. Output goes to ignored `artifacts/live/`. To intentionally replace the checked-in evidence, pass `samples/live` as the script's first argument.
+Choose the actual device with `adb devices -l`; replace `SELECTED_DEVICE` and use the run UUID printed by the harness. `run-android-e2e.sh` delegates to the maintained `check-android-instrumentation.mjs` runner and accepts no positional output/config arguments. It builds and installs Debug app/test APKs, runs actual AndroidJUnitRunner business-flow and transfer tests, validates emitted capture files, and checks collector ACK evidence. New captures, private collector state and reports stay under ignored `artifacts/android-instrumentation/<UUID>/`; existing canonical journals, explicit pairing and reverse routes are preserved. It does not replace checked-in captures.
 
-Checked-in [live captures](../samples/live/manifest.json) were generated on an Android 17 / API 37 emulator. See [E2E evidence](../E2E.md) for verification and [the actual customer connection](app/src/main/kotlin/dev/networklog/app/SampleFlow.kt) for a complete runnable manual integration.
+For current schema 1.2 native evidence, use [realtime captures](../samples/realtime/README.md), including the recorded Android recovery flow available in the viewer sample picker. [Older live captures](../samples/live/manifest.json) remain historical evidence and are unsupported by the current validator/viewer. See [the actual customer connection](app/src/main/kotlin/dev/networklog/app/SampleFlow.kt) for a complete runnable manual integration; repository capture evidence does not verify a different app's integration.

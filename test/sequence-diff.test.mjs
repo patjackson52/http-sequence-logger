@@ -217,6 +217,40 @@ test('human output escapes terminal controls from capture strings', () => {
   assert.equal(formatDiffText(diffSequences(a, b)).includes('\u001b'), false);
 });
 
+test('CLI warnings stay in results and exported profiles reproduce explicit correspondence', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'sequence-diff-replay-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const paths = ['primary.json', 'secondary.json'].map(name => join(dir, name));
+  const cli = (...args) => spawnSync(process.execPath, [new URL('../sequence-diff/cli.mjs', import.meta.url).pathname, ...args], { encoding: 'utf8' });
+  const incomplete = make(); incomplete.events.pop();
+  writeFileSync(paths[0], JSON.stringify(incomplete));
+  let response = cli('compare', paths[0], paths[0], '--check');
+  assert.equal(response.status, 3, response.stderr);
+  assert.equal(response.stderr, '');
+  assert.ok(JSON.parse(response.stdout).diagnostics.some(item => item.severity === 'warning'));
+  response = cli('compare', paths[0], paths[0], '--format', 'text');
+  assert.equal(response.status, 0, response.stderr);
+  assert.match(response.stdout, /warning primary:/);
+  assert.equal(response.stderr, '');
+
+  const primary = make(['/repeat', '/repeat']), secondary = make(['/repeat', '/repeat'], 'b');
+  const initial = diffSequences(primary, secondary);
+  const left = initial.pairs.find(pair => pair.primary?.kind === 'http').primary;
+  const right = initial.pairs.find(pair => pair.secondary?.kind === 'http').secondary;
+  const expected = diffSequences(primary, secondary, {
+    matches: [{ primary: left.node_id, secondary: right.node_id }], compare_timing: true, ignore_headers: ['date'],
+  });
+  assert.equal(initial.result, 'inconclusive');
+  assert.equal(expected.result, 'equal');
+  const profile = join(dir, 'comparison.profile.json');
+  writeFileSync(profile, JSON.stringify(expected.profile));
+  [primary, secondary].forEach((document, index) => writeFileSync(paths[index], JSON.stringify(document)));
+  response = cli('compare', ...paths, '--options', profile);
+  assert.equal(response.status, 0, response.stderr);
+  assert.deepEqual(JSON.parse(response.stdout), expected);
+  assert.equal(response.stderr, '');
+});
+
 test('capture partitioning cannot hide recording or event identity conflicts across sessions', () => {
   const a = make(), b = make(['/verify'], 'b');
   b.events.forEach(e => { e.recording_id = a.events[0].recording_id; });

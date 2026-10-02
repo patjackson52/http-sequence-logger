@@ -10,6 +10,26 @@ import { validateSourceReferences } from '../viewer/src/comparison-data.mjs';
 import { startCollector } from '../collector/server.mjs';
 import { comparisonFixture, ndjsonOf } from '../test/comparison-fixtures.mjs';
 
+if (process.argv.slice(2).length === 1 && process.argv[2] === '--help') {
+  console.log(`Production comparison browser acceptance
+Usage: npm run check:comparison
+       npm run check:comparison -- --help
+
+Run from the repository root with Node 24.13.x after npm ci and installed Google
+Chrome. Builds/serves the production viewer, launches headless Chrome, and starts
+isolated temporary non-activated SQLite collectors. Checks canonical worker/export
+parity, all three layouts, matching/rules, responsive/keyboard/motion behavior,
+cancellation, real event append/recompute, failed reads and collector replacement.
+No Android/iOS devices are used. Temporary collector databases are removed.
+
+Exit 0 means all assertions passed; failures exit nonzero.
+Writes ignored screenshots, JSON exports and evidence.json under artifacts/comparison.
+COMPARISON_ARTIFACTS overrides that output directory; WEB_TEST_CHANNEL overrides
+the installed browser channel (default chrome). Help creates no artifacts/services.
+Guide: docs/design/SESSION-COMPARISON-VERIFICATION.md`);
+  process.exit(0);
+}
+
 const artifacts=resolve(process.env.COMPARISON_ARTIFACTS||'artifacts/comparison');
 const privateDir=await mkdtemp(join(tmpdir(),'comparison-browser-'));
 const evidence={kind:'Canonical fixtures in installed Chrome, production viewer, real retained SQLite collector and SSE; no native device execution claimed.',scenarios:[],errors:[],screenshots:[]};

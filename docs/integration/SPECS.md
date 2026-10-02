@@ -17,11 +17,13 @@ Captures are **UTF-8 NDJSON**: one JSON event per line, newline-terminated by pr
 | Browser storage and same-origin delivery | [storage.mjs](../../web-sdk/src/storage.mjs), [transfer.mjs](../../web-sdk/src/transfer.mjs), Node-only [dev-relay.mjs](../../web-sdk/dev-relay.mjs) |
 | Pairing JSON, HTTP endpoints, ACKs, browser SSE | [transfer protocol](../transfer/PROTOCOL.md); transfer version is `2`, independent of capture schema |
 | Valid/invalid relationships and cross-event validation | [shared/validate.mjs](../../shared/validate.mjs); command entry [validate.mjs](../../validate.mjs) |
+| Session documents, comparison profile and machine diff | [sequence-diff guide](../../sequence-diff/README.md), [sequence schema](../../sequence-diff/schema/sequence.schema.json), [diff schema](../../sequence-diff/schema/diff.schema.json); the sole engine is [index.mjs](../../sequence-diff/index.mjs) |
 | Focused synthetic examples | [examples/manifest.json](../../examples/manifest.json), [manual-minimal](../../examples/manual-minimal.ndjson), [handler-http](../../examples/handler-http.ndjson), [stream-read-timeout](../../examples/stream-read-timeout.ndjson) |
 | Historical native capture evidence (older format) | [samples/live/manifest.json](../../samples/live/manifest.json), [transfer captures](../../samples/transfer/README.md) |
+| Current canonical platform capture evidence | [Android/iOS realtime captures](../../samples/realtime/README.md), [browser captures](../../samples/web/README.md); inspect each record's schema version |
 | GUI interpretation/design | [viewer/README.md](../../viewer/README.md), [design history](../design/README.md); design images do not define runtime APIs |
 
-The sole event schema is **1.2** for Android, iOS and web. Transfer/pairing uses **2** independently. Earlier captures/state are left untouched and rejected by the current collector; there is no migration or compatibility parser. Handler dispatch can be synchronous or explicitly awaited. Proposed metrics, redirect, propagation or general Swift capture APIs are not necessarily implemented SDK APIs: inspect source and compiled consumer recipes.
+The sole event schema is **1.2** for Android, iOS and web. Transfer/pairing uses **2** independently. Sequence documents and diff JSON each use their own schema **1.0**; they are not capture NDJSON or pairing files. Earlier captures/state are left untouched and rejected by current tools; there is no migration or compatibility parser. Handler dispatch can be synchronous or explicitly awaited. Proposed metrics, redirect, propagation or general Swift capture APIs are not necessarily implemented SDK APIs: inspect source and compiled consumer recipes.
 
 ## Producer rules agents must preserve
 
@@ -39,6 +41,7 @@ From the checked-out repository, after `npm ci`:
 
 ```sh
 node validate.mjs /absolute/path/to/customer-capture.ndjson
+node validate.mjs --help
 ```
 
 Exit `0`: no contradictions detected (inspect warnings for missing observations). Exit `1`: invalid capture or unreadable file. Exit `2`: no input file. Multiple filenames are validated separately; the viewer can merge imports and check relationships across them. Do not strip failed events or regenerate IDs merely to make validation pass.

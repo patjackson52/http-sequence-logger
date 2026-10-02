@@ -39,7 +39,7 @@ const session = logger.startSession({ name: 'Sign in', sessionId: existingSessio
 
 Production setup returns `noOpLogger` from the default entry. Shared operations and handlers still execute normally. Suppliers passed to no-op recording methods are not evaluated; bodies and sensitive metadata should remain inside suppliers.
 
-Logs live in **IndexedDB for the frontend origin**, not a device filesystem path. The database defaults to `http-sequence-logger`; `journalId` is required. One journal can retain multiple sessions and recordings. Closing/reopening the same database/journal preserves stored lines and event IDs; another port, browser profile or origin has different storage. Use DevTools → Application/Storage → IndexedDB to inspect the chosen database. Do not copy browser-internal database files as NDJSON.
+Logs live in **IndexedDB for the frontend origin**, not a device filesystem path. The database defaults to `http-sequence-logger-v2`; `journalId` is required. One journal can retain multiple sessions and recordings. Closing/reopening the same database/journal preserves stored lines and event IDs; another port, browser profile or origin has different storage. Use DevTools → Application/Storage → IndexedDB to inspect the chosen database. Do not copy browser-internal database files as NDJSON.
 
 The sample uses origin `http://127.0.0.1:4180`, database `http-sequence-logger-demo-v2`, a random journal ID retained under the development-only `network-log-journal-v2` session-storage key, and downloads `browser-capture.ndjson`. Customer apps choose and document their own names.
 

@@ -4,26 +4,49 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sequencesFromCapture, validateSequence, diffSequences, formatDiffText, SequenceDiffError } from './index.mjs';
 
-const HELP = `sequence-diff — canonical session comparison
-Usage:
-  sequence-diff normalize capture.ndjson [--namespace NAME --session ID] [--output FILE]
-  sequence-diff compare primary.json secondary.json [options]
-  sequence-diff compare primary.ndjson secondary.ndjson [options]
-
-Options:
+const NORMALIZE_OPTIONS = `Normalize options:
+  --namespace NAME         Select the session namespace
+  --session ID             Select the session ID from a multi-session capture
+  --output FILE            Create a new canonical session JSON file; refuses overwrite
+`;
+const COMPARE_OPTIONS = `Compare options:
   --format json|text       Diff output (default json)
   --output FILE            Create a new file; refuses to overwrite
-  --options FILE           Comparison profile JSON (ignore paths/headers, manual matches)
+  --options FILE           Engine profile JSON: exclusions, matches, JSON and timing rules
   --primary-session ID     Select from a multi-session primary capture
   --primary-namespace NAME Disambiguate the primary session namespace
   --secondary-session ID   Select from a multi-session secondary capture
-  --secondary-namespace NAME
+  --secondary-namespace NAME Disambiguate the secondary session namespace
   --check                  Exit 0 equal, 1 different, 3 inconclusive; errors exit 2
-  --help                   Show help
-
-JSON stdout contains only the result. Diagnostics go to stderr.
-Input files are read locally, with a 16 MiB per-file limit.
 `;
+const INPUT_GUIDANCE = `
+Inputs: canonical event-schema 1.2 NDJSON or http-sequence 1.0 session JSON.
+Regular local files only; no URL or stdin input. Limit: 16 MiB per file.
+JSON stdout contains only the result; fatal errors go to stderr and exit 2.
+Use -- before filenames beginning with --. Help reads/writes no input/output files.
+Profile, replay and API guide: sequence-diff/README.md.
+`;
+const COMPARISON_GUIDANCE = `Comparison also enforces 20000 events and 5000 nodes per side and engine work limits.
+Nonfatal capture warnings are in diff.diagnostics (and text output), not stderr.
+Without --check a completed comparison exits 0, including different/inconclusive.
+Default profile: compare JSON fields, exclude timing, no ignored headers/paths or matches.
+`;
+const HELP = `sequence-diff — canonical session comparison
+Usage:
+  sequence-diff normalize INPUT [options]
+  sequence-diff compare PRIMARY SECONDARY [options]
+  sequence-diff [normalize|compare] --help
+
+${NORMALIZE_OPTIONS}
+${COMPARE_OPTIONS}
+  --help                   Show general or command-specific help
+${INPUT_GUIDANCE}${COMPARISON_GUIDANCE}`;
+const commandHelp = command => `sequence-diff ${command} — ${command === 'normalize' ? 'select one canonical session' : 'compare two canonical sessions'}
+Usage:
+  sequence-diff ${command} ${command === 'normalize' ? 'INPUT' : 'PRIMARY SECONDARY'} [options]
+
+${command === 'normalize' ? NORMALIZE_OPTIONS : COMPARE_OPTIONS}  --help                   Show this command's help
+${INPUT_GUIDANCE}${command === 'compare' ? COMPARISON_GUIDANCE : 'Normalization selects one session and emits its canonical JSON; it does not assert complete capture.\n'}`;
 const MAX_BYTES = 16 * 1024 * 1024;
 async function readBounded(path) {
   const handle = await open(path, 'r');
@@ -74,6 +97,10 @@ async function load(path, namespace, id) {
 }
 export async function main(argv, io = process) {
   if (argv.length === 1 && argv[0] === '--help') { io.stdout.write(HELP); return 0; }
+  if (['normalize', 'compare'].includes(argv[0])) {
+    const separator = argv.indexOf('--');
+    if (argv.slice(1, separator < 0 ? undefined : separator).includes('--help')) { io.stdout.write(commandHelp(argv[0])); return 0; }
+  }
   try {
     const { command, flags, paths } = parse(argv);
     let value, output;

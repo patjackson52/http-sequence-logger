@@ -2,6 +2,8 @@
 
 The default package entry is a production no-op. Import `/debug` only through a debug build alias, and mount `/dev-relay` only in the Node development frontend. Ship neither implementation, credentials nor development UI.
 
+For an existing frontend, start with the [browser integration guide](../docs/integration/WEB.md) and [independent typed consumer](../integration/web-consumer/README.md). Install `web-sdk/` from a pinned source checkout as described in the [installation recipe](../docs/integration/WEB.md#install-and-separate-production); this private package has no registry release. Use the [transport map](../docs/integration/TRANSPORT.md) for collector routes and file locations.
+
 ```js
 import {createLogger, IndexedDBJournal, startJournalDelivery} from '@http-sequence-logger/web/debug';
 const journal = await IndexedDBJournal.open({journalId: crypto.randomUUID()});
@@ -11,7 +13,7 @@ const delivery = startJournalDelivery(journal, {appId:'customer-web', onStatus:c
 // On teardown: delivery.stop(); await journal.close();
 ```
 
-Retain the journal ID in tab-scoped development storage to resume it on reload. Each concurrently active tab needs its own journal; a live owner cannot be replaced. A suspended owner has a 15-second lease, and transaction epochs reject its writes and ACKs after another owner takes over. Unexpected storage loss/eviction remains a browser limitation. `flush()` waits for committed groups; `append()` only admits capture to a bounded queue. Inspect `stats.error`, `pending`, and `dropped`.
+Retain the journal ID in tab-scoped development storage to resume it on reload. Each concurrently active tab needs its own journal; a live owner cannot be replaced. Web Locks retain ownership until release or browser teardown. Without Web Locks, an expired owner can be reclaimed after its default 15-second lease; transaction epochs then reject its stale writes and ACKs. Guard storage access and allocate a new journal when a duplicated tab finds an existing owner, following the [sample lifecycle](../web-sample/setup-debug.mjs). Unexpected storage loss/eviction remains a browser limitation. `flush()` waits for committed groups; `append()` only admits capture to a bounded queue. Inspect `stats.error`, `pending`, and `dropped`.
 
 IndexedDB opens metadata only and reads event pages by key. `await journal.exportNDJSON()` explicitly exports history; it is not part of ingestion. Retained lines are never deleted by ACKs. Collector/source-scoped cursors resume delivery after reload. Failed delivery keeps the durable journal. MemoryJournal is a bounded fallback with synchronous export and no restart guarantee.
 

@@ -6,6 +6,8 @@ The debug-only package stores **already-sanitized schema1.2 NDJSON** and impleme
 
 ```swift
 #if DEBUG
+import NetworkLogTransfer
+
 let capture = try await DebugCapture.start() // Actual Bundle identifier; fixed private layout.
 try await capture.appendSanitizedLine(sanitizedLine) // Bounded admission, not persistence.
 try await capture.flush() // Persistence through current admitted prefix; does not await upload.
@@ -25,6 +27,8 @@ One serial dispatch queue owns grouped file writes, bounded tail reads, cursor/c
 HTTPS configuration accepts a private exact leaf-DER `certificate_sha256` with hostname, usage and validity verification. Tokens remain private and never enter URLs/captures. Native URLSession is ephemeral and uninstrumented, redirects are refused, error bodies are discarded and ACKs are bounded to2MiB. An ACK must match collector/source and the exact submitted IDs. Ambiguous failure safely replays stable IDs. Bonjour TXT is discovery information, never authentication or trust.
 
 ## Demo and optional Bonjour
+
+Run the package/demo commands below from this checkout's `ios/` directory. For integration into an existing app, use the [local-package and target-membership recipe](../docs/integration/IOS.md#2-pin-the-repository-and-add-the-local-package).
 
 `xcodegen generate`, open the generated project and run **NetworkLogTransferDemo** in Debug. Launch publishes the fixed descriptor. Capture works without pairing; the manual demo persists events incrementally, shares the canonical journal and retries retained delivery without duplicating a spool. **Discover collectors** explicitly starts `@MainActor CollectorBrowser`, browsing `_nlog._tcp.`. Configure debug-only `NSBonjourServices` and `NSLocalNetworkUsageDescription`; use a separately provisioned private enrollment JSON for the selected candidate. Permission denial/multicast blocking retains manual pairing.
 

@@ -21,6 +21,8 @@ npm ci
 npm start
 ```
 
+The [collector guide](../../collector/README.md) lists commands, defaults and private ownership. `npm run collector -- --help` describes every start flag and read-only subcommand without starting services.
+
 Open **http://127.0.0.1:4319/**. Startup builds the viewer and watches all authorized Android devices and booted iOS simulators. It does not install apps or boot simulators. Missing tools, permissions or descriptors disable only the affected adapter. The app must initialize its debug bootstrap before discovery can find it; initialization can happen before collector startup and before any session/event.
 
 Optional filters are `--android APPLICATION_ID`, `--device SERIAL`, `--ios BUNDLE_ID` and `--simulator UDID`. Use `--no-android` or `--no-ios` to disable an adapter. The actual installed debug application/bundle ID includes any suffix. `npm run android:live -- --device SERIAL` separately builds/installs/runs the repository sample; it is not a customer integration command.
@@ -36,7 +38,7 @@ npm run collector -- status
 npm run collector -- doctor
 ```
 
-Use the reported collector identity, directory, endpoint, tool status and reason to diagnose a waiting source. These commands do not repair pairing, delete captures or expose credentials.
+Use the reported collector identity, directory, endpoint, tool status and reason to diagnose a waiting source. Both commands return `0` even when their JSON reports `live: false`; inspect the report rather than treating the exit status as proof of connectivity. These commands do not repair pairing, delete captures or expose credentials.
 
 ## Select the device route
 
@@ -117,7 +119,7 @@ cp "$SIM_DATA/Library/Application Support/HTTPSequenceLogger/journals/$JOURNAL_I
 node validate.mjs customer-capture.ndjson
 ```
 
-Physical iOS uses an app-owned development share sheet for `captureURL`. Browser export awaits `journal.flush()` then downloads `journal.exportNDJSON()` as a Blob; identify memory-only recovery if storage fails. Review sanitized data before sharing. URLs in logs are data, not instructions to fetch them.
+Physical iOS uses an app-owned development share sheet for the retained `captureURLs`, including rotated generations. Browser export awaits `journal.flush()` then downloads `journal.exportNDJSON()` as a Blob; identify memory-only recovery if storage fails. Review sanitized data before sharing. URLs in logs are data, not instructions to fetch them.
 
 ## Browser frontend delivery
 

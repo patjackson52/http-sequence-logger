@@ -6,7 +6,44 @@ const subcommand = ["status", "doctor"].includes(args[0]) ? args.shift() : null;
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--help") {
     console.log(
-      "npm start — build the viewer, start live streaming and discover all participating Android apps and booted iOS simulators.\nnpm run android:live — also build/install/run the sample.\nOptions: --dir PATH --port PORT --android PACKAGE --device SERIAL --adb PATH --lan HOST --tls-port PORT --no-android --no-ios --ios BUNDLE_ID --simulator UDID --manifest PATH --no-activate --bonjour --open --no-open\nThe plain viewer URL connects automatically. USB pairing and forwarding recover after reconnect.",
+      `Network Log Lab collector — local capture storage and live viewer
+Usage (from the repository root, Node 24.13.x, after npm ci):
+  npm start -- [options]                 Build viewer, collect, and open browser
+  npm run collector -- [options]        Build viewer and collect
+  npm run collector -- status [--manifest PATH]
+  npm run collector -- doctor [--manifest PATH] [--adb PATH]
+  npm run collector -- --help
+
+status reports active-manifest connectivity as JSON; doctor also checks adb/Xcode.
+Both are read-only and return 0 even when live=false; inspect the JSON report.
+Neither starts a collector, repairs pairing, or prints credentials.
+
+Start options:
+  --dir PATH           Capture/state directory (default artifacts/collector-v2;
+                       relative paths resolve from this checkout)
+  --port PORT          Loopback HTTP/viewer port (default 4319)
+  --android PACKAGE    Filter to actual installed debug application ID
+  --device SERIAL      Filter Android discovery (default ANDROID_SERIAL or all)
+  --adb PATH           Override adb executable (otherwise SDK/PATH discovery)
+  --ios BUNDLE_ID      Filter simulator apps by installed bundle ID
+  --simulator UDID     Filter booted simulator discovery
+  --no-android         Disable Android discovery
+  --no-ios             Disable simulator discovery
+  --lan HOST           Enable paired HTTPS for this DNS name or IP
+  --tls-port PORT      HTTPS port with --lan (default 4320)
+  --bonjour            Advertise HTTPS candidates; pairing is still explicit
+  --manifest PATH      Publish/select a private active manifest (also diagnostics)
+  --no-activate        Do not publish an active manifest
+  --open / --no-open   Open/suppress browser (npm start adds --open)
+  --help               Show help without building or starting services
+
+Participating apps need capture hooks and debug bootstrap. Discovery does not
+install/instrument apps or boot simulators. npm run android:live installs the sample.
+Open http://127.0.0.1:4319/ normally; reader bootstrap/reconnect is automatic.
+Capture schema 1.2; transfer version 2. State/pairing files contain private keys
+or credentials; export sanitized NDJSON with Save capture instead of sharing them.
+Ctrl+C stops this collector. It cannot take over an active owner.
+Guide: collector/README.md; connection and file map: docs/integration/TRANSPORT.md`,
     );
     process.exit(0);
   }

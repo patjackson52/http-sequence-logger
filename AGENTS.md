@@ -1,6 +1,18 @@
 # Agent entry point
 
-This repository contains development network logging, device/browser transfer, and a local sequence viewer. For an **existing Android, iOS or browser application integration**, start with [docs/integration/README.md](docs/integration/README.md), then read only the relevant platform guide and [transport map](docs/integration/TRANSPORT.md). Follow the host application's own instructions when editing that application. Users can copy the prompt in [README → FOR AGENTS](README.md#for-agents) or the [full integration prompt](docs/integration/AGENT-PROMPT.md).
+This repository contains development network logging, device/browser transfer, a local sequence viewer and a standalone comparison module/CLI. Follow the host application's own instructions when editing that application. Read the route for the current task; design archives and old evidence are not runtime API documentation.
+
+## Choose a task route
+
+| Task | Read first | Next authority/check |
+| --- | --- | --- |
+| Integrate an existing Android/iOS/web client | [integration entry](docs/integration/README.md), then its one platform guide | [transport map](docs/integration/TRANSPORT.md), [callable API/spec index](docs/integration/SPECS.md), [independent consumer examples](integration/README.md); test the host's real flow and shipping artifact |
+| Start/diagnose collection, retrieve captures | [collector guide](collector/README.md) | `npm run collector -- --help`, `status`, `doctor`; [file locations](docs/integration/TRANSPORT.md#where-every-file-lives) and [protocol](docs/transfer/PROTOCOL.md) |
+| Compare files or consume a machine diff | [sequence-diff guide](sequence-diff/README.md) | `npm run diff:sequence -- --help`; package-local sequence/diff schemas and `sequence-diff/index.mjs` |
+| Inspect live/files or compare sessions visually | [viewer guide](viewer/README.md) | [comparison verification](docs/design/SESSION-COMPARISON-VERIFICATION.md); `npm run check:comparison` and applicable viewer regressions |
+| Implement/debug a canonical event producer | [spec/API index](docs/integration/SPECS.md) | Event schema and `CONTRACT.md`; `node validate.mjs --help`, then validate the app's actual capture |
+
+Commands run from this checkout with Node **24.13.x** after `npm ci`. In a host-app repository, invoke them from the pinned logger checkout rather than assuming its npm scripts exist in the host. SDKs are source/local-package integrations, not published dependencies. The [README agent prompt](README.md#for-agents) and [full integration prompt](docs/integration/AGENT-PROMPT.md) are specifically for client integration; collector, comparison and viewer tasks use the routes above.
 
 ## What exists
 
@@ -8,6 +20,7 @@ This repository contains development network logging, device/browser transfer, a
 - iOS Swift: `ios/` is the local `NetworkLogTransfer` package for **already-sanitized NDJSON**, plus a limited manual demo. It is not a general Swift capture SDK. The Swift API sketches in design documents are not implemented symbols.
 - Browser: `web-sdk/` supplies a zero-runtime-dependency ESM/TypeScript package. Its default entry is the production no-op; `/debug` adds Fetch/XHR/manual capture, synchronous/awaited handlers, bounded journals and continuous foreground delivery. `/dev-relay` is Node-only. See [WEB.md](docs/integration/WEB.md) and the build-separated `web-sample/`.
 - Desktop: `collector/` receives or retrieves files and serves `viewer/dist/`; `viewer/` is the React sequence inspector. The viewer does not belong in the mobile production binary.
+- Comparison: `sequence-diff/` owns matching, field comparison and order interpretation. The viewer runs this module in a worker; layouts only render its result. Never use the archived prototype's `nll-diff.js` or invent a second matching implementation.
 - No published Maven/npm package, root Swift package, hosted collector, or account setup is supplied. Pin a source checkout; use the documented source/local-package recipes.
 
 ## Find the right authority
@@ -16,6 +29,7 @@ This repository contains development network logging, device/browser transfer, a
 2. [schema/event.schema.json](schema/event.schema.json) defines each JSON event; [CONTRACT.md](CONTRACT.md) defines cross-event semantics. Read [the spec index](docs/integration/SPECS.md) before writing a producer.
 3. [docs/transfer/PROTOCOL.md](docs/transfer/PROTOCOL.md) defines pairing, ingestion, ACKs and browser access. Transfer version `2` is distinct from the sole supported event schema `1.2` on all platforms. No legacy source, state or capture migration is required.
 4. `ADAPTERS.md`, `MANUAL-LOGGING.md`, and `HANDLER-TRACING.md` mix implemented behavior with broader requirements/design sketches. Check platform status before using a named API.
+5. [sequence.schema.json](sequence-diff/schema/sequence.schema.json) and [diff.schema.json](sequence-diff/schema/diff.schema.json) are separate schema-1.0 wrappers/output over schema-1.2 events. Capture, transfer, sequence and diff versions are independent. A diff is evidence, not a replayable patch; preserve snapshots, profile, unknowns and exact source references.
 
 ## Integration invariants
 
@@ -56,12 +70,14 @@ Use the platform integration guides' external-consumer checks when changing inst
 
 Browser checks: `npm run check:web-types`, `npm run check:web-release`, `npm run check:web-browser` (installed Google Chrome), and `npm run web:sample` at `127.0.0.1:4180` (fixture servers `4181`/`4182`). The release audit checks positive debug controls and all shipping assets/maps. Node tests do not replace exercising the host app in a real browser.
 
+For comparison engine/controller/layout/inspector changes, run `node --test test/sequence-diff.test.mjs test/comparison-*.test.mjs`, `npm test`, `npm run build:viewer` and `npm run check:comparison`. Keep frozen live comparisons stable until explicit recomputation; failures/limits must retain the last valid result. Replay exports with their exact `profile`, not defaults. Single-session layout/export changes also require `npm run check:svg-export`; live rendering changes require `npm run check:viewer-realtime`.
+
 For collector/viewer connection changes, run `npm run check:live-setup` with installed Chrome. It covers ordinary URL bootstrap, refresh/reconnect, new collector identity, file import/pause/resume, following sessions and rejected foreign-origin access. Exercise USB delivery on the actual selected device when changing Android setup; [transfer verification](docs/transfer/VERIFICATION.md) records prior evidence and its limits.
 
 Repository tests validate repository fixtures. To finish a customer integration, validate a capture from that app, inspect HTTP and handler nesting in the viewer, verify offline recovery, and inspect **that app's** shipping artifact/dependency graph. Record unrun checks and concrete environment blockers.
 
 ## Maintaining this repository
 
-Edit schema in `scripts/build-schema.mjs`, then run `npm run generate` and relevant tests; generated schema/validator/example files must stay reproducible. Do not rewrite the event contract merely to accommodate one application's integration. Keep Android examples Kotlin-only. Update the integration guides if public APIs, source-install requirements, storage locations, or transport behavior change.
+Edit event schema in `scripts/build-schema.mjs`, then run `npm run generate` and relevant tests; generated schema/validator/example files must stay reproducible. Author sequence/diff schemas in `scripts/build-diff-schema.mjs` and use `npm run generate:diff`; see the standalone package's maintenance checks. Do not rewrite the event contract merely to accommodate one application's integration. Keep Android examples Kotlin-only. Update task guides and CLI `--help` if callable APIs, flags, defaults, installation, storage or behavior change.
 
 The short root entry point and linked, task-specific guides follow the [AGENTS.md convention](https://agents.md/); they are plain Markdown, not a plugin or agent runtime requirement.
