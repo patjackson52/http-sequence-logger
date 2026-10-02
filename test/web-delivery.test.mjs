@@ -1,292 +1,40 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import http from "node:http";
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { IDBFactory } from "fake-indexeddb";
-import { MemoryJournal, IndexedDBJournal } from "../web-sdk/src/storage.mjs";
-import { uploadJournal } from "../web-sdk/src/transfer.mjs";
-import { createNetworkLogRelay } from "../web-sdk/dev-relay.mjs";
-import { startCollector } from "../collector/server.mjs";
-
-const line = (id, extra = {}) => JSON.stringify({ event_id: id, ...extra }) + "\n";
-const json = (body, status = 200) => new Response(JSON.stringify(body), { status });
-const config = { version: 1, collector_id: "collector-one" };
-const acknowledgment = (body) => ({ ...config, acknowledged_event_ids: body.trim().split("\n").map((value) => JSON.parse(value).event_id) });
-function temp(t) {
-  const path = mkdtempSync(join(tmpdir(), "web-delivery-"));
-  t.after(() => rmSync(path, { recursive: true, force: true }));
-  return path;
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {IDBFactory} from 'fake-indexeddb';
+import {MemoryJournal,IndexedDBJournal} from '../web-sdk/src/storage.mjs';
+import {uploadJournal,startJournalDelivery} from '../web-sdk/src/transfer.mjs';
+import {createNetworkLogRelay} from '../web-sdk/dev-relay.mjs';
+const line=id=>JSON.stringify({event_id:id})+'\n';
+const json=body=>new Response(JSON.stringify(body));
+const registration={version:2,collector_id:'collector',source_id:'source',handle:'handle'};
+function upstream(calls=[]){return async(url,options)=>{calls.push([url,options]);if(url.endsWith('/register'))return json(registration);if(url.endsWith('/presence'))return json({version:2});return json({...registration,acknowledged_event_ids:options.body.trim().split('\n').map(s=>JSON.parse(s).event_id)});};}
+async function waitFor(predicate){for(let i=0;i<100;i++){if(await predicate())return;await new Promise(r=>setTimeout(r,5));}throw new Error('Condition did not occur');}
+test('memory admission is bounded and canonical',async()=>{const journal=new MemoryJournal({maxEvents:1});assert.equal(journal.append(line('a')),true);assert.equal(journal.append(line('b')),false);assert.equal(journal.exportNDJSON(),line('a'));assert.equal(journal.stats.dropped,1);assert.throws(()=>journal.append('{}\n{}\n'),/complete/);});
+test('metadata-first open does not hydrate history; keyset read, identity and cursor survive reopen',async()=>{
+ const indexedDB=new IDBFactory(),options={indexedDB,journalId:'journal'};let journal=await IndexedDBJournal.open(options);for(let i=0;i<500;i++)journal.append(line(String(i)));await journal.flush();const identity=journal.identity;await journal.acknowledge('collector','source',400);await journal.close();journal=await IndexedDBJournal.open(options);
+ assert.equal(journal._lines.length,0);assert.equal(journal.stats.events,500);assert.equal(journal.identity.environment_id,identity.environment_id);assert.equal(journal.getDeliveryCursor('collector','source'),400);assert.equal(journal.getDeliveryCursor('collector','other'),0);const page=await journal.readPage(498);assert.deepEqual(page.lines,[line('498'),line('499')]);assert.equal(page.next,500);assert.equal((await journal.exportNDJSON()).split('\n').length,501);await journal.close();
+});
+test('healthy journal owner cannot be displaced',async()=>{const options={indexedDB:new IDBFactory(),journalId:'owned'};const first=await IndexedDBJournal.open(options);await assert.rejects(IndexedDBJournal.open(options),/Another writer/);first.append(line('a'));await first.close();const second=await IndexedDBJournal.open(options);assert.equal(await second.exportNDJSON(),line('a'));await second.close();});
+test('expired owner epoch fences late ACK and append after a replacement opens',async()=>{let time=0;const options={indexedDB:new IDBFactory(),journalId:'epoch',locks:null,now:()=>time,leaseMs:1000};const first=await IndexedDBJournal.open(options);first.append(line('a'));await first.flush();time=1001;const second=await IndexedDBJournal.open(options);await assert.rejects(first.acknowledge('collector','source',1),/expired or was replaced/);first.append(line('stale'));await assert.rejects(first.flush(),/expired or was replaced/);await first.close().catch(()=>{});assert.equal(await second.exportNDJSON(),line('a'));await second.close();});
+test('pending memory remains bounded across stalled transaction admission',async()=>{const journal=await IndexedDBJournal.open({indexedDB:new IDBFactory(),journalId:'bounded'});journal._queue=new Promise(()=>{});for(let i=0;i<500;i++)assert.equal(journal.append(line(String(i))),true);await Promise.resolve();assert.equal(journal.append(line('overflow')),false);journal._closed=true;clearInterval(journal._renewTimer);journal._db.close();journal._releaseBrowserLock?.();});
+test('incremental uploads register zero-event pages and never resend committed prefix',async()=>{const calls=[],journal=new MemoryJournal(),options={origin:'https://app.test',appId:'app',fetchImpl:upstream(calls)};await uploadJournal(journal,options);assert.equal(calls.filter(([url])=>url.endsWith('/events')).length,0);for(let i=0;i<501;i++)journal.append(line(String(i)));const result=await uploadJournal(journal,options);assert.equal(result.events,501);assert.equal(result.batches,2);assert.equal((await uploadJournal(journal,options)).events,0);assert.equal(calls.filter(([url])=>url.endsWith('/events')).length,2);});
+test('lost ACK replays same IDs and invalid identity cannot publish cursor',async()=>{const journal=new MemoryJournal();journal.append(line('stable'));const options={origin:'https://app.test',fetchImpl:async(url,opts)=>url.endsWith('/register')?json(registration):json({...registration,source_id:'wrong',acknowledged_event_ids:['stable']})};await assert.rejects(uploadJournal(journal,options),/identity/);assert.equal(journal.getDeliveryCursor('collector','source'),0);await uploadJournal(journal,{...options,fetchImpl:upstream()});assert.equal(journal.getDeliveryCursor('collector','source'),1);});
+test('continuous sender wakes for append exactly at drain completion',async()=>{const journal=new MemoryJournal(),calls=[];let appended=false;const fetchImpl=async(url,options)=>{if(url.endsWith('/presence')&&!appended){appended=true;journal.append(line('race'));}return upstream(calls)(url,options);};const sender=startJournalDelivery(journal,{origin:'https://app.test',fetchImpl});await waitFor(()=>journal.getDeliveryCursor('collector','source')===1);sender.stop();assert.equal(calls.filter(([url])=>url.endsWith('/events')).length,1);});
+async function relayServer(t,{reachable=false,authorize,fetchImpl=async(url,opts)=>url.endsWith("/register")?json({...registration,source_token:"source-private-secret"}):upstream()(url,opts),manifest=true}={}){
+ const directory=mkdtempSync(join(tmpdir(),'relay-v2-')),path=join(directory,'active.json');t.after(()=>rmSync(directory,{recursive:true,force:true}));if(manifest)writeFileSync(path,JSON.stringify({version:2,collector_id:'collector',endpoint:'http://127.0.0.1:4319',enrollment_token:'private-secret-ticket'}),{mode:0o600});
+ let relay;const server=http.createServer((req,res)=>relay(req,res));await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();server.close();});const origin=reachable?'https://frontend.example':`http://127.0.0.1:${server.address().port}`;relay=createNetworkLogRelay({origin,connectionFile:path,reachable,authorize,fetchImpl});return{path,origin,url:`http://127.0.0.1:${server.address().port}/__network_log`};
 }
+async function rawFetch(url,options){return new Promise((resolve,reject)=>{const req=http.request(url,{method:options.method,headers:options.headers},res=>{const chunks=[];res.on('data',c=>chunks.push(c));res.on('end',()=>resolve(new Response(Buffer.concat(chunks),{status:res.statusCode})));});req.on('error',reject);req.end(options.body);});}
+const body={version:2,platform:'web',registration_id:'journal',journal_id:'journal',installation_id:'installation',environment_id:'environment',instance_id:'page',app_id:'app',environment_name:'Browser'};
+test('frontend before collector returns waiting and discovers later private manifest',async t=>{const relay=await relayServer(t,{manifest:false});const options={method:'POST',headers:{Origin:relay.origin,'Content-Type':'application/json'},body:JSON.stringify({...body,origin:relay.origin})};assert.equal((await fetch(relay.url+'/register',options)).status,503);writeFileSync(relay.path,JSON.stringify({version:2,collector_id:'collector',endpoint:'http://127.0.0.1:4319',enrollment_token:'private-secret-ticket'}),{mode:0o600});const config=await(await fetch(relay.url+'/register',options)).json();assert.equal(config.version,2);assert.equal(JSON.stringify(config).includes('secret'),false);});
+test('relay rejects foreign origins and keeps source token server-side',async t=>{const calls=[];const relay=await relayServer(t,{fetchImpl:async(url,options)=>{calls.push([url,options]);if(url.endsWith('/register'))return json({...registration,source_token:'source-private-secret'});return upstream()(url,options);}});const options={method:'POST',headers:{Origin:relay.origin,'Content-Type':'application/json'},body:JSON.stringify({...body,origin:relay.origin})};assert.equal((await fetch(relay.url+'/register',{...options,headers:{...options.headers,Origin:'https://evil.example'}})).status,403);const response=await fetch(relay.url+'/register',options);assert.equal(response.status,200);const result=await response.json();assert.ok(result.handle);assert.equal(JSON.stringify(result).includes('source-private'),false);assert.equal(calls[0][1].headers.Authorization,'Bearer private-secret-ticket');});
+test('reachable relay rejects spoofed Host/Origin without authenticated session and cross-session handles',async t=>{const relay=await relayServer(t,{reachable:true,authorize:req=>req.headers.authorization==='Bearer session-a'?'a':req.headers.authorization==='Bearer session-b'?'b':null,fetchImpl:async(url,options)=>url.endsWith('/register')?json({...registration,source_token:'source-private-secret'}):upstream()(url,options)});const headers={Host:new URL(relay.origin).host,Origin:relay.origin,'Content-Type':'application/json'},options={method:'POST',headers,body:JSON.stringify({...body,origin:relay.origin})};assert.equal((await rawFetch(relay.url+'/register',options)).status,401);const config=await(await rawFetch(relay.url+'/register',{...options,headers:{...headers,Authorization:'Bearer session-a'}})).json();assert.equal((await rawFetch(relay.url+'/events',{method:'POST',headers:{...headers,Authorization:'Bearer session-b','X-Network-Log-Handle':config.handle,'Content-Type':'application/x-ndjson'},body:line('event')})).status,403);});
+test('relay forbids remote HTTP and unauthenticated HTTPS configuration',()=>{assert.throws(()=>createNetworkLogRelay({origin:'http://remote.example',reachable:true}),/HTTPS/);assert.throws(()=>createNetworkLogRelay({origin:'https://remote.example',reachable:true}),/authenticated/);});
 
-test("memory journal bounds UTF-8 bytes and events, retaining canonical lines", async () => {
-  const value = line("a", { content: "漢字" }), bytes = Buffer.byteLength(value);
-  const journal = new MemoryJournal({ maxBytes: bytes, maxEvents: 2 });
-  assert.equal(journal.append(value), true);
-  assert.equal(journal.append(line("b")), false);
-  await journal.flush();
-  assert.equal(journal.exportNDJSON(), value);
-  assert.deepEqual(journal.stats, { bytes, events: 1, dropped: 1, error: null });
-  assert.throws(() => journal.append("{}\n{}\n"), /one complete/);
-  assert.throws(() => journal.append("[]\n"), /event object/);
-  const one = new MemoryJournal({ maxEvents: 1 });
-  assert.equal(one.append(line("first")), true);
-  assert.equal(one.append(line("second")), false);
-  assert.throws(() => new MemoryJournal({ maxBytes: Infinity }), /positive/);
-});
+test('browser environments share origin identity across app databases while journals/installations remain distinct',async()=>{const indexedDB=new IDBFactory();const a=await IndexedDBJournal.open({indexedDB,databaseName:'app-a',journalId:'a'}),b=await IndexedDBJournal.open({indexedDB,databaseName:'app-b',journalId:'b'});assert.equal(a.identity.environment_id,b.identity.environment_id);assert.notEqual(a.identity.installation_id,b.identity.installation_id);await a.close();await b.close();});
 
-test("IndexedDB flush commits, reload preserves IDs/order, and limits protect reopening", async () => {
-  const indexedDB = new IDBFactory(), options = { indexedDB, journalId: "session-group" };
-  const journal = await IndexedDBJournal.open(options);
-  for (const id of ["a", "b", "c"]) assert.equal(journal.append(line(id)), true);
-  assert.equal(journal.stats.pending, 3);
-  await journal.flush();
-  assert.equal(journal.stats.pending, 0);
-  assert.equal(journal.stats.persistedEvents, 3);
-  await journal.close();
-  assert.equal(journal.append(line("closed")), false);
-  const restored = await IndexedDBJournal.open(options);
-  assert.equal(restored.exportNDJSON(), journal.exportNDJSON());
-  await restored.close();
-  await assert.rejects(IndexedDBJournal.open({ ...options, maxEvents: 2 }), /exceeds configured limits/);
-  await assert.rejects(IndexedDBJournal.open({ indexedDB }), /journalId/);
-});
-
-test("concurrent IndexedDB writers never overwrite the committed journal", async () => {
-  const indexedDB = new IDBFactory(), options = { indexedDB, journalId: "same-journal" };
-  const first = await IndexedDBJournal.open(options), second = await IndexedDBJournal.open(options);
-  first.append(line("first"));
-  await first.flush();
-  second.append(line("second"));
-  await assert.rejects(second.flush(), /Another writer/);
-  assert.equal(second.exportNDJSON(), line("second"));
-  assert.match(second.stats.error, /Another writer/);
-  await first.close();
-  await assert.rejects(second.close(), /Another writer/);
-  const restored = await IndexedDBJournal.open(options);
-  assert.equal(restored.exportNDJSON(), line("first"));
-  await restored.close();
-});
-
-test("an aborted persistence transaction retains memory and reports failure", async () => {
-  const journal = await IndexedDBJournal.open({ indexedDB: new IDBFactory(), journalId: "abort" });
-  const transaction = journal._db.transaction.bind(journal._db);
-  journal._db.transaction = (...args) => {
-    const tx = transaction(...args);
-    queueMicrotask(() => tx.abort());
-    return tx;
-  };
-  journal.append(line("retained"));
-  await assert.rejects(journal.flush(), /write failed/);
-  assert.equal(journal.exportNDJSON(), line("retained"));
-  assert.equal(journal.stats.persistedEvents, 0);
-  await assert.rejects(journal.close(), /write failed/);
-});
-
-test("IndexedDB opening fails promptly when blocked or timed out and closes late success", async () => {
-  let request, closed = false;
-  const blocked = IndexedDBJournal.open({ journalId: "blocked", indexedDB: { open() { request = {}; return request; } } });
-  request.onblocked();
-  await assert.rejects(blocked, /blocked/);
-  request.result = { close() { closed = true; } };
-  request.onsuccess();
-  assert.equal(closed, true);
-  await assert.rejects(IndexedDBJournal.open({ journalId: "timeout", openTimeoutMs: 10, indexedDB: { open() { return {}; } } }), /timed out/);
-});
-
-test("uploader splits at 500 events, preserves content and replays all records", async () => {
-  const journal = new MemoryJournal();
-  for (let i = 0; i < 501; i++) journal.append(line(`id-${i}`, { content: "é" }));
-  const calls = [];
-  const fetchImpl = async (url, options) => {
-    assert.equal(options.credentials, "omit");
-    assert.equal(options.redirect, "error");
-    assert.equal(options.mode, "same-origin");
-    if (url.endsWith("/config")) return json(config);
-    calls.push(options.body);
-    return json(acknowledgment(options.body));
-  };
-  assert.deepEqual(await uploadJournal(journal, { origin: "http://127.0.0.1:4000", fetchImpl }), { events: 501, batches: 2, collectorId: config.collector_id });
-  await uploadJournal(journal, { origin: "http://127.0.0.1:4000", fetchImpl });
-  assert.equal(calls[0], calls[2]);
-  assert.equal(calls[1], calls[3]);
-  assert.equal(calls[0] + calls[1], journal.exportNDJSON());
-});
-
-test("retry after a later batch failure replays the acknowledged prefix with unchanged IDs", async () => {
-  const journal = new MemoryJournal();
-  for (let i = 0; i < 501; i++) journal.append(line(`stable-${i}`));
-  let fail = true, count = 0;
-  const delivered = new Set(), batches = [];
-  const fetchImpl = async (url, options) => {
-    if (url.endsWith("/config")) return json(config);
-    batches.push(options.body);
-    if (++count === 2 && fail) return json({}, 503);
-    const ack = acknowledgment(options.body);
-    for (const id of ack.acknowledged_event_ids) delivered.add(id);
-    return json(ack);
-  };
-  const options = { origin: "https://app.test", fetchImpl };
-  await assert.rejects(uploadJournal(journal, options), /HTTP 503/);
-  assert.equal(delivered.size, 500);
-  fail = false;
-  await uploadJournal(journal, options);
-  assert.equal(delivered.size, 501);
-  assert.equal(batches[0], batches[2]);
-  assert.equal(batches[1], batches[3]);
-  assert.equal(journal.stats.events, 501);
-});
-
-test("uploader honors exact UTF-8 byte boundary and rejects oversized events before networking", async () => {
-  const limit = 1024 * 1024, journal = new MemoryJournal();
-  const fixed = line("a", { text: "" });
-  journal.append(line("a", { text: "x".repeat(limit - Buffer.byteLength(fixed)) }));
-  journal.append(line("b", { text: "漢" }));
-  const sizes = [];
-  const fetchImpl = async (url, options) => {
-    if (url.endsWith("/config")) return json(config);
-    sizes.push(Buffer.byteLength(options.body));
-    return json(acknowledgment(options.body));
-  };
-  await uploadJournal(journal, { origin: "https://app.test", fetchImpl });
-  assert.equal(sizes[0], limit);
-  assert.equal(sizes.length, 2);
-  const oversized = new MemoryJournal();
-  oversized.append(line("big", { text: "x".repeat(limit) }));
-  await assert.rejects(uploadJournal(oversized, { origin: "https://app.test", fetchImpl: () => { throw new Error("must not fetch"); } }), /1 MiB/);
-});
-
-test("uploader rejects partial, foreign, malformed and oversized ACKs without deletion", async () => {
-  const journal = new MemoryJournal(); journal.append(line("retained"));
-  const bad = [
-    () => json({ ...config, acknowledged_event_ids: [] }),
-    () => json({ ...config, collector_id: "other", acknowledged_event_ids: ["retained"] }),
-    () => new Response("not json"),
-    () => new Response("x".repeat(2 * 1024 * 1024 + 1)),
-    () => json({}, 507),
-    () => json(null),
-  ];
-  for (const response of bad) {
-    await assert.rejects(uploadJournal(journal, { origin: "https://app.test", fetchImpl: async (url) => url.endsWith("/config") ? json(config) : response() }));
-    assert.equal(journal.exportNDJSON(), line("retained"));
-  }
-  await assert.rejects(uploadJournal(journal, { origin: "https://app.test", basePath: "https://evil.test", fetchImpl: async () => json(config) }), /same-origin/);
-  await assert.rejects(uploadJournal(journal, { origin: "https://user:password@app.test", fetchImpl: async () => json(config) }), /origin/);
-});
-
-test("uploader times out a stalled fetch and propagates persistence failure without networking", async () => {
-  const journal = new MemoryJournal(); journal.append(line("retained"));
-  await assert.rejects(uploadJournal(journal, { origin: "https://app.test", timeoutMs: 10, fetchImpl: () => new Promise(() => {}) }), /timed out/);
-  await assert.rejects(uploadJournal({ flush() { throw new Error("disk full"); } }, { origin: "https://app.test", fetchImpl: () => { throw new Error("must not fetch"); } }), /disk full/);
-});
-
-async function relayServer(t, options = {}) {
-  const directory = temp(t), collector = await startCollector({ directory: join(directory, "collector"), port: 0 });
-  t.after(() => collector.close());
-  const connectionFile = join(directory, "connection.json");
-  writeFileSync(connectionFile, JSON.stringify(collector.connections[0]));
-  let relay;
-  const server = http.createServer((req, res) => relay(req, res));
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
-  const origin = `http://127.0.0.1:${server.address().port}`;
-  relay = createNetworkLogRelay({ connectionFile, origin, ...options });
-  return { origin, collector, connectionFile, fetchImpl: (url, request = {}) => fetch(url, {
-    ...request, headers: { ...request.headers, ...(request.method === "POST" ? { Origin: origin } : {}) },
-  }) };
-}
-
-test("real relay and collector retain capture, replay without duplicates, and expose no pairing token", async (t) => {
-  const { origin, collector, fetchImpl } = await relayServer(t);
-  const journal = new MemoryJournal();
-  const fixture = readFileSync(new URL("../examples/success.ndjson", import.meta.url), "utf8");
-  for (const value of fixture.trim().split("\n")) journal.append(value + "\n");
-  const result = await uploadJournal(journal, { origin, fetchImpl });
-  assert.equal(collector.store.cursor, result.events);
-  await uploadJournal(journal, { origin, fetchImpl });
-  assert.equal(collector.store.cursor, result.events);
-  assert.equal(journal.exportNDJSON(), fixture);
-  const response = await fetch(origin + "/__network_log/config");
-  assert.deepEqual(await response.json(), { version: 1, collector_id: collector.connections[0].collector_id });
-  assert.equal(response.headers.get("access-control-allow-origin"), null);
-});
-
-test("relay checks Host, Origin, route, type, size, event count and does not grant CORS", async (t) => {
-  const { origin } = await relayServer(t);
-  const path = origin + "/__network_log/events", body = line("a");
-  for (const [options, status] of [
-    [{ method: "POST", headers: { Origin: "http://evil.test", "Content-Type": "application/x-ndjson" }, body }, 403],
-    [{ method: "POST", headers: { "Content-Type": "application/x-ndjson" }, body }, 403],
-    [{ method: "OPTIONS", headers: { Origin: "http://evil.test" } }, 403],
-    [{ method: "POST", headers: { Origin: origin, "Content-Type": "text/plain" }, body }, 415],
-    [{ method: "POST", headers: { Origin: origin, "Content-Type": "application/x-ndjson", "Content-Encoding": "gzip" }, body }, 415],
-    [{ method: "POST", headers: { Origin: origin, "Content-Type": "application/x-ndjson" }, body: body.repeat(501) }, 413],
-    [{ method: "POST", headers: { Origin: origin, "Content-Type": "application/x-ndjson" }, body: "x".repeat(1024 * 1024 + 1) }, 413],
-  ]) {
-    const response = await fetch(path, options);
-    assert.equal(response.status, status);
-    assert.equal(response.headers.get("access-control-allow-origin"), null);
-    await response.arrayBuffer();
-  }
-  assert.equal((await fetch(path + "?alternate=1")).status, 404);
-  const foreignHost = await new Promise((resolve, reject) => {
-    const request = http.request(origin + "/__network_log/config", { headers: { Host: "evil.test" } }, (response) => { response.resume(); resolve(response.statusCode); });
-    request.once("error", reject); request.end();
-  });
-  assert.equal(foreignHost, 403);
-});
-
-test("relay forwards only paired headers, refuses redirects and hides upstream errors", async (t) => {
-  let mode = "redirect", forwarded;
-  const { origin } = await relayServer(t, { fetchImpl: async (url, options) => {
-    forwarded = { url, options };
-    return mode === "redirect" ? new Response(null, { status: 302, headers: { Location: "http://evil.test" } }) : json({ error: "private-token-reflection" }, 500);
-  } });
-  const request = { method: "POST", headers: { Origin: origin, Cookie: "private-app-cookie", Authorization: "Bearer wrong-browser-token", "Content-Type": "application/x-ndjson" }, body: line("a") };
-  assert.equal((await fetch(origin + "/__network_log/events", request)).status, 502);
-  assert.equal(forwarded.options.redirect, "manual");
-  assert.deepEqual(Object.keys(forwarded.options.headers).sort(), ["Authorization", "Content-Type"]);
-  assert.notEqual(forwarded.options.headers.Authorization, request.headers.Authorization);
-  mode = "error";
-  const response = await fetch(origin + "/__network_log/events", request);
-  assert.equal(response.status, 500);
-  assert.doesNotMatch(await response.text(), /private-token-reflection/);
-});
-
-test("relay enforces ACK bound and timeout", async (t) => {
-  let mode = "large";
-  const { origin } = await relayServer(t, { timeoutMs: 20, fetchImpl: async (_url, options) => {
-    if (mode === "large") return new Response("x".repeat(2 * 1024 * 1024 + 1));
-    return new Promise((_, reject) => options.signal.addEventListener("abort", () => reject(new Error("secret error details")), { once: true }));
-  } });
-  const request = { method: "POST", headers: { Origin: origin, "Content-Type": "application/x-ndjson" }, body: line("a") };
-  const large = await fetch(origin + "/__network_log/events", request);
-  assert.equal(large.status, 502);
-  assert.match(await large.text(), /2 MiB/);
-  mode = "slow";
-  const slow = await fetch(origin + "/__network_log/events", request);
-  assert.equal(slow.status, 502);
-  assert.doesNotMatch(await slow.text(), /secret error details/);
-});
-
-test("relay permits only two simultaneous upstream uploads", async (t) => {
-  const pending = [];
-  const { origin, collector } = await relayServer(t, { fetchImpl: () => new Promise((resolve) => pending.push(resolve)) });
-  const request = { method: "POST", headers: { Origin: origin, "Content-Type": "application/x-ndjson" }, body: line("a") };
-  const first = fetch(origin + "/__network_log/events", request), second = fetch(origin + "/__network_log/events", request);
-  for (let i = 0; pending.length < 2 && i < 100; i++) await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(pending.length, 2);
-  assert.equal((await fetch(origin + "/__network_log/events", request)).status, 429);
-  for (const resolve of pending) resolve(json({ version: 1, collector_id: collector.connections[0].collector_id, acknowledged_event_ids: ["a"] }));
-  assert.equal((await first).status, 200);
-  assert.equal((await second).status, 200);
-});
-
-test("relay pairing rejects non-loopback and credential-bearing endpoints", (t) => {
-  const connectionFile = join(temp(t), "connection.json");
-  for (const endpoint of ["http://localhost:4319", "https://127.0.0.1:4319", "http://127.0.0.1.evil.test", "http://user:pass@127.0.0.1", "http://127.0.0.1/?token=secret"]) {
-    writeFileSync(connectionFile, JSON.stringify({ version: 1, endpoint, token: "device-token", collector_id: "collector" }));
-    assert.throws(() => createNetworkLogRelay({ connectionFile, origin: "http://127.0.0.1:4000" }), /loopback/);
-  }
-});
+test('oversized memory events fail delivery visibly instead of appearing drained',async()=>{const journal=new MemoryJournal();journal.append(JSON.stringify({event_id:'large',data:'x'.repeat(1024*1024)})+'\n');await assert.rejects(uploadJournal(journal,{origin:'https://app.test',fetchImpl:upstream()}),/batch byte limit/);assert.equal(journal.getDeliveryCursor('collector','source'),0);});

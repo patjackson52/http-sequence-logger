@@ -1,16 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:mobile-network-log:event:1.2",
-  "title": "Network log event, draft contracts 1.0, 1.1 and 1.2",
+  "title": "Network log event, contract 1.2",
   "description": "One NDJSON record. See CONTRACT.md for cross-event and capture semantics. Custom format, not OTLP JSON.",
   "type": "object",
   "properties": {
     "schema_version": {
-      "enum": [
-        "1.0",
-        "1.1",
-        "1.2"
-      ]
+      "const": "1.2"
     },
     "event_type": {
       "enum": [
@@ -78,131 +74,6 @@
     "data"
   ],
   "additionalProperties": false,
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "schema_version": {
-            "enum": [
-              "1.0",
-              "1.1"
-            ]
-          }
-        }
-      },
-      "then": {
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "event_type": {
-                  "const": "session.started"
-                }
-              }
-            },
-            "then": {
-              "properties": {
-                "data": {
-                  "properties": {
-                    "producer": {
-                      "properties": {
-                        "platform": {
-                          "enum": [
-                            "android",
-                            "ios"
-                          ]
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          {
-            "if": {
-              "properties": {
-                "event_type": {
-                  "const": "operation.started"
-                }
-              }
-            },
-            "then": {
-              "properties": {
-                "data": {
-                  "properties": {
-                    "invocation": {
-                      "properties": {
-                        "dispatch": {
-                          "const": "synchronous"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "schema_version": {
-            "const": "1.0"
-          }
-        }
-      },
-      "then": {
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "event_type": {
-                  "const": "operation.started"
-                }
-              }
-            },
-            "then": {
-              "properties": {
-                "data": {
-                  "properties": {
-                    "invocation": false
-                  }
-                }
-              }
-            }
-          },
-          {
-            "if": {
-              "properties": {
-                "event_type": {
-                  "const": "operation.ended"
-                }
-              }
-            },
-            "then": {
-              "properties": {
-                "data": {
-                  "properties": {
-                    "completion": false,
-                    "outcome": {
-                      "enum": [
-                        "success",
-                        "error",
-                        "cancelled"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          }
-        ]
-      }
-    }
-  ],
   "oneOf": [
     {
       "properties": {

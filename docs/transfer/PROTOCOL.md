@@ -1,70 +1,69 @@
-# Development capture transfer v1
+# Source-aware transfer protocol
 
-Capture event schemas `1.0`, `1.1` and `1.2` travel unchanged under transfer version `1`. Browser producers use capture `1.2`; native producers retain their existing versions. Transport frames never become capture events. All records must have passed the producer's capture/redaction policy before entering a transfer sink.
+Transfer version **2** is the sole supported transport. Capture events use schema **1.2**. Start with a new collector directory; earlier state and routes are unsupported and left untouched.
 
-## Connection configuration
+The collector runs an HTTP viewer on loopback and optionally a separate HTTPS upload listener. Producer credentials authorize only upload and own-source presence. Reader authority never enters producer configuration. The HTTPS listener does not serve the viewer or read APIs.
 
-A collector produces a pasted JSON connection string (not a URL query token):
+## Enrollment and identities
 
-```json
-{"version":1,"endpoint":"http://127.0.0.1:4319","token":"opaque-random-write-token","collector_id":"opaque-collector-id","certificate_sha256":null}
-```
+A trusted local adapter/tool issues a 256-bit enrollment ticket, bound to a principal and optional exact source metadata scope. Manual/physical native grants share the trusted `native-pairing` principal, so a fresh authorized grant for the same installation preserves its source after a lost response/recovery expiry. Local adapters and browser relays use their own scoped principals. Tickets expire after ten minutes, allow at most 128 new registration operations, and retain idempotent recovery for twenty minutes. The collector atomically persists enrollment use, a source, its scoped credential, and the recoverable result. Registration operation IDs must be persisted before requesting enrollment. Identical authenticated retries recover the same result; conflicting metadata and revoked sources fail. A native source identifies an installation; a browser source identifies its journal within the installation.
 
-`endpoint` is an origin with no credentials, query, fragment, or path except `/`. HTTP is accepted only for loopback hostnames/IPs. Other destinations require HTTPS. `certificate_sha256`, when supplied, is the lowercase SHA-256 hex digest of the complete DER leaf certificate. Matching the pin establishes the explicitly paired trust anchor, but certificate validity and endpoint hostname still must be verified. Never install a global trust override. Redirects are never followed. The token is supplied only in the Authorization header to this origin. It must not appear in capture events, diagnostic messages, URL parameters, or logs.
-
-Android desktop tooling can save this JSON in the debuggable app's `files/network-log/connection.json` and install `adb reverse tcp:4319 tcp:4319`. The app's development factory reads it. iOS consumers accept the same pasted JSON or a connection file in their own debug configuration. Network setup does not automatically instrument arbitrary HTTP clients.
-
-## Upload
-
-`POST /api/v1/events`, with `Authorization: Bearer <token>` and `Content-Type: application/x-ndjson`. The UTF-8 body contains complete JSON event lines and ends with newline. Max body: 1 MiB; max 500 events. A single event must fit the body limit. Small batches should flush within 250 ms. Producers persist to a bounded local NDJSON spool before asynchronous delivery; they retain unacknowledged data across connection failures and process restarts. The network sender must be excluded from the capture pipeline.
-
-A successful response is HTTP 200 with JSON:
+`POST /api/v2/register`, `Authorization: Bearer ENROLLMENT_TOKEN`, JSON at most 16 KiB:
 
 ```json
-{"version":1,"collector_id":"opaque-collector-id","accepted":2,"duplicates":0,"acknowledged_event_ids":["event-1","event-2"],"cursor":2,"recordings":[{"recording_id":"recording-1","highest_contiguous_sequence":2}]}
+{"version":2,"registration_id":"persisted-operation-id","platform":"ios","environment_id":"installation-scoped-environment","environment_name":"Developer phone","app_id":"com.example.app.debug","installation_id":"random-private-id","journal_id":"process-journal-id","instance_id":"ephemeral-process-id"}
 ```
 
-The collector acknowledges only after appending and fsyncing new records. A client advances its durable spool cursor only if `collector_id` matches its paired configuration and every submitted event ID is acknowledged. Cursor state is scoped to that collector and spool prefix; another collector or a replaced/truncated file must replay from the beginning. Event IDs and timestamps must never be regenerated on retry.
+Web registration additionally requires the exact frontend `origin`. Names/IP addresses are labels, never source keys. Direct LAN metadata is asserted by the enrolled principal; ADB/simulator adapters bind a descriptor to the tool-selected device/container. A registration response includes `version`, `collector_id`, `source_id`, `source_token`, and `endpoint`. Native sources may use one installation credential across process journals; delivery cursors still bind to the individual journal. Web credentials remain exclusively in the Node relay.
 
-Identical duplicate IDs (ignoring JSON key order) are accepted without duplicate storage. Conflicting event IDs or recording sequence identities fail atomically with HTTP 409. Schema-invalid or malformed batches fail atomically with 400; auth failures use 401; oversized batches use 413; full collector storage uses 507. Failures never acknowledge a prefix. Semantic capture diagnostics remain available to the viewer; incomplete running lifecycles are not rejected. Bounded backoff handles transient failures; permanent 4xx errors remain visible to diagnostics and retain the spool for export.
+Pairing JSON is private, development-only state:
 
-## Collector and viewer
+```json
+{"version":2,"collector_id":"collector-id","endpoint":"https://developer-host.local:4320","source_id":"source-id","source_token":"secret","certificate_sha256":"lowercase-SHA256-of-DER-certificate"}
+```
 
-The collector's loopback HTTP listener serves the built viewer. Its separate browser token allows read access, export, and viewing connection configuration; the device token only permits upload. The CLI prints the ordinary loopback URL. Collector-served HTML includes a non-secret `network-log-collector` marker; the viewer then obtains its read token from the same origin and keeps it only in memory. Requests still use Authorization headers. Legacy fragment links are removed on initial load and remain compatible; no new links contain credentials. An optional HTTPS LAN listener permits authenticated device ingestion only, never unauthenticated capture browsing. Host and Origin checks protect the loopback HTTP listener; no permissive CORS headers are sent.
+Before registration, the same document may supply `enrollment_token` instead of `source_id`/`source_token`. Pinning a private self-signed certificate requires service-name and certificate-validity checks as well as its exact DER fingerprint. Redirects are forbidden. Discovery supplies candidates; it cannot establish a trusted pin or grant enrollment. Explicit source revocation is immediate; rotation keeps the same source ID and permits a bounded sixty-second old-token overlap.
 
-`GET /api/v1/health` identifies a collector on the loopback listener, without secrets; it includes `service: "http-sequence-logger"` and `automatic_viewer: true`. It is unavailable on the upload-only LAN listener.
+Development TLS certificates must include a SAN matching the endpoint hostname/IP and `extendedKeyUsage=serverAuth`. The executed RSA test fixture also uses `keyUsage=digitalSignature,keyEncipherment`. A matching pin does not replace hostname, validity or server-purpose checks. Bind the listener to the address used by the client: simulator `localhost` may resolve to IPv6 `::1`. The simulator fixture records its exact certificate extensions and listener configuration with the test evidence.
 
-`GET /api/v1/viewer-session` returns `{version:1,collector_id,token}` only on loopback and requires **all** of `Sec-Fetch-Site: same-origin`, `Sec-Fetch-Mode: same-origin` and `X-Network-Log-Viewer: 1`. Host must be the listener's `127.0.0.1:port` or `localhost:port`; any Origin must match that exact host/port. Navigation, foreign/same-site origins, missing metadata and untrusted Hosts are rejected. It emits `Cache-Control: no-store` and `Cross-Origin-Resource-Policy: same-origin`, with no CORS permission. Browser scripts cannot set [Fetch Metadata headers](https://www.w3.org/TR/fetch-metadata/); local command-line processes remain trusted, as they already have access to the collector's private files. This grants a locally opened viewer access without exposing read APIs or device uploads anonymously. The LAN listener rejects this route.
+## Upload and acknowledgment
 
-The viewer bootstraps again after each connection loss, including credential rotation. New collector identity resets the cursor and displayed capture; same-identity reconnect catches up without duplicates. File-only static hosting has no marker and stays in file mode rather than scanning ports or weakening CORS.
+`POST /api/v2/events`, `Authorization: Bearer SOURCE_TOKEN`, `Content-Type: application/x-ndjson`: complete UTF-8 NDJSON lines, at most 1 MiB and 500 events. A batch is validated atomically. The first accepted event binds a recording to the authenticated source. Stable event IDs deduplicate identical replay, while changed IDs, recording sequences, identities or source ownership fail with 409. Source metadata does not rewrite the original event JSON.
 
-Browser-authenticated loopback routes:
+Success is returned only after the database transaction commits with WAL and synchronous FULL in the dedicated SQLite worker. The ACK echoes transfer version 2, collector/source identities, every submitted `acknowledged_event_ids`, accepted/duplicate counts, global `event_cursor` (`cursor` in the ACK), and touched recordings' highest contiguous sequence. Verify identities and all submitted IDs before advancing a journal cursor. A lost response may follow a successful commit: retain and replay the canonical records. An ACK never deletes capture history.
 
-- `GET /api/v1/events?after=<cursor>` returns `{collector_id,cursor,lines:[string],has_more}` in bounded pages. Cursors are collector-global journal positions, not source timestamps.
-- `GET /api/v1/stream` sends SSE `ready`/`changed` notifications with `{collector_id,cursor}` and heartbeat comments. Reconnect and read events after the browser's last cursor. Snapshot/event download closes the subscribe/fetch race.
-- `GET /api/v1/download` exports the persisted NDJSON.
-- `GET /api/v1/status` returns collector identity and Android connection state; device changes notify existing SSE subscribers even if the event cursor has not changed.
-- `GET /api/v1/pairing` returns loopback and available LAN connection configurations for explicit pairing.
+`POST /api/v2/presence` uses the source credential and a bounded JSON process instance/status. Accepted uploads refresh presence. Presence has no capture-event semantics and does not prove a session completed. Restart clears live presence; retained history stays visible.
 
-A browser disconnect is transport state, not a synthetic HTTP failure or method return. Live records with no terminal event display 'completion not yet observed'; imported files retain the existing incomplete-capture wording. The viewer initially follows new sessions; selection, filtering or method collapse disables following and retains inspection state as events arrive. Pause/file import stops browser reads while the collector continues retaining events; Resume returns to the collector capture. These controls do not change HTTP or handler outcomes.
+Producer journaling uses one canonical journal, one serialized disk owner, bounded append admission and asynchronous flush barriers. Queued logging is not yet durable. Senders read only the synced prefix. Local adapters read the published `durable_bytes` boundary from `journals/JOURNAL/journal.json`; they advance the follower checkpoint in the same database commit as its events. The collector does not treat visible complete lines after process death as proof of durability.
 
-## Browser SDK delivery through a development relay
+## Viewer APIs
 
-The browser SDK is a producer distinct from the desktop viewer. Its canonical journal is bounded, origin-scoped IndexedDB (or explicitly selected memory storage); an NDJSON file is created by export. Browser delivery is an **explicit foreground upload**, not the native sender's timed spool flushing/backoff/cursor behavior.
+A script on the collector's ordinary viewer URL bootstraps using `GET /api/v2/bootstrap`, `X-Network-Log-Viewer: 1`, and same-origin Fetch metadata. It receives `{version:2,collector_id,token}`. Reader requests use that bearer token. Exact Host and Origin checks apply; no browser-to-collector CORS exception exists.
 
-The opt-in Node middleware `web-sdk/dev-relay.mjs` mounts on the frontend's loopback-bound development server. It reads the collector's private loopback pairing file at startup and accepts only a collector endpoint with `http:` and hostname `127.0.0.1`. No native LAN certificate-pinning route is implemented by this relay. The frontend origin is configured explicitly; Host must match, a supplied Origin must match, and uploads require that matching Origin. No permissive CORS response or arbitrary proxy target is supplied. The upload token stays in Node memory, never browser code, public configuration, capture events or URL parameters.
+- `/api/v2/health`: public loopback service/runtime identity.
+- `/api/v2/sources`: registered source metadata and environment/app projections.
+- `/api/v2/sessions`: bounded logical-session summaries, optionally filtered by source.
+- `/api/v2/events`: bounded lines, with `after`, `high_water`, `source_id`, `session_namespace`, `session_id` filters.
+- `/api/v2/stream`: authenticated Fetch SSE; ready/changed hints carry `collector_id`, `event_cursor`, `registry_revision`.
+- `/api/v2/download`: bounded keyset export pinned to immutable event high-water; each page releases its database read before socket backpressure.
+- `/api/v2/status` and `/api/v2/pairing`: local diagnostics and explicit pairing candidates.
 
-Default same-origin routes:
+Subscribe before fetching a snapshot and reconcile buffered hints. Event pages return `next_after` even when filters produce no lines; `high_water` pins a finite catch-up. UI selection/pause/collector changes fence stale responses. Viewer pause leaves collection running.
 
-- `GET /__network_log/config` returns `{version:1,collector_id}` with no upload token.
-- `POST /__network_log/events` accepts uncompressed `application/x-ndjson`, at most 1 MiB / 500 complete lines, and forwards to the fixed collector `/api/v1/events` with the device credential. At most two relay uploads are active at once. Collector redirects are rejected; responses/ACKs are capped at 2 MiB. Rejection or timeout preserves the browser journal.
+## Discovery and relay boundaries
 
-`uploadJournal(journal)` awaits persistence, snapshots the retained NDJSON, and sends bounded batches using an uninstrumented Fetch call. It validates collector identity and acknowledgment of every submitted ID. It never deletes canonical data, advances a browser ACK cursor, or rewrites event identities. Repeated uploads replay retained records and the collector deduplicates them. Appends after the snapshot require another invocation. There is no automatic timer retry, background upload, WebSocket or continuous SDK stream; SSE remains the collector-to-viewer change notification mechanism.
+Default active manifest: `~/.http-sequence-logger/active.json`, owner-only directory and regular 0600 file, atomically published with collector/instance identity, endpoint, PID and bounded enrollment grant. It is server-side private configuration, never frontend assets. An explicit manifest override chooses another collector. A live owner cannot be silently displaced. Stale ownership is rechecked under an exclusive reclamation gate before repair; the database directory uses the same rule. Simultaneous restart cannot unlink a newly claimed owner. Interrupted reclamation is diagnosed; select a fresh manifest path or state directory instead of deleting ambiguous ownership files. Shutdown removes only its own publication.
 
-Restart the development server after changing the pairing file. Host apps retain a manual file export when the collector or IndexedDB is unavailable and exclude the relay, recorder, storage and export controls from shipping frontend artifacts. [Browser integration](../integration/WEB.md) gives package entries, storage names, source installation and build-boundary examples.
+Android opt-in descriptor: `no_backup/HTTPSequenceLogger/source.json`. Simulator opt-in descriptor: `Library/Application Support/HTTPSequenceLogger/source.json`. Both declare current version, actual app ID, installation ID and fixed `journal_directory: "journals"`. Each journal owns `capture.ndjson` and a published `journal.json`. The bounded version 2 `journal-budget.json` reservations identify retained generations. A missing reserved folder or capture pauses collection/reopen with a restore/export diagnostic; inventory is preserved. A descriptor initialized before any journal exists may have no budget file. The app owns explicit `pairing.json` in the descriptor root, including its registered installation credential. The collector exclusively owns automatic `pairing-local.json`; bootstrap uses it only when no explicit app selection exists. Local provisioning reuses a validated source credential and never overwrites app selection. Only authorized default-user Android debuggable apps and booted simulator containers are discovered automatically. Missing tools disable that adapter. Simulators are never booted to scan.
 
-## ADB file retrieval
+Android caches bounded package enumeration for 10 seconds, but probes descriptor presence on every scan in groups of at most 32 packages. Remote commands use the same numeric user as descriptor reads, create no files and return only candidate names. Every candidate then passes the ordinary bounded descriptor and path validation. There is no negative descriptor cache: an already installed app can initialize its descriptor between scans. Unexpected access errors remain candidates so the detailed read reports them.
 
-The CLI's optional Android watcher reads NDJSON from the debuggable app's `files/captures/` using `run-as`, tracks file changes, and buffers incomplete UTF-8/NDJSON tails. File replacement or rotation resets the file offset, while collector event-ID deduplication prevents duplicate records. Only validated package/filename arguments reach adb; commands do not parse Logcat. This works with the existing file-only SDK and with the transfer sink, and gives a no-app-change migration path. Device disconnects are retried and surfaced in the viewer. Routing and private pairing are rechecked after reconnect/reinstall. The first selected device is retained for the life of the watcher; it never silently switches phones.
+The debug Node relay is always mounted even before a collector exists. It registers participating pages with no events and returns opaque relay-local handles. Handle scope binds configured app, exact frontend origin and journal; remote access additionally binds the authenticated frontend session. All registration/presence/upload routes require the same explicit authentication middleware boundary, exact Host/Origin and CSRF checks when reachable. Correct spoofed headers are not authentication. The browser contacts its own frontend origin; the relay adds collector credentials using uninstrumented Fetch. Relay targets are private configured collector endpoints, never arbitrary request parameters.
 
-ACK bodies are bounded at **2 MiB** by both native senders, including chunked responses. A valid 1 MiB upload with many long or multibyte IDs can exceed 512 KiB in its ACK; do not use a smaller receiver limit. Oversized ACKs retain pending data and are rejected.
+Optional Bonjour advertises `_nlog._tcp` service version/collector ID/hostname, never secrets. Enable with `--bonjour --lan HOST`. Native debug apps browse foregrounded and explicitly select/trust a candidate. Manual pairing handles blocked multicast or permission denial. iOS debug-only Bonjour/local-network descriptions and Android OS/target-SDK permission behavior require physical-device verification.
+
+## Limits and failure behavior
+
+The initial collector caps uploads at eight globally/two per source, store event jobs at 16 MiB aggregate/2 MiB per source, sources at 1,000, control JSON at 16 KiB and SSE viewers at 32. Fair source rotation and reserved bounded control capacity keep admission independent of SQLite work. Retryable overload returns 429/503 with bounded retry; storage capacity errors, including actual SQLite full/ENOSPC failures, use 507. Uncertain I/O failures remain 503 and never return a success ACK. Existing identical replay remains acknowledgeable at logical event capacity. DB/index/WAL budgets and a free-space reserve constrain physical storage; no automatic retention deletion occurs. Unsupported directories, unsafe files, permission errors and source failures are diagnosed instead of adopting or deleting state.
+
+These limits and durability configuration are implementation constraints, not a claim that every device lifecycle, power-loss, performance or physical-browser acceptance gate has passed. See the implementation evidence record for executed checks and outstanding platform gates.

@@ -14,3 +14,6 @@
 
 .live-actions label{display:flex;align-items:center;gap:6px;min-height:32px}.live-actions input[type=checkbox]{min-height:0;width:14px;height:14px;margin:0}
 @media(max-width:719px){.live-actions label{min-height:44px}}
+
+.source-navigation {padding:1rem;max-height:55vh;overflow:auto;background:#fafbfc;border:1px solid var(--border);border-radius:10px}.source-navigation details details{margin-left:1rem}.source-navigation button{display:block;width:100%;text-align:left;margin:.3rem 0}.source-navigation small{display:block;color:var(--muted);overflow-wrap:anywhere}
+.session-nav .source-navigation,.sheet .source-navigation{max-height:none;overflow:visible;padding:0;border:0;border-radius:0}

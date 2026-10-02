@@ -23,13 +23,14 @@ private object Runs {
     var steps = listOf<String>()
     var result = "Use the public demo account. No setup required."
     var file: File? = null
+    var captureFiles = emptyList<File>()
     var listener: (() -> Unit)? = null
     var transferStatus = "Local capture only · collector not paired"
     private var retained = emptyList<FileHttpEventSink>()
     private fun transferDiagnostic(message: String) { main.post { transferStatus = message; notifyUi() } }
     fun resume(context: Context) = worker.execute {
         retained.forEach { it.close() }
-        retained = DebugTransfer.resumePending(context, File(context.filesDir, "captures"), diagnostic = ::transferDiagnostic)
+        retained = DebugTransfer.resumePending(context, diagnostic = ::transferDiagnostic)
         val paired = runCatching { DebugTransfer.readConnection(context) != null }.getOrDefault(false)
         main.post { transferStatus = if (paired) "Collector paired · captures upload automatically" else "Local capture only · collector not paired"; notifyUi() }
     }
@@ -45,14 +46,15 @@ private object Runs {
         if (busy) return
         busy = true; title = "Running sign in"; result = "Contacting three public services…"; steps = emptyList(); file = null; notifyUi()
         worker.execute {
-            val capture = File(directory, "capture-${System.currentTimeMillis()}.ndjson")
+            var capture: File? = null
             try {
-                DebugTransfer.open(context, capture, ::transferDiagnostic).use { sink ->
+                DebugTransfer.open(context, diagnostic = ::transferDiagnostic).use { sink ->
+                    capture = sink.file
                     val logger = NetworkLog(sink, appId)
                     try {
                         val response = SampleFlow.run(RecordingLogger(logger), sessionId, recovery) { step -> main.post { steps = steps + step; notifyUi() } }
                         main.post { title = "Sign in complete"; result = "Hello, ${response.name}.\nTask: ${response.task}\nSession: ${response.sessionId}" }
-                    } finally { sink.awaitUploaded(2_000) }
+                    } finally { sink.flush().get(); captureFiles=sink.captureFiles; sink.awaitUploaded(2_000) }
                 }
             } catch (error: Exception) {
                 main.post { title = "Run did not complete"; result = "${error.javaClass.simpleName}: ${error.message}\nPartial capture is available for inspection." }
@@ -71,6 +73,7 @@ class MainActivity : Activity() {
     private lateinit var session: EditText
     private lateinit var transfer: TextView
     private lateinit var pair: Button
+    private var discovery:CollectorDiscovery?=null
     private val ink = Color.rgb(24, 40, 51)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -120,6 +123,17 @@ class MainActivity : Activity() {
                     .setNegativeButton("Cancel", null).show()
             }; content.addView(this)
         }
+        Button(this).apply {
+            text="Discover collectors";isAllCaps=false
+            setOnClickListener {
+                discovery?.close()
+                val names=label("Searching local collectors…",12f)
+                discovery=CollectorDiscovery(applicationContext, { candidates -> runOnUiThread {
+                    names.text=if(candidates.isEmpty()) "No collector discovered. Manual pairing remains available."
+                        else candidates.joinToString("\n") { "${it.serviceName}: https://${it.hostname}:${it.port} · request enrollment JSON from this collector" }
+                } }, { message -> runOnUiThread { names.text=message } })
+            };content.addView(this)
+        }
         label("DEVELOPMENT DEMO", 11f, Color.rgb(34, 112, 85))
         label("Public synthetic account • demonstration challenge\nNo phone verification or OAuth security claim.\nCredentials and tokens are redacted before writing.\nCaptures stay local unless you pair a collector or export.", 12f)
         Runs.resume(applicationContext)
@@ -140,7 +154,7 @@ class MainActivity : Activity() {
     private fun begin(recover: Boolean) = Runs.run(applicationContext, File(filesDir, "captures"), packageName,
         session.text.toString().takeIf { it.isNotEmpty() }, recover)
     override fun onStart() { super.onStart(); Runs.listener = { render() }; render() }
-    override fun onStop() { Runs.listener = null; super.onStop() }
+    override fun onStop() { discovery?.close();discovery=null;Runs.listener = null; super.onStop() }
     override fun onSaveInstanceState(outState: Bundle) { outState.putString("session", session.text.toString()); super.onSaveInstanceState(outState) }
     private fun render() {
         state.text = Runs.title; detail.text = Runs.result
@@ -157,10 +171,10 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != 10 || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
-        val source = Runs.file ?: return
+        val sources = Runs.captureFiles.takeIf { it.isNotEmpty() } ?: return
         val resolver = applicationContext.contentResolver
         Runs.worker.execute {
-            val success = runCatching { requireNotNull(resolver.openOutputStream(uri)).use { out -> source.inputStream().use { it.copyTo(out) } } }.isSuccess
+            val success = runCatching { requireNotNull(resolver.openOutputStream(uri)).use { out -> sources.forEach { source -> source.inputStream().use { it.copyTo(out) } } } }.isSuccess
             Runs.main.post { Toast.makeText(applicationContext, if (success) "Log exported" else "Export failed", Toast.LENGTH_SHORT).show() }
         }
     }

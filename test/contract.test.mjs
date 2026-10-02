@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import { validateCapture } from '../validate.mjs';
 
 const root = new URL('../', import.meta.url);
@@ -34,9 +35,19 @@ for (const fixture of manifest.captures) {
 test('committed schema and captures reproduce exactly', () => {
   const names = ['schema/event.schema.json', ...readdirSync(new URL('examples/', root)).map((name) => `examples/${name}`)];
   const before = names.map((name) => readFileSync(new URL(name, root), 'utf8'));
-  execFileSync(process.execPath, ['scripts/build-schema.mjs'], { cwd: root });
-  execFileSync(process.execPath, ['scripts/build-examples.mjs'], { cwd: root });
-  names.forEach((name, i) => assert.equal(readFileSync(new URL(name, root), 'utf8'), before[i], name));
+  // Other test processes read committed fixtures while these generators run.
+  mkdirSync(new URL('.local/', root), { recursive: true });
+  const output = mkdtempSync(new URL('.local/contract-repro-', root));
+  try {
+    for (const directory of ['scripts', 'schema', 'examples']) mkdirSync(join(output, directory));
+    for (const script of ['build-schema.mjs', 'build-examples.mjs']) copyFileSync(new URL(`scripts/${script}`, root), join(output, 'scripts', script));
+    execFileSync(process.execPath, ['scripts/build-schema.mjs'], { cwd: output });
+    execFileSync(process.execPath, ['scripts/build-examples.mjs'], { cwd: output });
+    assert.deepEqual(readdirSync(join(output, 'examples')).sort(), readdirSync(new URL('examples/', root)).sort());
+    names.forEach((name, i) => assert.equal(readFileSync(join(output, name), 'utf8'), before[i], name));
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
 });
 
 test('repeated query parameters and response headers survive round-trip', () => {
@@ -307,12 +318,15 @@ rejectHandler('handler return cannot claim an error outcome', events => {
 rejectHandler('caller metadata must agree with parent method', events => {
   events.find(e => e.data.invocation).data.invocation.caller.owner = 'integrator';
 }, /caller must match/);
-rejectHandler('1.0 rejects handler fields instead of silently changing its schema', events => {
+rejectHandler('obsolete 1.0 captures are rejected', events => {
   events.forEach(e => { e.schema_version = '1.0'; });
+}, /schema validation/);
+rejectHandler('obsolete 1.1 captures are rejected', events => {
+  events.forEach(e => { e.schema_version = '1.1'; });
 }, /schema validation/);
 rejectHandler('a recording cannot change its schema version midstream', events => {
   events[0].schema_version = '1.0';
-}, /schema version changed/);
+}, /schema validation/);
 rejectHandler('generic operation cannot carry a handler return', events => {
   const lastOperation = events.filter(e => e.event_type === 'operation.ended').at(-1);
   lastOperation.data.completion = 'returned';

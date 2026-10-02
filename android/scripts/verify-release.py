@@ -36,7 +36,7 @@ with zipfile.ZipFile(root / 'android/demo-auth/build/outputs/aar/demo-auth-relea
         for name in jar.namelist():
             assert b'dev/networklog/logger/' not in jar.read(name), name
 
-forbidden = [b'dev/networklog/logger/', b'certificate_sha256', b'capture_policy', b'http.body.captured', b'Pair desktop collector', b'connection.json', b'Capture spool']
+forbidden = [b'dev/networklog/logger/', b'certificate_sha256', b'capture_policy', b'http.body.captured', b'Pair desktop collector', b'connection.json', b'Capture spool', b'HTTPSequenceLogger', b'source_token', b'enrollment_token', b'_nlog._tcp', b'CollectorDiscovery', b'journal.json', b'source.json']
 android = '{http://schemas.android.com/apk/res/android}'
 backup_domains = {'root', 'file', 'database', 'sharedpref', 'external', 'device_root', 'device_file', 'device_database', 'device_sharedpref'}
 

@@ -34,11 +34,12 @@ final class CollectorTransport: NSObject, BatchTransport, URLSessionTaskDelegate
         session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
     }
 
-    func upload(_ bytes: Data) async throws -> UploadResponse {
-        var request = URLRequest(url: connection.endpoint.appendingPathComponent("api/v1/events"))
+    func upload(_ bytes: Data) async throws -> UploadResponse { try await request("events", bytes:bytes, contentType:"application/x-ndjson") }
+    func request(_ path:String, bytes:Data, contentType:String="application/json") async throws -> UploadResponse {
+        var request = URLRequest(url: connection.endpoint.appendingPathComponent("api/v2/"+path))
         request.httpMethod = "POST"
         request.setValue("Bearer \(connection.token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/x-ndjson", forHTTPHeaderField: "Content-Type")
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.httpBody = bytes
         let (stream, response) = try await session.bytes(for: request, delegate: self)
         var completed = false

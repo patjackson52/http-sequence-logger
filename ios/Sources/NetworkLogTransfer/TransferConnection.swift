@@ -5,24 +5,31 @@ import Foundation
 public struct TransferConnection: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     public let endpoint: URL
     public let collectorID: String
+    public let sourceID: String
     public let certificateSHA256: String?
     let token: String
 
     public var description: String { "TransferConnection(paired collector, token: <redacted>)" }
     public var debugDescription: String { description }
 
+    public func encoded() throws -> Data {
+        var value:[String:Any] = ["version":2,"endpoint":endpoint.absoluteString,"collector_id":collectorID,"source_id":sourceID,"source_token":token]
+        value["certificate_sha256"] = certificateSHA256
+        return try JSONSerialization.data(withJSONObject:value)
+    }
     public static func parse(json: Data) throws -> TransferConnection {
         struct Wire: Decodable {
             let version: Int
             let endpoint: String
-            let token: String
+            let source_token: String
+            let source_id: String
             let collector_id: String
             let certificate_sha256: String?
         }
-        guard let wire = try? JSONDecoder().decode(Wire.self, from: json), wire.version == 1,
-              !wire.token.isEmpty, wire.token.utf8.count <= 4096,
-              wire.token.unicodeScalars.allSatisfy({ $0.value >= 33 && $0.value <= 126 }),
-              !wire.collector_id.isEmpty, wire.collector_id.utf8.count <= 512,
+        guard let wire = try? JSONDecoder().decode(Wire.self, from: json), wire.version == 2,
+              !wire.source_token.isEmpty, wire.source_token.utf8.count <= 4096,
+              wire.source_token.unicodeScalars.allSatisfy({ $0.value >= 33 && $0.value <= 126 }),
+              !wire.source_id.isEmpty, wire.source_id.utf8.count <= 512, !wire.collector_id.isEmpty, wire.collector_id.utf8.count <= 512,
               let parts = URLComponents(string: wire.endpoint),
               let scheme = parts.scheme?.lowercased(), ["http", "https"].contains(scheme),
               let host = parts.host, !host.isEmpty,
@@ -36,7 +43,7 @@ public struct TransferConnection: Sendable, CustomStringConvertible, CustomDebug
                   pin.allSatisfy({ "0123456789abcdef".contains($0) }) else { throw TransferError.invalidConnection }
         }
         return TransferConnection(endpoint: endpoint, collectorID: wire.collector_id,
-                                  certificateSHA256: wire.certificate_sha256, token: wire.token)
+                                  sourceID: wire.source_id, certificateSHA256: wire.certificate_sha256, token: wire.source_token)
     }
 
     static func isLoopback(_ host: String) -> Bool {

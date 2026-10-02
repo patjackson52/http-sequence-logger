@@ -20,16 +20,30 @@
     "build:web-sample": "vite build --config web-sample/vite.config.mjs",
     "check:web-release": "node scripts/check-web-release.mjs",
     "check:web-types": "tsc --ignoreConfig --noEmit --strict --types node --module nodenext --target es2022 --lib es2022,dom,dom.iterable integration/web-consumer/check.mts",
-    "check:web-browser": "npm run build:viewer && npm run build:web-sample && node scripts/check-web-browser.mjs"
+    "check:web-browser": "npm run build:viewer && npm run build:web-sample && node scripts/check-web-browser.mjs",
+    "check:web-https": "node scripts/check-web-https.mjs",
+    "check:collector-capacity": "node scripts/check-collector-capacity.mjs",
+    "check:web-capacity": "node scripts/check-web-capacity.mjs",
+    "check:collector-disk-full": "node scripts/check-collector-disk-full.mjs",
+    "check:viewer-realtime": "node scripts/check-viewer-realtime.mjs",
+    "check:native-realtime": "node scripts/check-native-realtime.mjs",
+    "check:web-storage-denied": "node scripts/check-web-storage-denied.mjs",
+    "check:native-crash-stages": "node scripts/check-native-crash-stages.mjs",
+    "check:collector-bonjour": "node scripts/check-collector-bonjour.mjs",
+    "check:android-instrumentation": "node scripts/check-android-instrumentation.mjs",
+    "check:native-installation-lifecycle": "node scripts/check-native-installation-lifecycle.mjs",
+    "check:native-simulator-clone": "node scripts/check-native-simulator-clone.mjs",
+    "check:native-os-restore": "node scripts/check-native-os-restore.mjs"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=24.13.0 <25"
   },
   "dependencies": {
     "@fontsource/source-code-pro": "5.3.0",
     "@fontsource/source-sans-3": "5.3.0",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
+    "better-sqlite3": "13.0.3",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

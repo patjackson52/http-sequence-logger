@@ -167,30 +167,16 @@ const events = [
 const schema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: 'urn:mobile-network-log:event:1.2',
-  title: 'Network log event, draft contracts 1.0, 1.1 and 1.2',
+  title: 'Network log event, contract 1.2',
   description: 'One NDJSON record. See CONTRACT.md for cross-event and capture semantics. Custom format, not OTLP JSON.',
   ...object({
-    schema_version: choices('1.0', '1.1', '1.2'),
+    schema_version: { const: '1.2' },
     event_type: { enum: events.map(([name]) => name) },
     event_id: ref('id'), session_namespace: ref('id'), session_id: ref('id'), recording_id: ref('id'),
     sequence: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
     timestamp, monotonic_ns: ref('ns'), context: ref('context'), data: { type: 'object' },
     extensions: { type: 'object', propertyNames: { pattern: '^[a-z][a-z0-9_-]*\\.[a-zA-Z0-9_.-]+$' } },
   }, ['schema_version', 'event_type', 'event_id', 'session_namespace', 'session_id', 'recording_id', 'sequence', 'timestamp', 'monotonic_ns', 'data']),
-  // 1.0 remains strict: handler fields and unknown operation outcomes are new in 1.1.
-  allOf: [{
-    if: { properties: { schema_version: choices('1.0', '1.1') } },
-    then: { allOf: [
-      { if: { properties: { event_type: { const: 'session.started' } } }, then: { properties: { data: { properties: { producer: { properties: { platform: choices('android', 'ios') } } } } } } },
-      { if: { properties: { event_type: { const: 'operation.started' } } }, then: { properties: { data: { properties: { invocation: { properties: { dispatch: { const: 'synchronous' } } } } } } } },
-    ] },
-  }, {
-    if: { properties: { schema_version: { const: '1.0' } } },
-    then: { allOf: [
-      { if: { properties: { event_type: { const: 'operation.started' } } }, then: { properties: { data: { properties: { invocation: false } } } } },
-      { if: { properties: { event_type: { const: 'operation.ended' } } }, then: { properties: { data: { properties: { completion: false, outcome: choices('success', 'error', 'cancelled') } } } } },
-    ] },
-  }],
   oneOf: events.map(([name, data, span]) => ({
     properties: { event_type: { const: name }, data: ref(data), ...(!span ? { context: false } : {}) },
     ...(span ? { required: ['context'] } : {}),

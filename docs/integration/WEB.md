@@ -21,17 +21,18 @@ A runtime `enabled` flag does not remove code. Audit chunks, maps, copied assets
 Create the recorder only in development setup:
 
 ```js
-import { createLogger, IndexedDBJournal } from '@http-sequence-logger/web/debug';
+import { createLogger, IndexedDBJournal, startJournalDelivery } from '@http-sequence-logger/web/debug';
 
 const journal = await IndexedDBJournal.open({
-  databaseName: 'my-app-network-log',
-  journalId: 'capture-2026-09-28', // App-owned; one live writer per journal.
+  databaseName: 'my-app-network-log-v2',
+  journalId: tabOwnedJournalId, // Persist in tab-scoped development storage; unique per active tab.
 });
 const logger = createLogger({
   namespace: 'my-app.development', appId: 'my-app', sink: journal,
   policy: { redactBodyKeys: ['customerIdentifier'] },
   onDiagnostic: code => showCaptureDiagnostic(code), // An app-owned debug UI.
 });
+const delivery = startJournalDelivery(journal, {appId:'my-app', onStatus:showCaptureDiagnostic});
 const session = logger.startSession({ name: 'Sign in', sessionId: existingSessionId });
 // Omit sessionId to generate one. End only when the observed flow is finished.
 ```
@@ -40,11 +41,13 @@ Production setup returns `noOpLogger` from the default entry. Shared operations 
 
 Logs live in **IndexedDB for the frontend origin**, not a device filesystem path. The database defaults to `http-sequence-logger`; `journalId` is required. One journal can retain multiple sessions and recordings. Closing/reopening the same database/journal preserves stored lines and event IDs; another port, browser profile or origin has different storage. Use DevTools → Application/Storage → IndexedDB to inspect the chosen database. Do not copy browser-internal database files as NDJSON.
 
-The sample uses origin `http://127.0.0.1:4180`, database `http-sequence-logger-demo`, journal `browser-demo-v1`, and downloads `browser-capture.ndjson`. Customer apps choose and document their own names.
+The sample uses origin `http://127.0.0.1:4180`, database `http-sequence-logger-demo-v2`, a random journal ID retained under the development-only `network-log-journal-v2` session-storage key, and downloads `browser-capture.ndjson`. Customer apps choose and document their own names.
 
-`MemoryJournal` and `IndexedDBJournal` default to **8 MiB / 10,000 events**. They retain existing records at capacity and report dropped writes through `stats`; choose a new journal/export policy rather than silently discarding history. IndexedDB keeps a bounded memory mirror. `append()` queues persistence; `await journal.flush()` is the persistence barrier. Inspect `stats.error` and handle rejected flushes. If IndexedDB opening fails, the app may explicitly select `MemoryJournal` and show that persistence is unavailable. A write failure retains memory export but is not a durable-write guarantee. Browser storage eviction, private browsing restrictions and abrupt page termination remain possible; no unload/background delivery is promised.
+`MemoryJournal` and `IndexedDBJournal` default to **8 MiB / 10,000 events**. Capacity retains records and rejects later writes; inspect `stats.dropped`, `pending`, and `error`. IndexedDB opens metadata only, appends short groups, and reads indexed ranges. `append()` admits to a bounded memory queue; `await journal.flush()` waits for committed groups. Persisted history is not hydrated into a memory mirror.
 
-Before switching journals or tearing down app-owned observers, end the session, dispose observers and await `journal.close()` for IndexedDB. Export remains available from the memory mirror when persistence fails. Use explicit development controls to download `journal.exportNDJSON()` as a Blob; prefer `await journal.flush()` first, but allow an identified memory-only recovery export after failure. Never include pairing data in the exported capture.
+One live writer owns a journal. Web Locks prevent displacement and release on browser teardown; transactional lease/epoch checks fence stale writes and ACKs. Environments without Web Locks recover an expired owner after its lease. Use a distinct journal for every concurrent tab. Close the sender before closing the journal. Store the journal ID in development tab state to resume it on reload. Guard access to session storage: private/storage-denied environments can throw or return no storage. A fresh random page journal preserves capture when reload recovery is unavailable. If a duplicated tab finds a healthy owner, allocate another journal ID; do not displace that owner. The sample implements these cases. Storage eviction and abrupt unflushed-tail loss remain browser limitations.
+
+`await journal.exportNDJSON()` explicitly reads retained capture pages for a download. A failed IndexedDB append retains only its bounded pending-memory records through `exportPendingNDJSON()`; previously committed records remain in IndexedDB and require a healthy reader. A MemoryJournal fallback has no restart durability. Display storage failures instead of implying that enqueue means persistence.
 
 ## Fetch and explicit body completion
 
@@ -125,26 +128,24 @@ try {
 
 `invokeAsyncHandler` calls once and preserves the fulfilled value or rejection object; its returned Promise is a wrapper. The viewer displays awaiting/resolved/rejected boundaries, not a blocked browser thread. `invokeHandler` instead observes the immediate synchronous return and preserves the returned object's identity, including a Promise. Later asynchronous work can outlive that synchronous span. Neither API installs ambient async context or records arguments/results. Manually managed `startHandler()` exposes `returned()`, `threw(error)`, `cancel()` and `stopObservation(reason)`; pass `dispatch: 'awaited'` only when the caller actually awaits the observed settlement. End ordinary operations with `end()`/`end('error', error)`.
 
-## Export and connect the viewer
+## Continuous delivery and viewer
 
-In the pinned logger checkout, run `npm ci` and **`npm start -- --no-android`**. It builds/opens the collector viewer at **http://127.0.0.1:4319/**; the ordinary URL auto-connects and survives refresh. Keep that terminal running. Automatic viewer connection does not configure the frontend's upload relay. For direct file use, export NDJSON and import it into `npm run viewer` at `http://127.0.0.1:4173`. No pairing is needed for file import.
+In the pinned checkout run `npm ci`, then `npm start`. The collector discovers available native sources, serves its ordinary loopback viewer URL, and lists participating web pages as soon as they register, even before events arrive. Device tools are optional; collection and the viewer continue when tools are absent. Static `npm run viewer` accepts exported files separately.
 
-For delivery, mount the Node-only relay in a **loopback-bound development server**. Its configured `origin` must exactly match the frontend's scheme, host and port. Use the collector's `connection-loopback.json`; the relay accepts only an HTTP `127.0.0.1` collector endpoint. It reads credentials server-side at startup. Do not use `VITE_*`/public environment variables, bundle the JSON, expose it through a public directory, or relax collector CORS.
+Always mount the Node-only relay in the debug frontend, even when the collector is absent:
 
 ```js
-// Development server configuration only; adapt middleware registration to the framework.
-import { createNetworkLogRelay } from '@http-sequence-logger/web/dev-relay';
-server.middlewares.use(createNetworkLogRelay({
-  connectionFile: process.env.NETWORK_LOG_CONNECTION,
-  origin: 'http://127.0.0.1:4180',
-}));
+import {createNetworkLogRelay} from '@http-sequence-logger/web/dev-relay';
+server.middlewares.use(createNetworkLogRelay({origin:'http://127.0.0.1:4180'}));
 ```
 
-From debug browser wiring, `await uploadJournal(journal)` uses the same-origin `/__network_log` relay. It flushes, snapshots, replays retained records in bounded batches and verifies acknowledgments. Failed delivery leaves the journal available for export/retry. Repeated calls deliberately replay the retained journal; deduplication occurs at the collector. There is **no browser ACK cursor, compaction, timer retry, continuous streaming, WebSocket, or background sender**. Trigger another upload when desired. Collector → viewer live updates use SSE after the upload arrives.
+The relay refreshes the private `~/.http-sequence-logger/active.json` manifest and waits when no collector is running. Set private `connectionFile` explicitly to select another collector. Restarting the same collector needs no frontend restart; another collector identity requires deliberate selection. Never put credentials in `VITE_*`, public assets, frontend config or capture exports.
 
-Run the host flow, upload, and confirm the viewer's event count/session. **Save capture** exports the desktop journal at `artifacts/collector/capture.ndjson`; the frontend's IndexedDB remains its canonical source. Viewer pause or file import suspends browser reads while the collector continues retaining uploads. **Resume live** returns to the collector, and **Follow newest session** displays new sessions until inspection/filtering disables it. [The transport recipe](TRANSPORT.md#browser-frontend-delivery) has a copyable two-terminal setup for the repository sample.
+`startJournalDelivery(journal,{appId})` runs one foreground drain, wakes on append, registers the page before events, sends bounded batches, checks source/collector ACK identity, and commits collector/source-scoped cursors in the owned journal. Lost responses replay unchanged IDs. `uploadJournal(journal,{appId})` performs one incremental drain. Neither delivery mode deletes canonical captures. Pause in the viewer stops viewing; collection continues. A closed/suspended browser cannot promise delivery until the participating page resumes.
 
-The relay permits only config reads and event uploads, validates Host/Origin, and keeps the device token away from browser code. Restart the dev server after changing pairing files. Same-origin script can use this development capability; it is not a production upload API. Remote mobile browsers, arbitrary LAN relay exposure, direct browser-to-collector cross-origin uploads and hosted collector access are outside this recipe.
+Reachable/mobile frontend delivery is opt-in: serve the host frontend over HTTPS, set `reachable:true`, and provide `authorize(req)` that validates a real frontend session and returns a stable opaque session ID or null. Origin and Host checks are additional defenses, never authentication. Relay handles bind to that authenticated session, app, origin and journal. Use the browser's same-origin session cookies; source credentials remain Node-only. Configure TLS, host access and firewall using the frontend's existing development server; validate actual mobile/browser permission behavior. Collector viewer/read APIs remain loopback. No collector CORS exception, browser-to-collector token, arbitrary relay target or service worker is needed.
+
+See the [sample relay](../../web-sample/vite.config.mjs), [sample lifecycle](../../web-sample/setup-debug.mjs), and [typed consumer](../../integration/web-consumer/check.mts).
 
 ## Verify the integration
 

@@ -1,50 +1,29 @@
 #if !DEBUG
 #error("DevelopmentDelivery is a Debug-only consumer. Build the separate Production package for the production smoke check.")
 #endif
-
 #if DEBUG
 import AppLogging
 import Foundation
 import NetworkLogTransfer
 
-/// Integration example around the implemented Swift transfer API.
-/// The app's producer owns redaction, schema validity, and canonical persistence.
-public actor DevelopmentCaptureDelivery: CaptureDelivery {
-    public nonisolated let isEnabled = true
-    private let sink: NDJSONTransferSink
-    public private(set) var diagnostic: String?
-
-    public init(pairingJSON: Data, spoolDirectory: URL) throws {
-        let connection = try TransferConnection.parse(json: pairingJSON)
-        sink = try NDJSONTransferSink(connection: connection, spoolDirectory: spoolDirectory)
+/// This owner writes one rolling canonical history; the producer supplies sanitized schema 1.2 lines.
+public actor DevelopmentCaptureDelivery:CaptureDelivery {
+    public nonisolated let isEnabled=true
+    private let capture:DebugCapture
+    public private(set) var diagnostic:String?
+    public init(pairingJSON:Data?=nil,directory:URL?=nil) async throws {
+        capture=try await DebugCapture.start(appID:"dev.example.external-consumer",directory:directory)
+        if let pairingJSON { try await capture.savePairing(pairingJSON) }
     }
-
-    /// This adapter never moves, rewrites, or deletes the customer's source file.
-    public func offerSanitizedFile(_ locateFile: @Sendable () throws -> URL) async {
-        do {
-            try await sink.relaySanitizedFile(locateFile())
-            let result = await sink.flush()
-            diagnostic = result.diagnostic
-        } catch {
-            // Do not replace the app's HTTP result/error or expose pairing/payload data.
-            diagnostic = "capture_relay_failed"
-        }
+    public func appendSanitizedLine(_ makeLine:@Sendable () throws ->String) async {
+        do { try await capture.appendSanitizedLine(makeLine());diagnostic=nil }
+        catch { diagnostic="capture_admission_failed" }
     }
-
-    /// Alternative to file relay. Call only after the canonical file accepted this
-    /// same sanitized line. Do not feed both paths for each newly emitted event.
-    public func appendAlreadyPersistedLine(_ line: String) async {
-        do {
-            try await sink.appendSanitizedLine(line)
-            diagnostic = nil
-        } catch {
-            diagnostic = "capture_delivery_pending"
-        }
-    }
-
-    public func resume() async { await sink.resume() }
-    public func status() async -> TransferStatus { await sink.status() }
-    public func flush() async -> TransferStatus { await sink.flush() }
-    public func close() async { await sink.close() }
+    public var captureURLs:[URL] { get async { await capture.captureURLs } }
+    public func resume() async { await capture.refresh() }
+    public func status() async ->TransferStatus { await capture.status() }
+    public func flush() async throws { try await capture.flush() }
+    @discardableResult public func deliverNow() async ->TransferStatus { await capture.deliverNow() }
+    public func close() async { await capture.close() }
 }
 #endif

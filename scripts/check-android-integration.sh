@@ -9,7 +9,7 @@ if [[ ! -x "$analyzer" ]]; then
   echo "Install Android SDK command-line tools (latest); missing: $analyzer" >&2
   exit 1
 fi
-node -e 'const [major,minor]=process.versions.node.split(".").map(Number); if(major<22||(major===22&&minor<12))throw Error("Node 22.12+ required")'
+node -e 'const [major,minor]=process.versions.node.split(".").map(Number); if(major!==24||minor<13)throw Error("Node24.13+ (24.x) required")'
 
 "$repo/android/gradlew" -p "$consumer" \
   :app:assembleDebug :app:assembleRelease \

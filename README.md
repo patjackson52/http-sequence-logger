@@ -1,6 +1,6 @@
 # HTTP sequence logger
 
-Draft **1.2** capture format (reader also accepts **1.0/1.1**) for mobile and browser development SDKs. Includes Kotlin Android and browser recorders with auth samples, a Swift transfer package and manually instrumented iOS demo, a local desktop collector, and an interactive web sequence viewer.
+Current **1.2** capture format and **version 2** source-aware transfer for mobile and browser development SDKs. Includes Kotlin Android and browser recorders with auth samples, a Swift transfer package and manually instrumented iOS demo, a local desktop collector, and an interactive web sequence viewer.
 
 Repository: [patjackson52/http-sequence-logger](https://github.com/patjackson52/http-sequence-logger) · [MIT license](LICENSE).
 
@@ -24,7 +24,7 @@ transfer implementations and their dependencies/resources.
 Use the documented automatic streaming setup for our app and open
 http://127.0.0.1:4319/ without a token URL. For Android, target our actual debug
 application ID; the android:live command installs the repository sample. Follow
-the explicit iOS pairing or browser relay/upload instructions where applicable.
+the iOS debug bootstrap and browser relay/continuous delivery instructions.
 The iOS package transfers sanitized events; implement an app-owned capture adapter
 if needed.
 
@@ -38,7 +38,7 @@ To try the repository sample before integrating an app, use the quick start belo
 
 ## Stream logs into the viewer
 
-For the Android sample, install Node **22.12+**, JDK **17**, Android SDK Platform **35** and platform-tools. Connect a phone with USB debugging authorized, or start an API 26+ emulator. In a new checkout:
+For the Android sample, install Node **24.13.x**, JDK **17**, Android SDK Platform **35** and platform-tools. Connect a phone with USB debugging authorized, or start an API 26+ emulator. In a new checkout:
 
 ```sh
 git clone https://github.com/patjackson52/http-sequence-logger.git
@@ -47,24 +47,28 @@ npm ci
 npm run android:live
 ```
 
-If you already have a checkout, run the last two commands from its root. This builds the viewer and debug app, selects the single connected phone in preference to emulators (or the sole emulator), installs the app, pairs USB, opens **[the live viewer](http://127.0.0.1:4319/)** and runs a sign-in. No serial, pairing JSON or special viewer URL is needed in the common case. Leave the collector terminal running.
+If you already have a checkout, run the last two commands from its root. This builds the viewer and debug app, installs/runs the sample on the selected device, and opens **[the live viewer](http://127.0.0.1:4319/)**. If more than one device is attached, use `npm run android:live -- --device SERIAL`. Leave the collector terminal running.
 
-Choose one startup command for your workflow, after `npm ci`:
+To start collection without choosing an app or device:
+
+```sh
+npm start
+```
+
+The collector discovers participating apps on all authorized Android devices and booted iOS simulators. Apps publish a private descriptor through their debug bootstrap. Optional device/package/bundle filters narrow discovery; missing tools/permissions appear as adapter diagnostics. Physical iOS uses explicitly paired HTTPS, with optional Bonjour candidate discovery. Browser debug pages register through a same-origin Node relay and deliver continuously while active. Frontends can start before the collector.
 
 | Workflow | Command from the logger checkout |
 | --- | --- |
-| Build/install/run the Android sample | `npm run android:live` |
-| Exercise the sample's 401/refresh/retry flow | `npm run android:live -- --recovery` |
-| Stream from the already installed Android sample | `npm start` |
-| Stream from your instrumented Android debug app | `npm run collector -- --android YOUR_APPLICATION_ID --open` |
-| Use an iOS or browser producer | `npm start -- --no-android`, then follow [its transfer route](docs/integration/TRANSPORT.md#select-the-device-route) |
-| Import files without a live collector | `npm run viewer` — serves the file viewer at port `4173` |
+| Discover participating devices/apps and open viewer | `npm start` |
+| Build/install/run Android sample | `npm run android:live -- --device SERIAL` |
+| Filter to an instrumented Android app | `npm run collector -- --android YOUR_APPLICATION_ID --open` |
+| Disable Android or simulator discovery | `npm start -- --no-android --no-ios` |
+| Inspect status or diagnose setup | `npm run collector -- status` or `npm run collector -- doctor` |
+| File import without collector | `npm run viewer` at port `4173` |
 
-The streaming commands build the viewer automatically. For ambiguous Android device selection, append `-- --device SERIAL` to `npm run android:live`, or add `--device SERIAL` after the existing `--` in other commands. [Additional options and tool discovery](android/README.md#build-and-run) cover custom SDK paths, ports and directories. `android:live` can reuse the collector for the same directory and port; `npm start` does not start a second instance on an occupied port.
+Open **http://127.0.0.1:4319/** normally after refresh. Devices and environments → Apps → Sessions groups sources without changing logical session identities. **Follow newest session** follows arrivals until you inspect/filter. **Pause live** and file import pause viewer updates while collection continues.
 
-Open **http://127.0.0.1:4319/** normally, including after refresh. The live panel shows collector connection, event count and Android readiness. USB pairing and forwarding recover after reconnect/reinstall. **Follow newest session** follows arrivals until you inspect or filter a session. **Pause live** and file import suspend browser updates; **Resume live** returns to the collector. The collector continues retaining events while the viewer is paused.
-
-Logs remain in the app's private storage and accumulate on the desktop in `artifacts/collector/capture.ndjson`, with multiple sessions per file. **Save capture** downloads that collected NDJSON; **Download SVG** saves the current diagram. Keep private `connection-*.json`, state and TLS files out of shared artifacts. [All log locations and retrieval commands](docs/integration/TRANSPORT.md#where-every-file-lives) · [Connection troubleshooting](docs/integration/TRANSPORT.md#troubleshooting-by-symptom) · [Viewer controls](viewer/README.md).
+The collector retains captures in `artifacts/collector-v2/capture.sqlite`; **Save capture** downloads NDJSON and **Download SVG** saves the current diagram. Native originals stay in private canonical journals; browser originals stay in IndexedDB. Earlier state/captures are left untouched, with no migration or compatibility requirement. Keep pairing, manifest, credentials and TLS files private. [Locations and retrieval](docs/integration/TRANSPORT.md#where-every-file-lives) · [Troubleshooting](docs/integration/TRANSPORT.md#troubleshooting-by-symptom) · [Viewer controls](viewer/README.md).
 
 ## Desktop viewer examples
 
@@ -72,7 +76,7 @@ Actual desktop captures of the viewer, using the included sanitized logs. Each s
 
 ### Multi-server sign-in and session navigation
 
-An Android auth flow separates app and SDK calls across three server origins. The sidebar keeps successful and recovered sign-in sessions together. [Source capture](samples/live/multi-session.ndjson).
+This historical Android capture shows app and SDK calls across three server origins; its older schema is retained as prior evidence. The sidebar keeps successful and recovered sign-in sessions together. [Source capture](samples/live/multi-session.ndjson).
 
 [![Desktop sequence viewer showing Android sign-in, app and SDK lanes, three server origins, and multiple sessions](docs/screenshots/desktop-multi-server.png)](docs/screenshots/desktop-multi-server.png)
 
@@ -103,7 +107,7 @@ npm ci
 npm run web:sample
 ```
 
-Open `http://127.0.0.1:4180`. The simulated auth flow uses two local servers, a small SDK, Fetch, and an SDK-awaited app handler making an XHR request. It includes expected token expiry and refresh; no account is needed. A separate action exercises two public APIs. Export NDJSON from the development panel, or configure its same-origin relay for explicit collector upload.
+Open `http://127.0.0.1:4180`. The simulated auth flow uses two local servers, a small SDK, Fetch, and an SDK-awaited app handler making an XHR request. It includes expected token expiry and refresh; no account is needed. A separate action exercises two public APIs. Export NDJSON from the development panel, or start the collector for automatic foreground delivery through its same-origin relay.
 
 The [browser SDK](web-sdk/README.md) includes manual customer-client recording, bounded memory/IndexedDB storage, redaction and a small production no-op entry. [Existing frontend integration](docs/integration/WEB.md) explains source installation, build aliases, log locations and delivery. Run `npm run check:web-types` and `npm run check:web-release` for typed consumer and shipping isolation checks. [Real browser captures](samples/web/README.md) · [Browser design](docs/web/PLAN.md) · [Review/evidence](docs/web/REVIEW.md).
 
@@ -133,7 +137,7 @@ See [Android setup and integration](android/README.md). The MIT-licensed sample 
 
 ## Validate locally
 
-Use Node.js 22.12 or later from this directory:
+Use Node.js 24.13.x from this directory:
 
 ```sh
 npm ci

@@ -5,19 +5,16 @@ import android.util.Log
 import dev.networklog.logger.DebugTransfer
 import dev.networklog.logger.NetworkLog
 import dev.networklog.logger.RecordingLogger
-import java.io.File
-import java.util.UUID
 
 object CaptureFactory {
-    /** Worker thread only: opening and appending to the local file are synchronous. */
+    /** Bootstrap on a worker; capture admission enqueues without disk or networking. */
     fun open(context: Context): CaptureLifetime = openDevelopmentCapture(create = {
         val app = context.applicationContext
-        val file = File(app.filesDir, "captures/capture-${UUID.randomUUID()}.ndjson")
-        val sink = DebugTransfer.open(app, file)
+        val sink = DebugTransfer.open(app)
         object : CaptureLifetime {
             override val logger = RecordingLogger(NetworkLog(sink, app.packageName,
                 namespace = "${app.packageName}/development"))
-            override val capturePath = file.absolutePath
+            override val capturePath = sink.file.absolutePath
             override fun close() = sink.close()
         }
     }, diagnostic = { Log.w("NetworkLog", "Development capture unavailable; application behavior preserved") })

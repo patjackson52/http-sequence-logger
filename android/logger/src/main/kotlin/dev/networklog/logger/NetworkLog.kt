@@ -3,22 +3,12 @@ package dev.networklog.logger
 import android.os.Build
 import android.os.SystemClock
 import org.json.JSONObject
-import java.io.Closeable
-import java.io.File
-import java.io.Writer
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
-fun interface EventSink { fun append(line: String) }
-
-/** Share one sink across sessions. Invoke capture APIs off the UI thread with this synchronous file sink. */
-class NdjsonFileSink(file: File) : EventSink, Closeable {
-    private val writer: Writer = file.apply { parentFile?.mkdirs() }.outputStream().bufferedWriter(Charsets.UTF_8)
-    @Synchronized override fun append(line: String) { writer.write(line); writer.write("\n"); writer.flush() }
-    @Synchronized override fun close() { writer.close() }
-}
+fun interface EventSink { fun append(line: String); fun appendEvent(event: JSONObject) = append(event.toString()) }
 
 interface CaptureClock {
     fun monotonicNanos(): Long
@@ -84,12 +74,12 @@ class Session internal constructor(
     }
     internal fun emit(type: String, context: CaptureContext?, data: JSONObject, time: Long = now(), extensions: JSONObject? = null) {
         if (ended) return
-        val event = obj("schema_version" to "1.1", "event_type" to type, "event_id" to UUID.randomUUID().toString(),
+        val event = obj("schema_version" to "1.2", "event_type" to type, "event_id" to UUID.randomUUID().toString(),
             "session_namespace" to namespace, "session_id" to sessionId, "recording_id" to recordingId,
             "sequence" to ++sequence, "timestamp" to clock.timestamp(), "monotonic_ns" to time.toString(), "data" to data)
         context?.let { event.put("context", it.json()) }
         extensions?.let { event.put("extensions", it) }
-        try { sink.append(event.toString()) } catch (_: Exception) { dropped++; report("Event sink unavailable") }
+        try { sink.appendEvent(event) } catch (_: Exception) { dropped++; report("Event sink unavailable") }
     }
     internal fun context(parent: CaptureContext?): CaptureContext {
         val usable = parent?.takeIf { it.recordingId == recordingId }

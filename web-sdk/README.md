@@ -1,53 +1,34 @@
-# Browser SDK
+# Browser development capture
 
-Development HTTP and SDK/app handler capture for browser frontends. Zero runtime package dependencies; JavaScript ES modules with TypeScript declarations. Captures use the shared **1.2 NDJSON** format and existing sequence viewer.
+The default package entry is a production no-op. Import `/debug` only through a debug build alias, and mount `/dev-relay` only in the Node development frontend. Ship neither implementation, credentials nor development UI.
 
-| Entry | Use |
-| --- | --- |
-| `@http-sequence-logger/web` | Small production API/no-op; no recorder, storage, transfer, or imports |
-| `@http-sequence-logger/web/debug` | Recorder, Fetch/XHR adapters, manual API, memory/IndexedDB journals, explicit upload |
-| `@http-sequence-logger/web/dev-relay` | Node-only development middleware; never import into browser code |
-
-This package is private and **not published to npm**. Install its `web-sdk/` directory from a pinned source checkout. See [existing frontend integration](../docs/integration/WEB.md) for installation, build aliases, public APIs, storage, export, and collector delivery. [Agent entry point](../AGENTS.md) · [JSON/spec index](../docs/integration/SPECS.md).
-
-## Run the sample
-
-From the repository root, using Node 22.12+:
-
-```sh
-npm ci
-npm run web:sample
+```js
+import {createLogger, IndexedDBJournal, startJournalDelivery} from '@http-sequence-logger/web/debug';
+const journal = await IndexedDBJournal.open({journalId: crypto.randomUUID()});
+const logger = createLogger({namespace:'customer.auth', appId:'customer-web', sink:journal});
+const delivery = startJournalDelivery(journal, {appId:'customer-web', onStatus:console.log});
+// Wire application-owned Fetch/XHR/manual hooks as described in docs/integration/WEB.md.
+// On teardown: delivery.stop(); await journal.close();
 ```
 
-Open `http://127.0.0.1:4180`. **Run sign-in with token recovery** exercises a small SDK, two local server origins (`4181` and `4182`), Fetch, an awaited app handler using XHR, and an expected 401 followed by refresh. The fixture is simulated authentication, not a production OAuth implementation. **Try two public APIs** calls JSONPlaceholder and DummyJSON; availability and browser CORS policy can affect that optional flow.
+Retain the journal ID in tab-scoped development storage to resume it on reload. Each concurrently active tab needs its own journal; a live owner cannot be replaced. A suspended owner has a 15-second lease, and transaction epochs reject its writes and ACKs after another owner takes over. Unexpected storage loss/eviction remains a browser limitation. `flush()` waits for committed groups; `append()` only admits capture to a bounded queue. Inspect `stats.error`, `pending`, and `dropped`.
 
-The development panel exports NDJSON, reopens its IndexedDB journal, runs browser boundary checks, and explicitly uploads through an optional relay. For live viewing, start the collector from the logger checkout in one terminal:
+IndexedDB opens metadata only and reads event pages by key. `await journal.exportNDJSON()` explicitly exports history; it is not part of ingestion. Retained lines are never deleted by ACKs. Collector/source-scoped cursors resume delivery after reload. Failed delivery keeps the durable journal. MemoryJournal is a bounded fallback with synchronous export and no restart guarantee.
 
-```sh
-npm start -- --no-android
+The foreground sender registers a source before its first event, sends bounded NDJSON batches, checks ACK identity, commits delivery cursors, and wakes on append or an idle heartbeat. It cannot deliver while the tab is closed or the browser suspends it. Reopening the journal resumes retained captures. `uploadJournal(journal,{appId})` performs one incremental drain.
+
+```js
+// Node dev-server configuration, never a browser import:
+import {createNetworkLogRelay} from '@http-sequence-logger/web/dev-relay';
+server.middlewares.use(createNetworkLogRelay({origin:'http://127.0.0.1:4180'}));
 ```
 
-It builds/opens the viewer automatically at **http://127.0.0.1:4319/**. Keep it running, then start or restart the sample from the same checkout in a second terminal:
+Always mount the relay for the debug frontend. It waits when the collector is absent, refreshes the private `~/.http-sequence-logger/active.json` manifest, and follows endpoint changes for the same collector. It refuses a different collector; restart with an explicit `connectionFile` to select it. Source credentials stay in Node; pages receive opaque journal handles. No collector CORS exception is required. Start frontend before or after `npm start`.
 
-```sh
-NETWORK_LOG_CONNECTION="$PWD/artifacts/collector/connection-loopback.json" npm run web:sample
-```
+For a reachable frontend, serve HTTPS and set `{reachable:true, authorize: async req => authenticatedSessionId}`. Authorization must validate the host frontend's actual session for every relay request and return null when unauthenticated; trusting Origin, Host, IP, or user-provided headers alone is insufficient. Cookie-based frontend sessions work through same-origin fetch credentials. Handles are bound to that session, app, origin and journal. Provide no arbitrary collector target in request parameters. TLS/reachable frontend and mobile browser deployment are host-owned and require actual browser validation.
 
-Use the actual private connection-file path if you changed the collector's `--dir`. Run a sample flow and click **Flush and upload**; the viewer displays arriving events automatically and reconnects after refresh without a token URL. The source browser SDK still needs that explicit upload each time; it has no background stream. Upload replay preserves event IDs and the collector deduplicates events. The source browser retains its IndexedDB journal, while **Save capture** downloads the desktop `artifacts/collector/capture.ndjson`. File import works without pairing. Keep the relay's connection file server-side and out of commits.
+The repository sample uses build aliases, a private Node relay, native business Fetch calls and zero-production dependencies. Run `npm run check:web-types`, `npm run check:web-release`, and `npm run check:web-browser` from the contract repository.
 
-## Verify
+Validation evidence for this update: real Chrome154, Firefox155 and Playwright WebKit26.6 passed capture, persistence/reload, two-tab/two-origin delivery, collector restart, source/session UI and production no-op tests. Actual authenticated HTTPS fixtures reject unauthenticated clients and cross-session handles in all three engines. WebKit engine evidence does not establish installed Safari or physical mobile browser behavior.
 
-```sh
-npm test
-npm run check:web-types
-npm run check:web-release
-npm run check:web-browser # Installed Google Chrome; ports 4180–4182 free
-npm run build:web-sample
-node validate.mjs /absolute/path/to/browser-capture.ndjson
-```
-
-The release audit builds positive debug controls and production, checks the module graph and every emitted asset/source map, and verifies that recorder/storage/transfer and development controls are absent. This verifies the repository sample; audit the host frontend's own shipping output too.
-
-Real browser NDJSON and verification are in [samples/web](../samples/web/README.md).
-
-The SDK observes browser-exposed metadata. It does not capture hidden cookies, wire headers, browser-internal redirects/retries, unconsumed streams, or arbitrary existing clients automatically. [Design and scope](../docs/web/PLAN.md) · [Review and evidence](../docs/web/REVIEW.md).
+The Chrome IndexedDB storage-only capacity gate retained 1,000,000 minimal canonical event_id lines (30.9 MB) in 18.83 seconds using 500-event flush groups on an Apple M4 Pro with 51.5 GB RAM. Metadata-only reopen took 1.9 ms; reading the final 100 events took 47 ms; no historical lines were hydrated and no events were dropped. These results do not establish full-schema capture/collector throughput or mobile/power-loss durability. Reproduce with `node scripts/check-web-capacity.mjs`; exact evidence is in ignored artifacts.

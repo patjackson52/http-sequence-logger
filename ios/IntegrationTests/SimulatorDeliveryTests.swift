@@ -31,20 +31,20 @@ final class SimulatorDeliveryTests: XCTestCase, @unchecked Sendable {
 
     @MainActor func testRealURLSessionCaptureTransfersOverHTTP() async throws {
         let config = try configuration()
-        let result = try await ManualCaptureDemo.run(connection: pairing(config, name: "loopback"),
+        let result = try await ManualCaptureDemo.runIsolated(connection: pairing(config, name: "loopback"),
             requestURL: URL(string: config["health_url"] as! String)!, directory: directory("http"))
         XCTAssertEqual(result.status.state, .idle)
         XCTAssertEqual(result.status.pendingBytes, 0)
         let capture = try String(contentsOf: result.captureURL, encoding: .utf8)
         XCTAssertEqual(capture.split(separator: "\n").count, 7)
         XCTAssertTrue(capture.contains("http.response.headers"))
-        XCTAssertFalse(capture.contains("/api/v1/events"))
+        XCTAssertFalse(capture.contains("/api/v2/events"))
         try evidence(result, test: "http-native-delivery")
     }
 
     @MainActor func testRealURLSessionCaptureTransfersOverPairedTLS() async throws {
         let config = try configuration()
-        let result = try await ManualCaptureDemo.run(connection: pairing(config, name: "tls"),
+        let result = try await ManualCaptureDemo.runIsolated(connection: pairing(config, name: "tls"),
             requestURL: URL(string: config["health_url"] as! String)!, directory: directory("tls"))
         XCTAssertEqual(result.status.state, .idle)
         XCTAssertEqual(result.status.pendingBytes, 0)
@@ -56,7 +56,7 @@ final class SimulatorDeliveryTests: XCTestCase, @unchecked Sendable {
         var bad = config["tls"] as! [String: Any]
         bad["certificate_sha256"] = String(repeating: "0", count: 64)
         let connection = try TransferConnection.parse(json: JSONSerialization.data(withJSONObject: bad))
-        let result = try await ManualCaptureDemo.run(connection: connection,
+        let result = try await ManualCaptureDemo.runIsolated(connection: connection,
             requestURL: URL(string: config["health_url"] as! String)!, directory: directory("bad-pin"))
         XCTAssertEqual(result.status.state, .retrying)
         XCTAssertEqual(result.status.diagnostic, "connection_failed")
@@ -68,7 +68,7 @@ final class SimulatorDeliveryTests: XCTestCase, @unchecked Sendable {
         let config = try configuration()
         var changed = config["loopback"] as! [String: Any]
         changed["endpoint"] = config["redirect_endpoint"]
-        let result = try await ManualCaptureDemo.run(connection: TransferConnection.parse(json: JSONSerialization.data(withJSONObject: changed)),
+        let result = try await ManualCaptureDemo.runIsolated(connection: TransferConnection.parse(json: JSONSerialization.data(withJSONObject: changed)),
             requestURL: URL(string: config["health_url"] as! String)!, directory: directory("redirect"))
         XCTAssertEqual(result.status.state, .blocked)
         XCTAssertEqual(result.status.lastHTTPStatus, 307)
@@ -90,7 +90,7 @@ final class SimulatorDeliveryTests: XCTestCase, @unchecked Sendable {
         for (index, id) in ids.enumerated() {
             // Complete schema-valid records; missing earlier lifecycle observations are permitted.
             let event: [String: Any] = [
-                "schema_version": "1.0", "event_type": "session.ended", "event_id": id,
+                "schema_version": "1.2", "event_type": "session.ended", "event_id": id,
                 "session_namespace": "com.example.networklog/development", "session_id": recordingPrefix,
                 "recording_id": "\(recordingPrefix)-\(index)", "sequence": 1,
                 "timestamp": timestamp, "monotonic_ns": "0",
@@ -102,7 +102,7 @@ final class SimulatorDeliveryTests: XCTestCase, @unchecked Sendable {
         XCTAssertLessThan(bytes.count, 1024 * 1024)
         // These required fields alone exceed the former limit; the collector adds recording metadata.
         let minimumACK = try JSONSerialization.data(withJSONObject: [
-            "version": 1, "collector_id": connection.collectorID, "acknowledged_event_ids": ids
+            "version": 2, "collector_id": connection.collectorID, "acknowledged_event_ids": ids
         ])
         XCTAssertGreaterThan(minimumACK.count, 512 * 1024)
         let source = location.appendingPathComponent("large-ack.ndjson")
@@ -110,7 +110,7 @@ final class SimulatorDeliveryTests: XCTestCase, @unchecked Sendable {
         let sink = try NDJSONTransferSink(connection: connection, spoolDirectory: location.appendingPathComponent("spool"))
         let count = try await sink.relaySanitizedFile(source)
         XCTAssertEqual(count, ids.count)
-        let delivered = await sink.flush()
+        let delivered = await sink.deliverNow()
         XCTAssertEqual(delivered.state, .idle, "\(delivered.diagnostic ?? "none"); HTTP \(delivered.lastHTTPStatus ?? 0)")
         XCTAssertEqual(delivered.pendingBytes, 0)
         await sink.close()
@@ -120,7 +120,7 @@ final class SimulatorDeliveryTests: XCTestCase, @unchecked Sendable {
         let config = try configuration()
         var changed = config["loopback"] as! [String: Any]
         changed["endpoint"] = config["ack_limit_endpoint"]
-        let result = try await ManualCaptureDemo.run(connection: TransferConnection.parse(json: JSONSerialization.data(withJSONObject: changed)),
+        let result = try await ManualCaptureDemo.runIsolated(connection: TransferConnection.parse(json: JSONSerialization.data(withJSONObject: changed)),
             requestURL: URL(string: config["health_url"] as! String)!, directory: directory("ack-limit"))
         XCTAssertEqual(result.status.state, .blocked)
         XCTAssertEqual(result.status.diagnostic, "acknowledgement_too_large")
@@ -154,7 +154,7 @@ final class SimulatorDeliveryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(retained, original)
         await sink.close()
         let reopened = try NDJSONTransferSink(connection: connection, spoolDirectory: location.appendingPathComponent("spool"), limits: limits)
-        let resumed = await reopened.flush()
+        let resumed = await reopened.deliverNow()
         XCTAssertEqual(resumed.pendingBytes, 0)
         await reopened.close()
         try evidence(.init(captureURL: initial.captureURL, sessionID: initial.sessionID, status: final), test: "real-offline-automatic-reconnect")

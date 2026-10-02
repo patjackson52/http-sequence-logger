@@ -64,7 +64,7 @@ test('no-op does no metadata work and preserves requests, reads and handler beha
   const response = new Response('{"ok":true}'); const args = []; const client = createFetchClient(session, { fetchImpl: async (...v) => { args.push(v); return response; } });
   const init = { headers: { A: 'B' } }; assert.equal(await client.fetch('https://one.example', init), response); assert.equal(args[0][1], init); assert.deepEqual(await client.readJson(response), { ok: true });
 });
-test('web and awaited vocabulary require schema1.2 while legacy recordings still validate', () => {
+test('web and awaited vocabulary require the sole current schema1.2', () => {
   const s = setup(); s.session.invokeHandler({ name: 'Handler', origin: app, caller: sdk }, () => {}); s.session.end(); s.validate();
   for (const version of ['1.0', '1.1']) assert.equal(validateCapture(s.lines.map(line => JSON.stringify({ ...JSON.parse(line), schema_version: version })).join('\n') + '\n').valid, false);
 });

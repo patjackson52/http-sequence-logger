@@ -6,7 +6,7 @@ The words **must**, **should**, and **may** distinguish requirements, recommenda
 
 ## Scope and structure
 
-The first producers are Android and iOS development SDKs. Integrators can supply HTTP wrappers/adapters or call the recorder directly. A local web viewer imports files with approximately 10–20 requests per session and dynamically discovers destination origins.
+Producers are Android development loggers, app-owned iOS capture hooks using the transfer package, and browser debug SDKs. Integrators can supply HTTP wrappers/adapters or call the recorder directly. A local web viewer imports files with approximately 10–20 requests per session and dynamically discovers destination origins.
 
 Each UTF-8 NDJSON line contains one event. Producers must terminate records with LF; consumers also accept CRLF, an optional leading UTF-8 BOM, and a complete last record without LF. A file may contain many sessions, recordings, and interleaved events. No outer JSON array or mandatory file header is used.
 
@@ -14,7 +14,7 @@ Every event must have:
 
 | Field | Meaning |
 | --- | --- |
-| `schema_version` | Exact version per recording: `1.0`, `1.1`, or `1.2`; browser producers write `1.2`, Android remains `1.1` |
+| `schema_version` | Exact current version: `1.2` on every platform |
 | `event_type` | Event discriminator from the schema |
 | `event_id` | Collision-resistant identity, stable across re-export/replay |
 | `session_namespace` | Stable project/environment scope, shared across relevant producers |
@@ -51,9 +51,9 @@ HTTP origin has separate `initiator` and `executor` actors. For example, Checkou
 
 Local parents start before their children. Children can outlive a parent's return when work is asynchronous; the viewer must not fabricate strict lifetime nesting. A missing local parent is an incomplete-data warning. Remote parents may be absent from this file. A span must not parent itself or change identity halfway through a request.
 
-## Local handler invocations (1.1 and 1.2)
+## Local handler invocations
 
-A handler is an ordinary operation span with explicit invocation metadata. It is independent of HTTP and must be representable when there are zero requests or server origins. On `operation.started`, optional `data.invocation` has `kind: handler`, `dispatch: synchronous` (or `awaited` in 1.2), and a `caller` actor. `data.origin` identifies the handler/callee. The parent context, if present, points to the invoking operation and its actor must match `invocation.caller`. The handler span ID distinguishes each invocation; names do not serve as identities.
+A handler is an ordinary operation span with explicit invocation metadata. It is independent of HTTP and must be representable when there are zero requests or server origins. On `operation.started`, optional `data.invocation` has `kind: handler`, `dispatch: synchronous` or `awaited`, and a `caller` actor. `data.origin` identifies the handler/callee. The parent context, if present, points to the invoking operation and its actor must match `invocation.caller`. The handler span ID distinguishes each invocation; names do not serve as identities.
 
 A handler's `operation.ended` must include `data.completion`: `returned` with outcome `success`, `threw` with outcome `error`, `cancelled` with outcome `cancelled`, or `observation_stopped` with outcome `unknown`. Observation stop requires a nonempty `extensions["capture.observation_stop_reason"]` and no known error. A missing end is an incomplete-data warning, never an inferred return. A normal return does not mean a returned business value was true or accepted. A thrown handler error can be caught by a successful parent.
 
@@ -61,7 +61,7 @@ These completion fields belong only to handler spans. Generic method operations 
 
 The Kotlin `invokeHandler` helper records entry/exit around actual customer code. It forwards the identical return object or exception, captures no arguments/return payloads, and runs user code outside the recorder lock. For manual integration, `startHandler` exposes a first-terminal-wins handle. Version 1.2 adds `dispatch: awaited` for an explicitly awaited handler: the terminal boundary records fulfillment (`returned`) or rejection (`threw`) of the awaited value. The viewer calls these resolved/rejected. The caller must remain active until this settlement. This does not claim a blocked thread, implicit context propagation, or suspension/resumption events. A synchronous handler that returns a Promise still ends at its immediate return. General asynchronous enqueue/continuation tracing remains future work.
 
-All events in one recording must use the same schema version. The current reader accepts both versions. The schema rejects invocation/completion fields and unknown operation outcomes in 1.0; old captures are not rewritten or retroactively assigned handler boundaries. [Handler tracing](HANDLER-TRACING.md) defines the API, rendering requirements, and fixtures. Summary `handler_calls`, `unfinished_handler_calls`, and `unknown_handler_outcomes` are separate from HTTP counters.
+All events use schema version 1.2. Earlier schema versions are rejected; older capture files are left untouched and are not imported into the new collector. [Handler tracing](HANDLER-TRACING.md) defines the API, rendering requirements, and fixtures. Summary `handler_calls`, `unfinished_handler_calls`, and `unknown_handler_outcomes` are separate from HTTP counters.
 
 ## Event vocabulary
 
@@ -190,13 +190,13 @@ Importer rules:
 
 The reference validator is a contract aid, not a hardened large-file ingestion service. It reads the whole file in memory. Byte/file limits and worker-based parsing belong in the later viewer. Its success means the implemented checks found no contradictions; it does not establish native capture completeness or accuracy.
 
-## Future server correlation and compatibility
+## Future server correlation and format changes
 
 Keep trace IDs from day one. Propagation is disabled by default; integrators can enable an origin allowlist. Session IDs are not automatically transmitted. Native instrumentation should share an existing tracing context when available instead of replacing an application's tracing provider.
 
 W3C `traceparent` carries the current client span as the remote parent. An instrumented server uses a distinct server span ID under that parent. Trace/span relationships, rather than session IDs or timestamp proximity, identify the shared exchange. A later server importer must retain both observations and original clocks; it should not double-count them as two requests.
 
-This first schema admits mobile producers and reserves remote-parent relationships. Server event types/producer metadata, raw HAR/OTLP import, and multi-machine clock presentation need a later reviewed extension. Trace IDs alone do not establish server timings or retroactively correlate old logs without shared identities.
+This schema admits mobile and browser producers and reserves remote-parent relationships. Server event types/producer metadata, raw HAR/OTLP import, and multi-machine clock presentation need a later reviewed extension. Trace IDs alone do not establish server timings or retroactively correlate old logs without shared identities.
 
 Before an incompatible format change, bump the major schema version. Even additive core fields need an updated schema/version and importer capability declaration because v1 rejects unknown core fields. Use namespaced extensions for optional vendor metadata in the meantime.
 
@@ -211,7 +211,7 @@ Before an incompatible format change, bump the major schema version. Even additi
 
 ## Browser producer (1.2)
 
-Version 1.2 adds `producer.platform: web` and awaited handler dispatch. Versions 1.0/1.1 remain readable and reject these new values. Native producers need not upgrade. Browser and native recordings may coexist in one imported file, each with a fixed version. Transfer protocol remains version 1.
+The sole supported event version is 1.2, including `producer.platform: web` and awaited handler dispatch. Browser and native recordings may coexist in one capture. Source registration, pairing, upload and ACK use transfer version 2, independently of the event version.
 
 The browser observes logical Fetch/XHR calls: browser-added request headers, cookie details, filtered response headers, redirects, preflights and hidden attempts are not fabricated. Header sets are partial. Fetch opaque/opaque-redirect status 0 becomes unavailable status and an unknown observation, not an HTTP response or success. A CORS failure does not establish whether a server processed the request. Trace propagation remains disabled by default.
 

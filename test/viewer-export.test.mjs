@@ -27,14 +27,14 @@ test('SVG: all reference sessions render standalone shapes and text without UI o
 });
 
 test('SVG: active search and origin filters exclude hidden requests and origins', () => {
-  const session = load('samples/live/successful-sign-in.ndjson')[0];
+  const session = load('examples/viewer-three-origin.ndjson')[0];
   const all = draw(session);
   for (const origin of session.origins) assert.ok(all.includes(new URL(origin).host));
   const selected = draw(session, { search: '/todos/1' });
-  assert.match(selected, /jsonplaceholder.typicode.com/);
+  assert.match(selected, /tasks.example/);
   assert.match(selected, /GET \/todos\/1/);
-  for (const origin of session.origins.filter(origin => !origin.includes('jsonplaceholder'))) assert.ok(!selected.includes(new URL(origin).host));
-  const origin = session.origins.find(origin => !origin.includes('jsonplaceholder'));
+  for (const origin of session.origins.filter(origin => !origin.includes('tasks.example'))) assert.ok(!selected.includes(new URL(origin).host));
+  const origin = session.origins.find(origin => !origin.includes('tasks.example'));
   assert.doesNotMatch(draw(session, { origins: [origin] }), /GET \/todos\/1/);
 });
 

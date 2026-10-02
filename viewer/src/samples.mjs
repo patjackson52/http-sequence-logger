@@ -1,9 +1,8 @@
 const files = import.meta.glob('../../examples/*.ndjson', { query: '?raw', import: 'default' });
-const live = import.meta.glob('../../samples/live/*.ndjson', { query: '?raw', import: 'default' });
-const transferred = import.meta.glob('../../samples/transfer/*.ndjson', { query: '?raw', import: 'default' });
+const nativeCurrent = import.meta.glob('../../samples/realtime/android-adb-emulator-5556-user-0.ndjson', {query:'?raw',import:'default'});
 export const sampleOptions = [
- ['live','Live Android · successful + recovered sign-in'],
- ['transferred','Transferred Android + iOS · native captures'],
+ ['realtime-android','Android emulator · recorded current capture'],
+ ['viewer-three-origin','Three origins · SDK and customer handler'],
  ['handler-no-http','Handler · no HTTP'], ['handler-throw','Handler · throws, SDK continues'],
  ['handler-cancelled','Handler · cancelled'], ['handler-stopped','Handler · observation stopped'],
  ['handler-interrupted','Handler · missing end'], ['handler-http-outlives-return','Handler · HTTP completes after return'], ['handler-repeated-nested','Handlers · repeated and nested SDK callback'], ['handler-http','Handler · nested HTTP'],
@@ -13,8 +12,8 @@ export const sampleOptions = [
  ['redirect','Redirect'], ['retry','Retry'], ['interrupted','Interrupted recording'],
 ];
 export async function loadSample(id) {
- const key=id==='transferred'?'../../samples/transfer/multi-platform.ndjson':id==='live'?'../../samples/live/multi-session.ndjson':`../../examples/${id}.ndjson`;
- return [{name:id==='live'?'live-android-sessions.ndjson':`${id}.ndjson`,text:await (transferred[key]||live[key]||files[key])()}];
+ const key=id==='realtime-android'?'../../samples/realtime/android-adb-emulator-5556-user-0.ndjson':`../../examples/${id}.ndjson`;
+ return [{name:`${id}.ndjson`,text:await (nativeCurrent[key]||files[key])()}];
 }
 export async function loadMalformedSample() {
  const [file]=await loadSample('handler-no-http');

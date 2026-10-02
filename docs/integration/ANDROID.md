@@ -63,25 +63,26 @@ Use one shared injection type and the same factory symbol in `src/debug` and `sr
 - [Release factory](../../integration/android-consumer/app/src/release/kotlin/example/consumer/CaptureFactory.kt): `NoOpLogger` and no file/recorder/transfer initialization.
 - [Host execution hook](../../integration/android-consumer/app/src/main/kotlin/example/consumer/ConsumerApplication.kt): worker-thread lifetime with no Activity retention.
 
-The essential debug wiring, on a worker thread, is:
+Initialize once on a host setup/IO context; capture callbacks then use bounded memory admission:
 
 ```kotlin
 val app = context.applicationContext
-val file = File(app.filesDir, "captures/capture-${UUID.randomUUID()}.ndjson")
-val sink = DebugTransfer.open(app, file)
+val sink = DebugTransfer.open(app)
 val logger: dev.networklog.api.Logger = RecordingLogger(NetworkLog(
     sink, appId = app.packageName, namespace = "${app.packageName}/development"
 ))
 // Inject logger into the existing app/SDK. The owner closes sink after recording ends.
 ```
 
-The file path is **chosen by the application**, not an automatically installed SDK service. `files/captures/*.ndjson` is the convention supported by the collector's ADB watcher. `NetworkLog` otherwise defaults its namespace to the sample's value, so explicitly set an application/environment namespace. Producer `app_version` is currently a fixed prototype value; do not claim this field automatically reflects the host's real application version.
+`DebugTransfer.open` creates a new process journal under `context.noBackupFilesDir/HTTPSequenceLogger/journals/<uuid>/capture.ndjson`, publishes the fixed installation descriptor and starts one pairing/connection manager. Keep one sink across sessions. It rotates retained generations without deleting acknowledged history; use `captureFiles` at export time, since `file` names the current generation. `DebugTransfer.initialize(context)` can publish discovery without opening a recording. The descriptor uses `context.packageName`, including the host's debug suffix. Set an application/environment namespace explicitly.
 
-Start a session with an opaque existing ID or omit it to generate one while recording. Supplied IDs must be nonempty and at most 512 characters; do not use an access token or secret as an ID. Multiple sessions can share one retained sink. Reusing a session ID does not merge recording instances: `recording_id` still identifies each recording. With `NoOpLogger`, an omitted ID is empty; business identity must come from the app rather than depend on debug ID generation.
+Initialization performs synchronous filesystem work. Run `open`, `initialize` and private configuration writes on a worker thread, as the external consumer does. Callback-safe append admission does not make initial journal creation or setup UI-thread safe.
 
-Both local capture and durable transfer write synchronously; use the host's worker/IO execution context. Keep the owner independent of Activity recreation. End sessions after their operations complete and close the sink when recording ends. `NdjsonFileSink`, including unpaired `DebugTransfer.open`, **truncates an existing file**: create a unique file for a new recording, and do not reopen an old unpaired file to append. Capture setup can fail before logging starts. The compiled debug factory falls back to no-op with `capturePath=null` on setup failure, emits a fixed credential-free diagnostic, and makes close/diagnostic failures observation-only. Preserve this boundary when adapting the wiring so storage errors do not prevent a business request or replace its result. The short construction snippet above shows the successful setup path; use the complete factory for failure handling.
+Supply an opaque existing session ID or generate one; do not use tokens as IDs. All events use schema 1.2. `recording_id` separates recording periods even when logical session IDs are shared across sources. Logging-disabled business identity must not depend on a generated debug ID.
 
-For paired delivery, closing a sink stops its worker and leaves unacknowledged bytes on disk; it does not wait for successful upload. Retain the sink until the chosen recording/delivery boundary, or reopen pending files after startup and pairing with `DebugTransfer.resumePending`. Own and close the returned senders before re-pairing. `awaitUploaded(...)` is optional and must run off the UI thread. The fixture closes its short lifetime immediately and verifies local recording, not background delivery.
+Append takes an immutable sanitized snapshot into a bounded queue. One serial writer performs serialization/grouped append/sync away from callback threads. `sink.flush()` returns a `CompletableFuture<Unit>` persistence barrier; await it off the UI thread when a durable prefix is required. An unflushed tail may be lost on process kill. Admission/storage failure is an observation diagnostic and must not replace application responses or callback results. Construction still needs the complete factory's setup failure/no-op boundary.
+
+The open sink refreshes private pairing and rebinds its sender while canonical capture continues. Retained journals survive ACK; each delivery cursor binds to collector/source/journal generation. `DebugTransfer.resumePending(context, maximumFiles=16)` reopens retained current-format journals with exclusive disk ownership; own/close the returned senders. `awaitUploaded` is optional and runs off the UI thread. Close stops admission and releases ownership only after accepted disk jobs finish; it is not a successful-upload guarantee. No old files/cursors are imported.
 
 ## 4. Instrument existing HTTP and handler calls
 
@@ -146,20 +147,22 @@ Keep `android.permission.INTERNET` in the host as needed. Configure capture reda
 
 Merge narrowly into the host's existing rules:
 
-- Exclude `files/captures` and `files/network-log` from cloud backup and device transfer, including sidecars/credentials. Apply equivalent exclusions if using custom directories. The sample disables all backup; do not copy that whole-app policy into a customer app without need.
-- If using ADB loopback HTTP, add the loopback exceptions from [the sample debug network-security config](../../android/app/src/debug/res/xml/network_log_debug_security.xml) to a **debug-only** configuration. Preserve the app's existing trust/cleartext/domain rules instead of replacing its complete policy. No broad cleartext or trust-all override belongs in production.
-- `DebugTransfer.saveConnection(...)` stores private pairing in `files/network-log/connection.json`. Never write pairing JSON to capture logs, screenshots, source files, or shared artifacts. A non-debuggable runtime check is a secondary guard; dependency/source separation is still required.
+- Use the bootstrap's no-backup directory for installation, descriptor, pairing and journals. Do not disable the host's entire business backup policy. Validate data reset/restore/reinstall behavior and keep unmatched restored state visibly unlinked.
+- If using ADB loopback HTTP, merge the [debug network-security config](../../android/app/src/debug/res/xml/network_log_debug_security.xml) into a debug-only configuration. Preserve business trust/domain/cleartext rules; no global trust-all or cleartext override belongs in production.
+- `DebugTransfer.saveConnection(context, json)` stores private version 2 enrollment/source input under `no_backup/HTTPSequenceLogger/pairing.json`. Never log/commit/export this input. Build separation remains the shipping guard.
 
-Build/install the host app's debug variant with its own tools. From the logger checkout, use Node **22.12+** and start the collector for the actual installed debug application ID (including suffixes):
+Build/install the host's debuggable variant using its own tools. Start agnostic collection from the logger checkout:
 
 ```sh
 npm ci
-npm run collector -- --android CUSTOMER_APPLICATION_ID --open
+npm start
 ```
 
-This builds/opens the viewer, discovers ADB, selects the single phone (otherwise the sole emulator), writes private pairing, establishes ADB reverse, and watches `files/captures/*.ndjson`. If selection is ambiguous, add `--device SERIAL` after the existing `--`; use `--adb /path/to/adb` only when discovery needs an override. `npm run android:live` is for building/installing the repository sample, not the customer's app.
+The collector discovers participating packages on all authorized Android devices. Optional `--android CUSTOMER_APPLICATION_ID --device SERIAL` filters narrow discovery. Enumeration, descriptor/pairing access and bounded capture reads use the validated numeric default user; other profiles remain unsupported pending validation. The sample install command is separate.
 
-Open **http://127.0.0.1:4319/** and keep the collector running. Browser connection/refresh and USB reconnection/pairing repair are automatic; the live panel shows device readiness. The next `DebugTransfer.open` uses the pairing; an already-open local sink remains local, but the ADB watcher can still retrieve its complete lines. Run a host-app flow and confirm its event count/session. **Save capture** exports `artifacts/collector/capture.ndjson`; app originals stay in their private directory. **Pause live** only pauses browser updates. Stop the watcher before manually changing app pairing. See [transport and retrieval](TRANSPORT.md) for overrides, HTTPS LAN, file export, credentials, restarts and troubleshooting. A sanitized NDJSON file can also be imported directly into the file-only viewer at port `4173`.
+Open **http://127.0.0.1:4319/**. Device/app/session navigation, source status and event counts establish delivery. The collector and app can start in either order; an open sink observes pairing refresh. ADB reverse and private pairing recover after reconnect. Native HTTP and bounded file replay share source ownership and deduplicate event IDs. A different selected collector is not silently replaced.
+
+**Save capture** exports current NDJSON from `artifacts/collector-v2/capture.sqlite`; native originals remain canonical private journals. Viewer pause leaves collection running. Physical LAN delivery uses explicitly paired HTTPS, applicable debug local-network permission and optional NSD candidate discovery. See [TRANSPORT.md](TRANSPORT.md) for trust, paths, bounded recovery and troubleshooting.
 
 ## 6. Verify the host integration and release boundary
 

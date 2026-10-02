@@ -54,11 +54,11 @@ function files(directory) {
 }
 const markers = [
   'NDJSONTransferSink', 'CollectorTransport', 'DurableSpool', 'TransferConnection', 'ManualCaptureDemo',
-  'api/v1/events', 'certificate_sha256', 'events.ndjson', 'cursor.json', 'httpbin.org', 'Collector pairing',
+  'api/v2/', 'certificate_sha256', 'capture.ndjson', 'cursor.json', 'DebugCapture', 'CollectorBrowser', 'source.json', 'journal.json', '_nlog._tcp', 'source_token', 'enrollment_token', 'httpbin.org', 'Collector pairing',
 ];
 // DEBUG dylibs are part of the app on recent Xcode versions, so inspect the entire bundle.
 const debugBytes = files(debugApp).map(path => readFileSync(path));
-for (const marker of ['NDJSONTransferSink', 'CollectorTransport', 'api/v1/events']) {
+for (const marker of ['NDJSONTransferSink', 'CollectorTransport', 'api/v2/']) {
   assert.ok(debugBytes.some(bytes => bytes.includes(Buffer.from(marker))), `Debug positive control missing ${marker}`);
 }
 const releaseFiles = files(releaseApp);
@@ -76,6 +76,7 @@ assert.doesNotMatch(linkedLibraries, /NetworkLogTransfer|CryptoKit|Security\.fra
   'Development transfer dependency linked into production');
 const info = JSON.parse(execFileSync('plutil', ['-convert', 'json', '-o', '-', join(releaseApp, 'Info.plist')], { encoding: 'utf8' }));
 assert.equal(info.NSLocalNetworkUsageDescription, undefined, 'Production includes a development local-network prompt');
+assert.equal(info.NSBonjourServices, undefined, 'Production includes development Bonjour service declaration');
 assert.equal(info.NSAppTransportSecurity, undefined, 'Production includes development ATS exceptions');
 writeFileSync(join(evidence, 'result.json'), JSON.stringify({
   passed: true, production_app: releaseApp, debug_positive_control: debugApp,

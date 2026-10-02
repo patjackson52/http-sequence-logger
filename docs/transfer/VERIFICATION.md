@@ -1,5 +1,7 @@
 # Transfer verification
 
+This is the historical pre-update verification record. Current schema 1.2/transfer 2 evidence and open acceptance gates are in [Realtime implementation verification](../design/REALTIME-VERIFICATION.md). These earlier physical-device and protocol results do not establish the current implementation.
+
 ## Automatic live setup — 2026-09-30 UTC
 
 The plain `http://127.0.0.1:4319/` URL now connects automatically. `npm start` builds/serves the viewer and checks the installed Android sample; `npm run android:live` also builds, installs, pairs and launches a flow. Pairing is still private and authenticated; the browser receives its read credential through the guarded same-origin route described in [the protocol](PROTOCOL.md).

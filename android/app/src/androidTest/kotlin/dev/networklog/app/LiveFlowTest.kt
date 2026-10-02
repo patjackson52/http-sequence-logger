@@ -14,8 +14,9 @@ import java.io.File
 class LiveFlowTest {
     @Test fun successfulAndRecoverySessionsProduceRealLogs() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val file = File(context.filesDir, "captures/live-e2e.ndjson")
-        NdjsonFileSink(file).use { sink ->
+        val file = File(instrumentationFixtureDirectory(context), "live/capture.ndjson")
+        check(!file.exists()) { "Use a fresh fixture ID; retained captures must not be deleted" }
+        FileHttpEventSink(file,null).use { sink ->
             val logger = NetworkLog(sink, context.packageName)
             assertEquals("Emily", SampleFlow.run(RecordingLogger(logger)).name)
             assertEquals("Emily", SampleFlow.run(RecordingLogger(logger), "demo-reused-session", recovery = true).name)

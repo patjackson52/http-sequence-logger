@@ -24,8 +24,9 @@ internal interface EventTransport {
 internal class HttpEventTransport(private val pairing: TransferConnection) : EventTransport {
     @Volatile private var active: HttpURLConnection? = null
 
-    override fun upload(body: ByteArray): UploadResponse {
-        val connection = URL("${pairing.endpoint}/api/v1/events").openConnection(Proxy.NO_PROXY) as HttpURLConnection
+    override fun upload(body: ByteArray): UploadResponse = request("events", body, "application/x-ndjson")
+    internal fun request(path: String, body: ByteArray, contentType: String = "application/json"): UploadResponse {
+        val connection = URL("${pairing.endpoint}/api/v2/$path").openConnection(Proxy.NO_PROXY) as HttpURLConnection
         active = connection
         try {
             connection.instanceFollowRedirects = false
@@ -35,7 +36,7 @@ internal class HttpEventTransport(private val pairing: TransferConnection) : Eve
             connection.requestMethod = "POST"
             connection.doOutput = true
             connection.setRequestProperty("Authorization", "Bearer ${pairing.token}")
-            connection.setRequestProperty("Content-Type", "application/x-ndjson")
+            connection.setRequestProperty("Content-Type", contentType)
             connection.setRequestProperty("Accept", "application/json")
             connection.setFixedLengthStreamingMode(body.size)
             if (connection is HttpsURLConnection && pairing.certificateSha256 != null) {

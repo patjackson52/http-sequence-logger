@@ -9,7 +9,14 @@ import org.json.JSONObject
 import org.junit.runner.RunWith
 import java.io.File
 
-/** Opt-in: configure files/network-log/connection.json and forward the collector port first. */
+/** All instrumentation writes are confined to a fresh harness-owned cache fixture, outside canonical journals. */
+internal fun instrumentationFixtureDirectory(context:android.content.Context):File {
+    val id=requireNotNull(InstrumentationRegistry.getArguments().getString("transferFixtureID")) { "Provide a fresh transferFixtureID UUID via scripts/check-android-instrumentation.mjs" }
+    require(java.util.UUID.fromString(id).toString()==id) { "transferFixtureID must be a canonical UUID" }
+    return File(context.cacheDir,"networklog-acceptance/$id").also { require(it.isDirectory) { "Provision the private instrumentation fixture first" } }
+}
+
+/** Opt-in: the maintained harness provisions private fixture pairing and owned reverse routes. */
 @RunWith(AndroidJUnit4::class)
 class TransferFlowTest {
     @Test fun factoryDoesNotReadPairingInNonDebuggableApplication() {
@@ -20,12 +27,13 @@ class TransferFlowTest {
             }
         }
         assertNull(DebugTransfer.readConnection(releaseContext))
-        DebugTransfer.open(releaseContext, File(context.cacheDir, "non-debug-local.ndjson")).use { assertFalse(it.uploadsEnabled) }
+        try { DebugTransfer.open(releaseContext); fail("Debug bootstrap must reject a production app") } catch (_: IllegalStateException) { }
     }
     @Test fun pairedCollectorReceivesCaptureAndRetainsLocalExport() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val connection = requireNotNull(DebugTransfer.readConnection(context)) { "Pair a debug collector before running TransferFlowTest" }
-        val file = File(context.filesDir, "captures/transfer-e2e-${System.currentTimeMillis()}.ndjson")
+        val directory=instrumentationFixtureDirectory(context)
+        val connection = TransferConnection.parse(File(directory,"pairing.json").readText())
+        val file = File(directory,"paired/capture.ndjson");check(!file.exists()) { "Use a fresh fixture ID" }
         FileHttpEventSink(file, connection).use { sink ->
             val logger = NetworkLog(sink, context.packageName)
             if (InstrumentationRegistry.getArguments().getString("transferLiveFlow") == "true") {
@@ -45,12 +53,13 @@ class TransferFlowTest {
 
     @Test fun offlineSpoolSurvivesCloseAndResumesWithoutNewIds() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val connection = requireNotNull(DebugTransfer.readConnection(context))
-        val file = File(context.filesDir, "captures/transfer-offline-e2e.ndjson")
+        val directory=instrumentationFixtureDirectory(context)
+        val connection = TransferConnection.parse(File(directory,"pairing.json").readText())
+        val file = File(directory,"offline/capture.ndjson")
         val phase = InstrumentationRegistry.getArguments().getString("transferOfflinePhase")
         require(phase == "write" || phase == "resume") { "Select write with collector disconnected, then resume after reconnect" }
         if (phase == "write") {
-            file.delete(); File(file.path + ".transfer.json").delete()
+            check(!file.exists()) { "Use a fresh fixture ID for the offline write phase" }
             FileHttpEventSink(file, connection).use { sink ->
                 val session = NetworkLog(sink, context.packageName).startSession("Offline transfer probe", "android-offline-transfer")
                 session.startOperation("Persist while offline").complete(); session.end()
@@ -66,17 +75,17 @@ class TransferFlowTest {
 
     @Test fun pinnedTlsAcceptsPairedLeafAndRejectsDifferentPin() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val raw = File(context.filesDir, "network-log/connection-tls.json").readText()
+        val directory=instrumentationFixtureDirectory(context)
+        val raw = File(directory,"connection-tls.json").readText()
         val paired = TransferConnection.parse(raw)
         require(paired.certificateSha256 != null)
-        val file = File(context.filesDir, "captures/transfer-tls-${System.currentTimeMillis()}.ndjson")
+        val file = File(directory,"tls/capture.ndjson");check(!file.exists()) { "Use a fresh fixture ID" }
         FileHttpEventSink(file, paired).use { sink ->
             val session = NetworkLog(sink, context.packageName).startSession("Paired TLS transfer", "android-pinned-transfer")
             session.end(); assertTrue("Paired TLS certificate was not accepted", sink.awaitUploaded(10_000))
         }
         val wrongPin = TransferConnection.parse(JSONObject(raw).put("certificate_sha256", "0".repeat(64)).toString())
-        val rejectedFile = File(context.filesDir, "network-log/rejected-pin.ndjson")
-        rejectedFile.delete(); File(rejectedFile.path + ".transfer.json").delete()
+        val rejectedFile = File(directory,"rejected-pin/capture.ndjson");check(!rejectedFile.exists()) { "Use a fresh fixture ID" }
         FileHttpEventSink(rejectedFile, wrongPin).use { sink ->
             val session = NetworkLog(sink, context.packageName).startSession("Wrong pin must remain local")
             session.end(); assertFalse(sink.awaitUploaded(1_500)); assertTrue(sink.pendingBytes() > 0)

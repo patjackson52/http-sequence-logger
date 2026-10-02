@@ -37,7 +37,8 @@ targets:
         UILaunchScreen: {}
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-        NSLocalNetworkUsageDescription: Transfer development captures to a paired local collector.
+        NSLocalNetworkUsageDescription: Discover and transfer development captures to a paired local collector.
+        NSBonjourServices: ["_nlog._tcp"]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.networklog.demo

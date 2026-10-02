@@ -1,98 +1,53 @@
 # Kotlin Android SDK and sample
 
-This runnable sample integrates the draft 1.1 recorder with native `HttpURLConnection`, a small demo auth SDK, customer-owned networking code, and optional durable transfer to the local web collector. Source is MIT licensed. Android API 26+; no Java source/API examples are maintained.
+The debug recorder writes sanitized schema **1.2** events and source-aware transfer **2**. Use [Android integration](../docs/integration/ANDROID.md) for existing apps. `logger-api` contains the shared API/no-op; `logger` and discovery wiring belong only in debug dependencies. API26+, JDK17, Kotlin2.2.20 and SDK35 are the tested baseline.
 
-To integrate a customer's existing application, start with the [agent-oriented source-install and wiring guide](../docs/integration/ANDROID.md). This page primarily runs and explains the repository sample.
+## Run
 
-## Modules
-
-- `logger-api`: small Kotlin interfaces, lazy capture descriptors, and `NoOpLogger`, with no recorder or I/O dependencies.
-- `logger`: debug-only recorder, JSON capture policy, NDJSON file sink, durable file/HTTP transfer sink, and optional `LoggingHttpClient` built on native HttpURLConnection. `RecordingLogger` adapts it to the shared API.
-- `demo-auth`: `DemoAuthSdk` and its own HTTP client, which call two independent origins and depend only on `logger-api`.
-- `app`: debug logging UI and a separate production UI around the same business flow, an app-owned manually instrumented connection to a third origin, and native tests.
-
-Use [debug-only integration and release verification](RELEASE.md) for production setup, lazy manual recording, R8/ProGuard rules, and binary audits. The sample's Release build includes only the API/no-op; recorder code and logging resources are excluded even without shrinking. Both builds apply explicit backup/device-transfer exclusions to app storage.
-
-## Build and run
-
-The fastest path, from the repository root with Node 22.12+, JDK 17, Android SDK Platform 35 and platform-tools installed, plus an authorized USB phone or running API 26+ emulator:
+From `tools/network-log-contract`, run `npm ci`, then `npm start`. The agnostic collector discovers all authorized ADB devices and initialized debug apps. `npm run android:live -- --device SERIAL` separately builds/installs/runs the repository sample. Select an actual serial from `adb devices -l`. Missing tools and unauthorized devices do not block the viewer.
 
 ```sh
-npm ci
-npm run android:live
-```
-
-This builds and installs the debug sample, automatically picks the single connected phone in preference to emulators (or the sole emulator), configures USB streaming, opens http://127.0.0.1:4319/ and runs a sign-in. `-- --recovery` runs the 401 scenario; `-- --no-run` opens the app without starting a flow; `-- --no-open` skips opening a browser. With multiple phones or multiple emulators and no phone, supply `-- --device SERIAL` using `adb devices -l`. `ANDROID_SERIAL` is also honored. The process keeps a newly started collector running until Ctrl+C. Repeated runs reuse the collector in the same directory and port; keep that original collector terminal running. `--dir` and `--port` are optional overrides, not required setup.
-
-ADB is discovered from `ANDROID_HOME`/`ANDROID_SDK_ROOT`, common SDK locations, or PATH; `-- --adb /absolute/path/to/adb` overrides it. The launcher derives the SDK root from an absolute discovered platform-tools path when needed. Set `JAVA_HOME` for a nonstandard JDK installation; common macOS Homebrew JDK 17 locations are detected. Use `npm run android:live -- --help` for the full option list.
-
-For the already installed sample, **`npm start`** builds/opens the viewer and pairs USB without rebuilding the APK or running a flow. Tap either sign-in action in the app. The plain viewer URL reconnects after refresh; USB disconnect/reconnect and app reinstall are retried by the running collector. **Follow newest session** displays each new run until you inspect/filter one. **Save capture** exports the desktop journal at `artifacts/collector/capture.ndjson`; original app files remain available through **Export structured log**. See [live viewer controls](../viewer/README.md#live-device-captures).
-
-The debug activity consumes a `networklog.run` intent extra once, so rotation does not restart the flow. Release code does not include that launcher behavior. The lower-level build/install commands follow for IDE workflows.
-
-Use JDK 17, Android SDK Platform 35, and an API 26+ device/emulator. Gradle 8.14.3 (checksum verified), AGP 8.13.2, and Kotlin 2.2.20 are pinned. Gradle downloads the pinned dependencies on the first build.
-
-```sh
-# From the repository root. Set JAVA_HOME to a JDK 17 installation if necessary.
-# Set ANDROID_HOME to your Android SDK, or create android/local.properties with sdk.dir=...
 ./android/gradlew -p android :app:assembleDebug :logger:testDebugUnitTest
-adb devices
-export ANDROID_SERIAL=emulator-5554 # Choose your device, not necessarily this example.
 adb -s "$ANDROID_SERIAL" install -r android/app/build/outputs/apk/debug/app-debug.apk
-adb -s "$ANDROID_SERIAL" shell am start -n dev.networklog.sample/dev.networklog.app.MainActivity
+adb -s "$ANDROID_SERIAL" shell am start -n dev.networklog.sample/dev.networklog.app.MainActivity --es networklog.run success
 ```
 
-Tap **Run successful sign in** or **Run with 401 → refresh → retry**. Supply an optional opaque session ID; an empty field generates a UUID. A flow continues across Activity recreation through a process-scoped worker; process termination can leave an intentionally incomplete capture. The app shows that failure without inventing completed requests.
+The sample offers successful sign-in, 401/retry, canonical export and pairing. Optional Bonjour browsing starts only with **Discover collectors**; DNS-SD labels require an independently provisioned enrollment ticket/pairing and never authorize TLS trust. LAN endpoints require HTTPS; loopback HTTP uses ADB reverse.
 
-Each run writes `files/captures/capture-<time>.ndjson` in private app storage. **Export structured log** opens Android's document picker. Captures remain local until a collector is paired or a file is exported. A paired debug collector receives events automatically, while the local export stays available. Multiple sessions can share a sink, as demonstrated by the live test.
-
-## Connect the development collector
-
-`npm run android:live` and `npm start` pair the sample automatically; no JSON copy/paste or manual reversal is needed. For an already instrumented customer debug app, use `npm run collector -- --android YOUR_APPLICATION_ID --open` instead. The watcher creates private `files/network-log/connection.json`, configures ADB reverse, and retrieves complete lines from `files/captures/*.ndjson` as a fallback. The live panel shows phone readiness separately from the browser connection. Pairing/reversal recover after reconnect or reinstall; HTTP and ADB delivery deduplicate by event ID.
-
-For explicit/manual pairing, start with `npm start -- --no-android` (add `--lan YOUR_DESKTOP_IP` for Wi-Fi), then copy the appropriate JSON from **Other devices** into the app's **Pair desktop collector** dialog. The bearer token is saved only in private `files/network-log/connection.json`; it is never placed in a capture or URL. **Disconnect** removes pairing and stops retained upload workers. Stop automatic USB watching first, since an active watcher reinstates its pairing. The factory ignores pairing entirely when `ApplicationInfo.FLAG_DEBUGGABLE` is absent.
-
-Only for manual loopback setup, forward the collector port using the selected serial:
-
-```sh
-adb -s "$ANDROID_SERIAL" reverse tcp:4319 tcp:4319
-```
-
-Use the collector's `http://127.0.0.1:4319` connection JSON with that route. Cleartext transfer is accepted only for loopback destinations; the sample has a debug-only network security configuration for localhost/127.0.0.1/::1. Release resources do not include that exception. LAN pairing uses HTTPS. When the JSON includes `certificate_sha256`, the sender requires the exact DER leaf-certificate SHA-256 fingerprint, current certificate validity, and the platform's hostname verification. No global trust or hostname checks are changed. Redirects are never followed, and the sender uses native HttpURLConnection directly so it cannot recursively record its own uploads.
-
-Development source sets can choose the transfer sink directly on a worker thread:
+## Debug bootstrap and storage
 
 ```kotlin
-val connection = TransferConnection.parse(pastedConnectionJson)
-FileHttpEventSink(captureFile, connection).use { sink ->
-    val logger = NetworkLog(sink, appId = "your.app")
-    val session = logger.startSession("Checkout")
-    // Existing manual logging and SDK adapters are unchanged.
-    session.end()
-    sink.awaitUploaded(2_000) // Optional worker-thread wait; false means data remains local.
-}
+// Bootstrap on the host's worker. Keep this process journal across sessions.
+DebugTransfer.initialize(context) // Discovery descriptor exists without a collector/events.
+val sink = DebugTransfer.open(context)
+val logger = NetworkLog(sink, appId = context.packageName)
+val session = logger.startSession("Checkout")
+// Wire the host's existing capture hooks.
+session.end()
+sink.flush().get() // Worker-only wait for the admitted prefix to be durable.
+val exportFiles = sink.captureFiles // All retained canonical generations.
+// Optional worker-only bounded upload wait:
+val delivered = sink.awaitUploaded(2_000)
+sink.close()
 ```
 
-Or use `DebugTransfer.open(context, captureFile)` to select the configured transfer sink or a plain local file sink. The returned `DevelopmentCaptureSink` supports the same `EventSink` API and an optional `awaitUploaded` helper.
+Default private paths are `no_backup/HTTPSequenceLogger/source.json`, `pairing.json` (app-owned explicit selection/registered credential), `pairing-local.json` (collector-owned automatic proposal), and `journals/<journal-id>/capture.ndjson`. Each process/open has a unique locked generation and rotates transparently when full. `JournalLimits` configures generation and installation capacity. Metadata `journal.json` publishes the synced prefix for stopped-app collection, coalesced at250ms/1MiB and forced on seal/close. `DebugTransfer.resumePending(context)` reopens up to16 retained current-format journals; retain and close the returned senders. The bootstrap connection manager refreshes pairing every second and serializes rebinds without truncating capture. Direct `FileHttpEventSink(file, connection)` is available when the app explicitly owns its new canonical journal.
 
-Each append writes and fsyncs a complete NDJSON record before returning. HTTP executes on a private worker; small batches are scheduled within 200 ms. A batch contains at most 500 events/1 MiB. Only HTTP 200 with the paired collector ID and acknowledgments for every submitted event advances the saved offset. Offset state is scoped to collector origin/identity and the file's identity and acknowledged prefix hash. Truncation, replacement, or a changed collector causes replay using the original event IDs. The collector deduplicates retries. A partially written final line is removed on reopen; complete preceding lines remain intact.
+Capture admission is bounded memory, **not persistence**. A serial disk worker groups writes on a50ms,64KiB or500-event trigger; triggers do not guarantee fsync completion time. `flush()` is a durability barrier; HTTP runs separately and tails synced lines in bounded1MiB/500-event batches. The recorder defers complete event serialization to that disk worker. A pending write/network stall never changes business request results. `close()` stops new admission, flushes the admitted prefix, cancels delivery and retains canonical bytes.
 
-The default spool retains at most 16 MiB **per file**, including acknowledged records so export remains complete. It never evicts unacknowledged records. New records beyond the limit are rejected through the recorder's existing dropped-event diagnostics; export/rotate files explicitly. The spool, sidecar state, and exclusive writer lock are private local files. Do not open the same spool in two senders.
+Canonical journals retain ACKed records. The defaults are16MiB per generation,256MiB per installation,2MiB aggregate admission queue and128 retained generations. Installation capacity is reserved while acquiring the writer under the same installation lock. Capacity rejection increments dropped diagnostics; export retained paths and explicitly archive storage. Automatic rotation never deletes history. The rolling owner replays retained generations one at a time. Cursors bind collector/source/journal/file identity and a bounded boundary sample. Partial final tails are repaired on reopen; complete records remain. Changed source/collector replays stable IDs. A lost ACK safely retries. No acknowledged-prefix hashing or historical whole-file reads occur per event.
 
-Transient failures retry with bounded 500 ms–30 s backoff. Permanent 4xx rejection retains the file and emits a credential-free diagnostic; `retryNow()` resumes after the problem is corrected. `close()` stops delivery without waiting for network completion, leaving all unacknowledged bytes durable. Reopening the same file resumes delivery. The sample reopens pending captures at startup, after pairing, and after each run; it considers the latest 16 capture files and keeps those senders alive for reconnects. Older files remain exportable and can be reopened explicitly with `FileHttpEventSink`. Android process termination stops workers; delivery resumes when the app starts again. This development implementation does not claim OS-scheduled background delivery.
+The collector provisions private pairing automatically for local ADB sources. For explicit physical-device pairing use `DebugTransfer.saveConnection(context, json)` on a worker with the current source config or enrollment ticket. Explicit pairing wins over an automatic local proposal. Successful enrollment persists the installation credential in app-owned pairing for relaunch after ticket expiry. Tokens stay out of URLs/logs. HTTPS pins use the exact DER certificate SHA256 plus validity and hostname verification. Redirects are refused. All transfer uses an uninstrumented native connection. The debug factory rejects non-debuggable hosts.
 
-## Transfer verification
-
-The deterministic JVM tests cover ACK mismatches, retries, offline close/reopen, a changed collector, stale in-flight ACKs after spool replacement, size/count bounds, interrupted final lines, and HTTP redirect refusal.
-
-With a collector on port 4319 and optional pinned HTTPS on 4320, run:
+## Verify
 
 ```sh
-ANDROID_SERIAL=emulator-5554 ./android/scripts/run-transfer-e2e.sh \
-  artifacts/transfer/connection-loopback.json artifacts/transfer/connection-lan.json
+./android/gradlew -p android :logger:testDebugUnitTest :app:assembleDebugAndroidTest
+JAVA_HOME=/path/to/jdk17 ANDROID_HOME=/path/to/sdk ./android/scripts/verify-release.sh
+ANDROID_SERIAL=SELECTED_DEVICE ./android/scripts/run-transfer-e2e.sh /private/current-loopback-source.json /private/current-tls-source.json
 ```
 
-This explicitly runs the real recovery SampleFlow, disconnects/reconnects ADB forwarding to test offline persistence across instrumentation processes, verifies the debug factory remains disabled for a non-debuggable context, and checks correct versus incorrect TLS pins when the second connection file is supplied. It keeps capture exports and test output under ignored `artifacts/transfer/`. Connection files must remain private and must not be committed.
+The tests cover offline/restart, lost/mismatched ACK, source scopes, late ACK during rebind, concurrent admission/close, canonical retention, partial tails, bounded batches and redirect refusal. Release audits inspect shipping APKs/dependencies, descriptor/discovery/credential markers and debug resources. Real physical permission/lifecycle gates require actual devices; emulator evidence does not establish them.
 
 ## Demo scenario
 
@@ -131,7 +86,7 @@ See [handler API, format, and GUI mapping](../HANDLER-TRACING.md). The sample no
 For code shared with production, use the [small API and lazy metadata suppliers](RELEASE.md#manual-recording-in-shared-code). The direct-recorder example below belongs in debug sources.
 
 ```kotlin
-val sink = NdjsonFileSink(file) // New file; keep open to record multiple sessions.
+val sink = DebugTransfer.open(context) // Keep open across concurrent sessions.
 val logger = NetworkLog(sink, appId = "your.app")
 val session = logger.startSession("Checkout", sessionId = existingSessionId)
 val exchange = session.startRequest("GET", requestUrl)
@@ -159,7 +114,7 @@ sink.close()
 
 Use `receiveResponseHeaders` if the body continues streaming, then complete only after EOF/intentional close; errors after headers retain the status. Customers can label a request using `Actor(owner, component, method)` and optionally supply an operation's context. A method block is never required. For custom asynchronous clients, retain the exchange in the existing callbacks and call `cancel` on native cancellation. Handles are synchronized; the first terminal observation wins. Logging does not change the client's callbacks, request, or cancellation behavior.
 
-The sink writes and flushes synchronously, so invoke capture operations on a worker thread. This sample's entire flow runs on a dedicated worker. Reuse one sink for concurrent sessions targeting one file; constructing a new `NdjsonFileSink` replaces that file. Sink failures are reported through an optional diagnostic and do not replace network results. After a sink write failure, the file may be incomplete and must be validated. Session creation/configuration and file opening can report invalid configuration or filesystem failures before any request begins.
+Capture calls admit bounded memory and serialize/write on the journal owner. Bootstrap/open and blocking flush/close belong on a worker. Share one owner across concurrent sessions; it rotates generations and retains canonical history. Sink failures report diagnostics without replacing network results. A failed writer stays blocked until close/reopen repairs its uncertain tail; validate retained captures before exporting.
 
 Use either `LoggingHttpClient` or manual recording for a request, not both. This prototype does not implement shared capture tokens for deduplicating automatic/manual instrumentation.
 

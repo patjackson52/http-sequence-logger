@@ -21,8 +21,8 @@ test('layout: no-HTTP handler has a call, one block, and return without adding a
   assert.equal(layoutSequence(session).height, layout.height);
 });
 
-test('layout: real HTTP follows executor and custom handler follows App lane', () => {
-  const session = fromText(loadText('samples/live/successful-sign-in.ndjson'));
+test('layout: three-origin HTTP fixture follows executor and custom handler follows App lane', () => {
+  const session = fromText(loadText('examples/viewer-three-origin.ndjson'));
   const layout = layoutSequence(session), app = layout.lanes.find((l) => l.owner === 'integrator'), sdk = layout.lanes.find((l) => l.owner === 'sdk');
   const manual = session.exchanges.find((x) => x.manual), sdkRequest = session.exchanges.find((x) => x.executor.owner === 'sdk');
   assert.equal(layout.arrows.find((a) => a.entityId === manual.id && a.kind === 'request').x1, app.x);
@@ -140,10 +140,10 @@ test('layout: HTTP application error remains a failed terminal even with success
 });
 
 test('layout: search narrows origins, while local-only retains the original participants', () => {
-  const session = fromText(loadText('samples/live/successful-sign-in.ndjson'));
+  const session = fromText(loadText('examples/viewer-three-origin.ndjson'));
   assert.equal(session.origins.length, 3);
   const filtered = projected(session, { search: '/todos/1' });
-  assert.deepEqual(filtered.lanes.filter((l) => l.kind === 'server').map((l) => l.origin), ['https://jsonplaceholder.typicode.com']);
+  assert.deepEqual(filtered.lanes.filter((l) => l.kind === 'server').map((l) => l.origin), ['https://tasks.example']);
   const local = projected(session, { kind: 'local', search: 'loadTask' });
   assert.equal(local.lanes.filter((l) => l.kind === 'server').length, 3);
   const transactions = fixture('ios-logical-transactions');

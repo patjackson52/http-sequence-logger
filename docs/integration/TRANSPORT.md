@@ -1,183 +1,165 @@
 # Connect an app, locate logs, and open the viewer
 
-The app owns capture/instrumentation. Transfer sends existing sanitized events. The local collector persists them, and the desktop viewer reconstructs the sequence. Pairing alone does not add logging to an HTTP client.
+The app supplies capture hooks and sanitizes events. Its debug bootstrap publishes discovery and maintains one canonical journal. The collector authenticates the source, stores events on its machine and serves the viewer. Pairing does not instrument arbitrary HTTP clients.
 
-```text
-app HTTP / SDK / handler observations
-  → app-owned canonical NDJSON
-  → native file+HTTP sink (or Android ADB file watcher)
-  → desktop collector capture.ndjson
-  → same-origin browser HTTP reads + SSE notifications
-  → interactive sequence + details
-
-offline alternative: export canonical NDJSON → drop into local web viewer
-
-browser frontend observations → origin-scoped IndexedDB journal
-  → explicit same-origin POST → Node development relay → desktop collector
+```mermaid
+flowchart LR
+  A[Android debug journal] -->|ADB discovery and HTTP or bounded file replay| C[Collector SQLite worker]
+  I[iOS debug journal] -->|Simulator discovery or paired HTTPS| C
+  W[Web IndexedDB journal] --> R[Same-origin Node relay]
+  R -->|Source registration and HTTP batches| C
+  C -->|Selected session pages and SSE hints| V[Devices and environments → Apps → Sessions]
+  C --> E[NDJSON export]
 ```
 
 ## Start desktop tools
 
-In the pinned logger checkout, with Node **22.12+**:
+From the pinned checkout, use Node 24.13.x and the pinned dependencies:
 
 ```sh
 npm ci
 npm start
 ```
 
-Open **http://127.0.0.1:4319/**. The collector-served viewer obtains its read credential automatically through a guarded same-origin bootstrap. Refresh and collector reconnect do not require a special URL. No credential is stored in localStorage/sessionStorage. `npm start` watches the already installed Android sample by default; it does not build or install a mobile app. For the repository sample, `npm run android:live` also builds, installs, pairs and runs the app with automatic device selection. For iOS/browser-only work, start with `npm start -- --no-android`.
+Open **http://127.0.0.1:4319/**. Startup builds the viewer and watches all authorized Android devices and booted iOS simulators. It does not install apps or boot simulators. Missing tools, permissions or descriptors disable only the affected adapter. The app must initialize its debug bootstrap before discovery can find it; initialization can happen before collector startup and before any session/event.
 
-Choose one collector startup command and keep its terminal running. `android:live` can reuse a running collector only when its directory/identity and port match. Other startup commands report an occupied port; inspect that process and use its viewer or stop it cleanly before restarting. An override such as `--port 4330 --dir artifacts/another-run` changes the viewer address and storage together; use the printed ordinary URL. Relative directories resolve from the logger checkout. A new directory creates a new identity and requires producer pairing again.
+Optional filters are `--android APPLICATION_ID`, `--device SERIAL`, `--ios BUNDLE_ID` and `--simulator UDID`. Use `--no-android` or `--no-ios` to disable an adapter. The actual installed debug application/bundle ID includes any suffix. `npm run android:live -- --device SERIAL` separately builds/installs/runs the repository sample; it is not a customer integration command.
 
-For offline file import only, use `npm run viewer` or `npm run preview:viewer` (after a build), at `http://127.0.0.1:4173`. That Vite origin is **not** a collector endpoint. Live reads use the collector's own origin; adding permissive CORS or using a `file://` viewer is unnecessary and unsupported. Rebuild the viewer after changing source; the collector serves `viewer/dist/`.
+Keep one collector terminal running. A directory has one owner; another collector cannot take over the active manifest or app pairing. To start a separate collector, select another directory/port and disable activation, or use a separate explicit manifest. A new collector identity needs deliberate selection and authorized enrollment. There is no port scan, automatic project router or old-state import.
+
+The viewer gets its read credential through guarded same-origin bootstrap and keeps it in memory. Refresh/reconnect needs no credential URL. `npm run viewer` at `4173` is file-only; permissive collector CORS is unnecessary. **Pause live** and file import pause viewer updates while collector ingestion continues.
+
+Read-only diagnostics:
+
+```sh
+npm run collector -- status
+npm run collector -- doctor
+```
+
+Use the reported collector identity, directory, endpoint, tool status and reason to diagnose a waiting source. These commands do not repair pairing, delete captures or expose credentials.
 
 ## Select the device route
 
-| Device | Pairing origin | Setup |
+| Platform | Route | Requirements and limits |
 | --- | --- | --- |
-| Android emulator or USB device | Loopback HTTP on the device, forwarded to desktop | Installed debuggable app, authorized ADB; automatic selection, pairing and `adb reverse` |
-| iOS Simulator on this Mac | Desktop loopback HTTP | Development target permits local networking; pass generated loopback pairing JSON |
-| Physical iPhone or Android over LAN | Desktop LAN HTTPS origin with paired certificate | Reachable host/firewall, generated LAN pairing JSON, applicable local-network permission |
-| Browser frontend on developer computer | Same-origin development relay; relay forwards to desktop loopback | Debug package, origin-scoped journal, loopback-bound Node dev server; pairing stays server-side |
-| Any device, offline | No endpoint | Export a sanitized canonical file and import it in the viewer |
+| Android phone/emulator | ADB reverse and authenticated loopback HTTP; bounded file replay recovers retained journals | Authorized ADB, debuggable app, fixed descriptor. Default numeric user only; inaccessible profiles are unsupported. |
+| iOS simulator | Private automatic pairing in the resolved data container; native loopback HTTP and bounded file replay | Booted simulator with explicit UDID, Xcode, debug bootstrap. Shutdown simulators are not booted for scanning. |
+| Physical iOS/Android | Explicit paired HTTPS; optional Bonjour finds candidates | Reachable hostname/IP, host firewall, trusted endpoint/certificate pairing, relevant debug local-network permissions. Foreground delivery only. |
+| Desktop browser app | Page → own frontend origin → Node relay → collector | Debug integration and origin-scoped journal. Relay stays mounted when collector is absent. |
+| Mobile/remote browser | Same-origin reachable HTTPS frontend/relay behind authenticated development access | Authorize the frontend session, bind handles to it, require CSRF protection and exact Origin/Host. Valid headers alone do not authenticate a LAN client. |
+| Offline | Export canonical NDJSON and import in viewer | Current schema 1.2. Pairing/SQLite/IndexedDB internals are not capture imports. |
 
-For a customer Android app, build/install its debuggable variant with the host's own tools, then start the collector with the **actual application ID** (including any debug suffix):
+Android debug wiring uses `DebugTransfer.open(context)` once per process lifetime. The helper creates an installation descriptor and a unique journal, then observes private pairing changes while the app remains open. The collector discovers all eligible packages, pairs each installation and replays the same canonical event IDs when necessary. Native push and local file retrieval share the authenticated source owner. Local adapters reuse a validated same-collector installation credential and bind its verified device alias rather than issuing a second source. An explicit app selection takes priority over automatic proposals.
 
-```sh
-npm run collector -- --android com.example.customer.debug --open
-```
+Swift `DebugCapture.start()` publishes its descriptor and creates the default canonical journal; the host provides sanitized events. On the simulator the collector resolves each booted device's installed apps/container through `simctl`, parses its property list and checks the fixed descriptor. A physical phone registers its installation after explicit pairing; the collector cannot list every installed iPhone app or freely read app sandboxes.
 
-This builds/opens the viewer, configures port reversal, writes `files/network-log/connection.json` through `run-as`, and polls **only** `files/captures/*.ndjson` as a fallback. It does not modify app source or install an interceptor. `DebugTransfer.open` reads pairing when a new sink opens; an already-open sink does not retarget. The watcher repairs pairing and port reversal after reconnect/reinstall. With one phone, `--device` and `--adb` can be omitted; selection prefers the single phone over emulators and does not switch devices during a running collector. If ambiguous, discover the serial with `adb devices -l` and add `--device SERIAL` after the existing `--`; add `--adb /absolute/path/to/adb` only if discovery fails. `ANDROID_SERIAL` is also honored. File-only logging can use the watcher without a native uploader; double delivery deduplicates by event ID.
-
-While the watcher is active it owns that app's USB pairing. Stop the collector or use `--no-android` before changing the app to a different manual/LAN pairing. **Pause live** only pauses browser reads; it does not stop file retrieval or native uploads.
-
-For manual port reversal, using the selected serial:
+For physical HTTPS, choose a reachable desktop hostname or address:
 
 ```sh
-adb -s "$DEVICE_SERIAL" reverse tcp:4319 tcp:4319
+npm start -- --lan 192.168.1.25
 ```
 
-Use the generated loopback JSON, not `10.0.2.2` HTTP: the transfer library only permits cleartext loopback destinations. Merge the [Android guide's](ANDROID.md) debug-only loopback network configuration into the customer's existing policy. Native HTTPS business requests keep their normal security behavior.
+The optional HTTPS listener defaults to port `4320`. The desktop viewer stays on loopback. Use the private `connection-lan.json` as enrollment input in the app's debug setup. The generated certificate has a bounded lifetime; validate hostname, dates and the paired SHA-256 certificate fingerprint. Certificate pinning supplements server-certificate and hostname checks; see [TLS identity and certificate requirements](../transfer/PROTOCOL.md) for the transport rules. Changed/expired trust needs explicit repair and pairing. LAN viewer, bootstrap and read/export routes remain unavailable. Do not install a global trust override.
 
-For a physical phone, with a desktop IP/hostname reachable from that phone:
-
-```sh
-npm start -- --no-android --lan 192.168.1.25 --dir artifacts/customer-collector
-```
-
-The optional HTTPS listener defaults to `4320` and binds for LAN ingestion. Its certificate is generated with OpenSSL for the specified host and is valid for 30 days. Use **connection-lan.json** on the device, or copy that HTTPS configuration from **Other devices** in the viewer. The browser still uses the ordinary loopback URL on the desktop. LAN `/`, health, download and browser reads return 404; that is intentional. The LAN listener accepts authenticated uploads only. A changed LAN host or expired certificate requires a fresh collector directory and re-pairing; do not disable hostname/date/pin verification or install a global trust override.
-
-Merge permissions into the development target according to its OS/target SDK; use [platform setup](../transfer/README.md#ios-simulator-and-wi-fi) and its official platform references. Physical-device signing, firewall and permissions must be verified on the chosen device; simulator success does not establish them.
+Optional Bonjour advertises `_nlog._tcp` candidate metadata, never enrollment or source secrets. Selecting a discovered host is not trust: trusted QR/JSON pairing establishes endpoint and certificate. Multicast can be unavailable, so manual pairing remains supported. iOS local-network permissions and Android platform permissions belong only in development configuration; simulator evidence cannot verify physical permission prompts.
 
 ## Where every file lives
 
-These are **sample/tooling conventions**, not automatic capture discovery outside the listed directories. Resolve platform containers through APIs/tools; do not hardcode sandbox UUIDs or Android user paths.
-
-| Owner | Location | Purpose / lifetime |
+| Owner | Location | Meaning |
 | --- | --- | --- |
-| Android customer convention | `<context.filesDir>/captures/<unique>.ndjson` | Canonical capture and, with `FileHttpEventSink`, retained upload spool. Caller supplies the file. One sink can contain multiple sessions. |
-| Android upload sink | `<capture>.transfer.json`, `<capture>.transfer.lock` | ACK cursor/identity and exclusive writer lock; private sidecars, not imports |
-| Android debug pairing | `<context.filesDir>/network-log/connection.json` | Native upload credentials/configuration; created by ADB setup or `DebugTransfer.saveConnection` |
-| iOS demo | `<Documents>/demo-<UUID>/<session_id>.ndjson` | Canonical manual-demo capture |
-| iOS demo spool | Same demo directory, under `spool/` | `events.ndjson`, `cursor.json`, `writer.lock` |
-| iOS existing app | Caller-selected Application Support capture and spool paths | No SDK default; adopt and record the paths in [the iOS guide](IOS.md). Keep canonical capture distinct from spool. |
-| Browser customer app | IndexedDB under its exact frontend origin; default database `http-sequence-logger`, required app-owned `journalId` | Canonical sanitized journal; no filesystem path until explicit NDJSON download. One writer per journal. |
-| Browser sample | Origin `http://127.0.0.1:4180`, database `http-sequence-logger-demo`, journal `browser-demo-v1` | Development panel exports `browser-capture.ndjson`; a different origin/profile has separate storage. |
-| Desktop default collector | `<checkout>/artifacts/collector/capture.ndjson` | Canonical collected events, across devices/sessions; override directory with `--dir` |
-| Desktop private pairing | Same directory: `connection-loopback.json`, optional `connection-lan.json` | Device upload configuration; do not import into viewer or commit |
-| Desktop private state | Same directory: `connection-state.json`, `collector.lock` | Read/write tokens, collector identity, process ownership |
-| Desktop TLS, when enabled | Same directory: `collector-key.pem`, `collector-cert.pem`, `certificate-host.txt` | Development key/certificate/hostname; not capture evidence |
-| Built viewer | `<checkout>/viewer/dist/` | Static desktop web assets; not mobile app resources |
+| Android bootstrap | `<context.noBackupFilesDir>/HTTPSequenceLogger/source.json` | Current installation descriptor; actual package name, no capture events required |
+| Android canonical journal | Same root: `journals/<uuid>/capture.ndjson` | Retained bounded generations, with durable-prefix publication and scoped ACK sidecars |
+| Android explicit pairing | Same root: `pairing.json` | App-owned explicit enrollment/registered installation configuration; SDK and local collector never compete to write it |
+| Android automatic pairing | Same root: `pairing-local.json` | Collector-owned local proposal; used only while no explicit pairing is selected |
+| iOS bootstrap | `<Library/Application Support>/HTTPSequenceLogger/source.json` | Current app installation descriptor; root excluded from backup |
+| iOS canonical journal | Same root: `journals/<uuid>/capture.ndjson` | Retained bounded generations; no second durable upload copy |
+| Native installation budget | Descriptor root: `journal-budget.json` | Byte reservations also identify expected generations; a missing reserved directory/capture reports retained-history loss |
+| iOS explicit pairing | Same root: `pairing.json` | App-owned explicit enrollment/registered installation configuration; credentials stay private |
+| iOS automatic pairing | Same root: `pairing-local.json` | Collector-owned simulator proposal; explicit app pairing takes priority |
+| Browser app | IndexedDB at its exact frontend origin | Origin-scoped environment/installation IDs, separate page journals, owner epochs and source/collector-scoped delivery cursor |
+| Collector events/state | `<checkout>/artifacts/collector-v2/capture.sqlite` | Sole authoritative current collector store; SQLite WAL/FULL, one database worker |
+| Collector pairing | Same directory: `connection-loopback.json`, optional `connection-lan.json` | Private version 2 enrollment configuration; not exports |
+| Collector ownership/TLS | Same directory: lock and optional key/certificate/hostname files | Private runtime ownership/trust; not captures |
+| Active collector manifest | `~/.http-sequence-logger/active.json`, or explicit override | Private selected collector publication. No reader credential in producer manifest. |
+| Built viewer | `<checkout>/viewer/dist/` | Desktop assets, excluded from native shipping builds |
 
-Only one collector process owns a directory. Stop it cleanly before restarting. To start a separate run use a new directory (and re-pair for its new identity/tokens); retain old captures. Do not truncate or replace an active journal or edit ACK/cursor files to force completion.
+ACK never deletes canonical producer events. Older captures/directories remain untouched; this release does not convert/import them. Never truncate an active journal, edit a cursor to claim success or copy a live SQLite database without its WAL. Use SQLite's online backup or a safely closed database; **Save capture** exports NDJSON.
+
+## Persistence and recovery
+
+Native append admits a bounded immutable record to memory. Sequence/order is allocated under a short synchronization boundary; serialization, disk and HTTP work run outside capture callbacks. Await the async persistence barrier for the admitted prefix to be flushed/synced. A process kill can lose an unflushed tail. Group-flush intervals are scheduling triggers, not promises under stalled disk.
+
+A single serial disk owner maintains each canonical journal. The sender reads a bounded durable batch and performs network waits outside disk ownership. ACK/cursor state binds to collector, source and journal generation. Rebind cancels/fences the old sender; a late ACK cannot advance the new cursor. Canonical capture writes continue independently. Close stops admission, preserves the accepted prefix and releases its lock after disk jobs finish. An uncertain partial append/sync poisons the writer rather than claiming durable success.
+
+Local file followers read only the published durable prefix in at most 64 KiB chunks and commit each complete batch/checkpoint atomically with events. Generation/file identity and bounded boundary samples detect replacement/truncation without repeatedly reading/hashing the full history. A crash can leave synced but unpublished bytes; stopped-app pull may conservatively miss that tail until producer reopen/resync/publication. Missing retained generations appear as a gap rather than inferred complete capture.
+
+Browser journals use short IndexedDB append groups and indexed range reads, with transactional owner tokens/epochs for append and ACK. Foreground delivery registers before events and maintains one drain/retry task. Storage failure retains a bounded memory export. Browser durability depends on browser storage/eviction; unload, beacon, background sync and closed-tab delivery are not guarantees. A participating page must open/resume to replay retained history.
+
+The collector validates a whole authenticated batch, assigns immutable source ownership on first ingestion, deduplicates stable event IDs and commits events, positions, accounting and applicable checkpoint in one SQLite transaction before ACK. Worker queues, per-source bytes and HTTP admission are bounded. Quota/free-space pressure rejects new writes while preserving existing records; duplicate-only replay remains acknowledgeable. Slow export uses short high-water pages and releases each read before waiting on a socket.
 
 ## Retrieve a canonical file without live delivery
 
-Android, after selecting values from the actual app/device:
+Android, using the selected device, actual debug package and a journal ID from `journals/`:
 
 ```sh
-adb -s "$DEVICE_SERIAL" exec-out run-as "$APPLICATION_ID" ls files/captures
-adb -s "$DEVICE_SERIAL" exec-out run-as "$APPLICATION_ID" cat "files/captures/$CAPTURE_NAME" > customer-capture.ndjson
+adb -s "$DEVICE_SERIAL" exec-out run-as "$APPLICATION_ID" --user 0 ls no_backup/HTTPSequenceLogger/journals
+adb -s "$DEVICE_SERIAL" exec-out run-as "$APPLICATION_ID" --user 0 cat "no_backup/HTTPSequenceLogger/journals/$JOURNAL_ID/capture.ndjson" > customer-capture.ndjson
 node validate.mjs customer-capture.ndjson
 ```
 
-`CAPTURE_NAME` is a selected basename from that directory. `run-as` requires a debuggable installed application; this is not a production extraction mechanism. `adb pull` cannot normally read private app storage. The sample also supports Android's document picker; a customer should expose an equivalent development-only export if needed.
+This deliberate export may read a whole chosen file; the live follower uses bounded reads. `run-as` requires a debuggable app. App development share/export is also supported.
 
-iOS Simulator: discover a simulator with `xcrun simctl list devices available`, then resolve its container:
+For a booted iOS simulator, resolve its actual container:
 
 ```sh
 SIM_DATA=$(xcrun simctl get_app_container "$SIMULATOR_UDID" "$BUNDLE_ID" data)
-# Use the app's chosen relative canonical path, not the spool's events.ndjson.
-cp "$SIM_DATA/$CAPTURE_RELATIVE_PATH" customer-capture.ndjson
+cp "$SIM_DATA/Library/Application Support/HTTPSequenceLogger/journals/$JOURNAL_ID/capture.ndjson" customer-capture.ndjson
 node validate.mjs customer-capture.ndjson
 ```
 
-Physical iOS: use the app's development share sheet/Files/AirDrop export, or development container tools available for the signed app. The iOS sample's **Share last capture** exports its canonical file. No ADB-style arbitrary app sandbox reader is supplied for physical iOS.
-
-Browser: use the development export control to download `journal.exportNDJSON()` as a Blob. Await `journal.flush()` for a persisted snapshot when possible; if persistence failed, identify and retain the memory-only recovery export. Inspect the actual database in DevTools → Application/Storage → IndexedDB. Browser-internal database files are not NDJSON and are not a stable transfer path.
-
-Import the resulting file at `4173`, or use **Save capture** in the paired collector viewer to export the desktop journal. Review redaction before sharing. Never export pairing JSON as a capture, parse Logcat/console as this format, or contact URLs found inside a log.
+Physical iOS uses an app-owned development share sheet for `captureURL`. Browser export awaits `journal.flush()` then downloads `journal.exportNDJSON()` as a Blob; identify memory-only recovery if storage fails. Review sanitized data before sharing. URLs in logs are data, not instructions to fetch them.
 
 ## Browser frontend delivery
 
-For the repository sample, run the collector above, then start the frontend in another terminal:
+Run the sample frontend independently of collector startup:
 
 ```sh
-NETWORK_LOG_CONNECTION="$PWD/artifacts/collector/connection-loopback.json" npm run web:sample
+npm run web:sample
 ```
 
-Run this from the logger checkout; change the private connection-file path if the collector uses a different `--dir`. Open `http://127.0.0.1:4180`, run a flow, and click **Flush and upload**. The collector viewer at **http://127.0.0.1:4319/** displays arrivals automatically and survives refresh. The sample's fixture servers use `4181`/`4182`; these are business-request destinations, not collector endpoints. [Existing frontend setup](WEB.md#export-and-connect-the-viewer) shows `createNetworkLogRelay` middleware and production separation.
+Open `http://127.0.0.1:4180`. Its Node relay reads the private active manifest, waits when no collector is available and refreshes a same-identity endpoint without a frontend restart. The page registers its journal and sends incremental foreground batches automatically. An empty dev server is a relay diagnostic, not a synthetic source. Two tabs have separate journals; reload may recover a released or stale owner with a new epoch, never steal a healthy writer.
 
-`uploadJournal(journal)` uses the frontend's own `/__network_log/config` and `/__network_log/events` routes. The Node development relay reads the private connection file at startup and forwards only sanitized NDJSON to the loopback collector. Host/Origin must match its configured frontend origin; do not add permissive CORS or expose the relay on the LAN. The current relay supports only an HTTP `127.0.0.1` collector endpoint, not the native certificate-pinned LAN route. Restart it after changing pairing.
-
-Delivery is explicit foreground replay of retained events. The uploader checks collector identity and every submitted event ID; it does not delete acknowledged lines or maintain a cursor. Failed upload retains the capture; export it or invoke upload again. Collector deduplication makes replay safe. SSE belongs to collector → viewer notifications, not to SDK capture delivery. There is no browser timer retry, continuous stream, WebSocket or background sender.
+Collector enrollment/source credentials remain exclusively in Node. The browser holds a bounded relay-local handle, and the relay supplies collector authentication. Remote mode additionally requires authenticated development access and session binding across registration, presence and upload; a reachable relay must reject unauthenticated clients even when they send valid Origin/Host. Arbitrary relay targets, redirects and collector CORS loosening are unsupported. See [WEB.md](WEB.md) for callable setup APIs and production exclusion.
 
 ## Pairing and delivery contract
 
-Pairing JSON contains `version: 1`, an endpoint **origin**, upload `token`, `collector_id`, and optional `certificate_sha256`. Pass it to the platform parser; do not append `/api/v1/events` to `endpoint`. Device and browser tokens have different roles. Native sinks use Authorization headers and the protocol's endpoint paths themselves. [Full protocol](../transfer/PROTOCOL.md).
+The sole transfer/configuration version is **2**. Enrollment input carries `endpoint`, `collector_id`, `enrollment_token` and an optional `certificate_sha256`. Registered configuration carries `source_id` and `source_token` instead. The endpoint is an origin; clients append their own protocol route. Capture events independently use **1.2**. No v1 routes or parsers are retained.
 
-| Route | Listener / credential |
+| Route | Authority |
 | --- | --- |
-| `POST /api/v1/events` | Loopback or LAN; device token; NDJSON batch |
-| `GET /api/v1/health` | Loopback only; no token; connectivity/identity check |
-| `GET /api/v1/viewer-session` | Loopback only; strict same-origin browser metadata and custom header; returns in-memory read credential |
-| `GET /api/v1/events?after=<cursor>`, `/api/v1/stream`, `/api/v1/download`, `/api/v1/pairing`, `/api/v1/status` | Loopback only; browser token; same-origin viewer |
+| `POST /api/v2/register` | Scoped enrollment grant; bounded metadata; retry operation is idempotent |
+| `POST /api/v2/presence` | Source credential; own presence/status only |
+| `POST /api/v2/events` | Source credential; NDJSON, at most 1 MiB/500 events |
+| `GET /api/v2/health` | Loopback connectivity/identity only |
+| `GET /api/v2/bootstrap` | Guarded same-origin viewer bootstrap |
+| `/api/v2/sources`, `/sessions`, `/events`, `/stream`, `/download`, `/status` | Loopback reader credential; no source credential can read these |
 
-Native batches are at most **1 MiB / 500 events**. The collector fsyncs new events before ACK; both native implementations cap ACKs at **2 MiB** and check collector identity and submitted IDs. Retries keep IDs and timestamps intact. Identical events deduplicate and conflicts reject the batch. Pairing a new collector causes native sinks to replay bytes still retained in their files/spools without synthesizing new requests. After Swift spool compaction, recovering full history requires an explicit `relaySanitizedFile(canonicalURL)`; the sink does not discover or reread the app's canonical files automatically. Device transport is HTTP; browser live notification is SSE, not WebSocket.
-
-Browser replay uses the same 1 MiB / 500-event upload and 2 MiB ACK bounds through the relay, with no browser credential or cursor. The retained browser journal is canonical history; explicit repeated upload sends that history again.
-
-## Retention and sender lifetime
-
-- Android file-only `NdjsonFileSink` flushes synchronously and **truncates on open**. It has no automatic rotation/size limit. Allocate a new path for a new sink, or retain one sink across sessions. Do not use it to reopen an old capture for resume.
-- Android `FileHttpEventSink` appends/fsyncs synchronously, sends on its own worker, retains acknowledged history, and defaults to 16 MiB per file. Run recording off the UI thread. Keep returned pending senders alive; close them before re-pairing. Reopen with `FileHttpEventSink` or `DebugTransfer.resumePending` to resume retained data, not by reopening an unpaired file-only sink. `resumePending` defaults to the latest 16 files; older files need explicit handling/export.
-- Swift defaults to an 8 MiB spool and may compact acknowledged bytes. Canonical export files therefore need their own bounded retention. Use one actor sink per spool directory, `resume()` after reopen/foreground, and `close()` when finished. This is foreground development delivery, not OS-scheduled background transfer.
-- Browser journals default to 8 MiB / 10,000 events and do not evict older records at capacity. Inspect `stats`, export and rotate to a new journal ID; do not silently clear an unexported journal. IndexedDB flush failures leave memory export available. The app owns journal/observer lifetime and handles browser storage unavailability or eviction; no unload persistence guarantee is made.
-- Collector defaults to 64 MiB / 100,000 events. At capacity, keep/export the capture and start a new directory rather than discard unacknowledged data. File import allows 16 MiB per file, 64 MiB combined, 100,000 events; a large collector export may require splitting **between complete lines**. Preserve IDs and import all parts. The viewer is intended for roughly 10–20 requests per session and does not virtualize enormous diagrams.
-- Permanent rejection retains pending data. Correct pairing/schema/storage first, then `retryNow()` (Android) or `resume()` (Swift). Transient failures retry with bounded backoff. `close()` retains unacknowledged data; it is not a successful-upload guarantee.
+Enrollment expiry/recovery, explicit rotation/revocation, conflict behavior and ACK identity checks are specified in [PROTOCOL.md](../transfer/PROTOCOL.md). Source credentials cannot read/list other sources. Native and browser ACKs are capped at 2 MiB and verify collector/source/submitted event identities. SSE communicates committed ingestion/registry watermarks; it carries hints, not capture data or business completion.
 
 ## Troubleshooting by symptom
 
 | Symptom | Check next |
 | --- | --- |
-| Gradle recorder not found in Release | Expected guard: shared code must use API/no-op; never add a production fallback to recorder Debug |
-| `run-as` denied / wrong app | Installed variant's real application ID, debug flag, selected/authorized device |
-| Paired but no events | Capture hooks actually installed; session/sink active; correct canonical directory; `DebugTransfer.open` happened after pairing; validate a local file first |
-| HTTP upload fails on Android loopback | ADB reverse, debug network-security merge, INTERNET permission, correct port and loopback pairing |
-| Browser cannot connect | Open the plain loopback collector URL at 4319; restart the collector after updating it. Read credentials refresh automatically. Port 4173 is file-only. |
-| Live but no new app events | Live confirms the viewer connection only. Check Android readiness, actual app ID/capture hooks, or iOS pairing/browser explicit upload. Run an app flow and confirm its event count. |
-| Multiple Android devices / unauthorized phone | Use `adb devices -l`, authorize USB debugging, and add `--device SERIAL` after npm's `--`. A running watcher stays with its first selected device. |
-| Port already in use | Use the running collector or stop it cleanly before restart. For a separate collector choose both a new `--port` and `--dir`. Only `android:live` automatically reuses a matching collector. |
-| New session arrives but old one stays selected | Enable **Follow newest session**; inspection, session selection and filtering turn it off. After file import or pause, choose **Resume live**. |
-| App pairing keeps returning after Disconnect | Automatic USB watching owns pairing. Stop that collector or restart with `--no-android` before disconnecting or using LAN pairing. |
-| Browser sample upload 404 | Restart sample with `NETWORK_LOG_CONNECTION` pointing to private loopback pairing; relay middleware is optional |
-| Browser relay 403 | Frontend origin/Host must exactly match configured scheme, host and port; use `127.0.0.1`, not a mismatched `localhost` alias |
-| Browser journal missing after reload | Same origin/profile/database/journal ID; previous flush succeeded; inspect memory fallback and IndexedDB errors |
-| LAN health/UI 404 | Intentional upload-only listener; use desktop loopback for health/viewer |
-| TLS/connection failure on phone | Reachable LAN hostname/IP, firewall, permissions, fresh matching pin/certificate and dates; preserve checks |
-| Collector 400 / 409 / 413 / 507 | Respectively schema/batch format, ID/sequence conflict, batch limit, storage limit; retain data and fix the cause |
-| Spool busy / capture already open | One sender owns each Android file or Swift directory; close old owner before reopen/re-pair |
-| File exists but viewer is incomplete | Missing lifecycle events, ended session too early, interrupted process, dropped observations; inspect diagnostics and do not fabricate ends |
-| Viewer blank / failed worker load | Built `viewer/dist`, HTTP serving instead of `file://`, supported Node/build version; use correct viewer origin |
+| App absent | Debug bootstrap initialized; actual suffixed package/bundle ID; authorized device or booted simulator; descriptor status |
+| Tool unavailable | Install/configure platform tools; viewer and other adapters continue |
+| Ready, no events | Host capture hooks, active session and source; pairing itself does not record HTTP |
+| Backlog retained | Collector reachability, source credential, quota and journal/persistence status |
+| Permission required | Device USB/local-network permission or revoked grant; authorize explicitly |
+| Another collector selected | Deliberately select/re-enroll; no automatic takeover |
+| Storage full | Export/archive or choose capacity/new directory; no automatic deletion |
+| Paused viewer | Collection continues; Resume live returns to current collector |
+| Frontend started first | Relay waiting is expected; start collector and page delivery retries |
+| Wrong/missing physical source | HTTPS trust/name/firewall, explicit pairing, foreground app and real-device permission |
+| Shipping build contains debug code | Fix dependency/source/build alias isolation and audit the actual artifact |
 
-After diagnosis, rerun the affected customer-app acceptance checks in [the integration guide](README.md), not just a synthetic fixture.
+The native/browser platform guides and release checks establish integration boundaries. Record exact commands, environment, real captures and unrun physical/browser checks without including credentials.

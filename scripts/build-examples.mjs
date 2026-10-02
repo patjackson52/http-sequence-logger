@@ -40,7 +40,7 @@ function recording(name, { sessionId = `session-${name}`, platform = 'android', 
   const emit = (type, ms, data, ctx) => {
     const sequence = events.length + 1;
     const event = {
-      schema_version: '1.0', event_type: type, event_id: `${recordingId}/event-${sequence}`,
+      schema_version: '1.2', event_type: type, event_id: `${recordingId}/event-${sequence}`,
       session_namespace: 'com.example.shop/development', session_id: sessionId, recording_id: recordingId,
       sequence, timestamp: stamp(offset + ms), monotonic_ns: String(ms * 1_000_000),
       ...(ctx ? { context: ctx } : {}), data,
@@ -267,7 +267,7 @@ const expected = (requests = 1, failed = 0, extra = {}) => ({ sessions: 1, recor
   save('ios-logical-transactions', r, 'One observed task and two native transaction snapshots; no retrospective spans or fabricated callback timing.', expected());
 }
 
-// Control-flow spans are independent of HTTP. Keep the original 1.0 fixtures unchanged.
+// Control-flow spans are independent of HTTP.
 for (const mode of ['http', 'no-http', 'throw', 'cancelled', 'stopped', 'interrupted']) {
   const name = `handler-${mode}`;
   const r = recording(name);
@@ -295,12 +295,39 @@ for (const mode of ['http', 'no-http', 'throw', 'cancelled', 'stopped', 'interru
     r.emit('operation.ended', 48, { outcome: 'success', duration_ns: '2000000', error: null }, resume);
   }
   r.finish(50);
-  r.events.forEach(e => { e.schema_version = '1.1'; });
   save(name, r, `SDK invokes an app-owned handler (${mode}); return/unwind is separate from HTTP.`,
     expected(mode === 'http' ? 1 : 0, 0, { handler_calls: 1, unfinished_handler_calls: mode === 'interrupted' ? 1 : 0, unknown_handler_outcomes: mode === 'stopped' ? 1 : 0 }));
 }
 
-// These acceptance captures use the actual 1.1 vocabulary, not prototype IDs.
+// Current synthetic multi-origin graph, replacing active references to older native evidence.
+{
+  const r = recording('viewer-three-origin');
+  for (const [i, host] of ['api.example', 'auth.example', 'api.example'].entries()) {
+    const call = r.request(`sdk-before-${i}`, 10 + i * 30, { url: `https://${host}/sdk/${i}`, payload: null });
+    call.respond(20 + i * 30); call.finish(25 + i * 30);
+  }
+  const sdkStart = r.events.find(e => e.event_type === 'operation.started' && e.data.origin.owner === 'sdk');
+  const handler = actor('integrator', 'CustomerTaskHandler', 'loadTask');
+  const ctx = { ...sdkStart.context, span_id: hex('viewer-three-origin/handler', 16), parent_span_id: sdkStart.context.span_id, parent_scope: 'local' };
+  r.emit('operation.started', 110, { name: 'CustomerTaskHandler.loadTask', origin: handler, invocation: { kind: 'handler', dispatch: 'synchronous', caller: sdk } }, ctx);
+  const manualAdapter = { name: 'customer.manual', version: '0.1.0' };
+  r.events[0].data.adapters.push({adapter: manualAdapter, capabilities: {attempts: 'logical', request_body: 'partial', response_body: 'partial', transaction_metrics: false}});
+  const call = r.request('manual-task', 120, { method: 'GET', url: 'https://tasks.example/todos/1', payload: null });
+  call.ctx.parent_span_id = ctx.span_id;
+  const started = r.events.find(e => e.event_type === 'http.request.started' && e.context.span_id === call.ctx.span_id);
+  started.data.adapter = manualAdapter;
+  started.data.origin = {initiator: handler, executor: actor('integrator', 'CustomerTaskClient', 'loadTask'), callsite: null};
+  call.respond(130, 200, {title: 'Synthetic task'}); call.finish(140);
+  r.emit('operation.ended', 150, {outcome: 'success', completion: 'returned', duration_ns: '40000000', error: null}, ctx);
+  for (let i = 0; i < 4; i++) {
+    const request = r.request(`sdk-after-${i}`, 160 + i * 30, {url: `https://auth.example/sdk/after/${i}`, payload: null});
+    request.respond(170 + i * 30); request.finish(175 + i * 30);
+  }
+  r.finish(300);
+  save('viewer-three-origin', r, 'Synthetic current-format app handler, manual child HTTP and SDK traffic across three reserved origins.', expected(8, 0, {handler_calls: 1}));
+}
+
+// These acceptance captures use the current vocabulary, not prototype IDs.
 {
   const name = 'handler-http-outlives-return';
   const r = recording(name);
@@ -322,7 +349,6 @@ for (const mode of ['http', 'no-http', 'throw', 'cancelled', 'stopped', 'interru
   r.emit('http.body.captured', 40, { direction: 'response', body: body({ title: 'Read after handler return' }) }, request.ctx);
   request.finish(45);
   r.finish(50);
-  r.events.forEach(e => { e.schema_version = '1.1'; });
   save(name, r, 'Handler returns at 25 ms; SDK resumes immediately while its app-owned HTTP child finishes reading at 45 ms. The method boundary is not stretched to the request end.',
     expected(1, 0, { handler_calls: 1, unfinished_handler_calls: 0, unknown_handler_outcomes: 0 }));
 }
@@ -364,7 +390,6 @@ for (const mode of ['http', 'no-http', 'throw', 'cancelled', 'stopped', 'interru
   r.emit('operation.ended', 84, { outcome: 'success', duration_ns: '2000000', error: null }, resumeCtx);
   r.emit('operation.ended', 90, { outcome: 'success', duration_ns: '88000000', error: null }, rootCtx);
   r.finish(90);
-  r.events.forEach(e => { e.schema_version = '1.1'; });
   save(name, r, 'Two distinct CustomerTaskHandler.loadTask invocations (#1/#2); the second calls DemoAuthTokenStore.currentToken on the SDK at depth 2. App and SDK HTTP ownership follows each request origin.',
     expected(3, 0, { handler_calls: 3, unfinished_handler_calls: 0, unknown_handler_outcomes: 0 }));
 }

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import { importFiles, filterSessionItems, formatDuration } from '../viewer/src/model.mjs';
 
 const root = new URL('../', import.meta.url);
@@ -21,8 +22,8 @@ for (const fixture of fixtureManifest.captures) {
   });
 }
 
-test('live sample produces causal SDK / customer handler / server graph with original sources', () => {
-  const path = 'samples/live/successful-sign-in.ndjson';
+test('current three-origin fixture preserves causal SDK / customer handler / server graph with original sources', () => {
+  const path = 'examples/viewer-three-origin.ndjson';
   const text = readFileSync(new URL(path, root), 'utf8');
   const result = importFiles([{ name: path, text }]);
   const session = result.sessions[0], handler = session.handlers[0];
@@ -208,8 +209,18 @@ test('file and event caps reject oversize input with diagnostics without truncat
 test('generated standalone validator is deterministic and does not compile code at runtime', () => {
   const path = new URL('shared/event-validator.mjs', root);
   const before = readFileSync(path, 'utf8');
-  execFileSync(process.execPath, ['scripts/build-validator.mjs'], { cwd: root });
-  assert.equal(readFileSync(path, 'utf8'), before);
+  // Keep generated module replacement away from concurrent importers.
+  mkdirSync(new URL('.local/', root), { recursive: true });
+  const output = mkdtempSync(new URL('.local/validator-repro-', root));
+  try {
+    for (const directory of ['scripts', 'schema', 'shared']) mkdirSync(join(output, directory));
+    copyFileSync(new URL('scripts/build-validator.mjs', root), join(output, 'scripts/build-validator.mjs'));
+    copyFileSync(new URL('schema/event.schema.json', root), join(output, 'schema/event.schema.json'));
+    execFileSync(process.execPath, ['scripts/build-validator.mjs'], { cwd: output });
+    assert.equal(readFileSync(join(output, 'shared/event-validator.mjs'), 'utf8'), before);
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
   assert.equal(/new Function|\beval\(/.test(before), false);
   assert.equal(/\brequire\(/.test(before), false);
 });

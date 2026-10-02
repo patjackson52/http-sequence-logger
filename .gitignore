@@ -6,6 +6,7 @@ local.properties
 *.iml
 .DS_Store
 artifacts/
+/.local/
 viewer/dist/
 
 web-sample/dist/

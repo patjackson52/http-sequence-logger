@@ -1,5 +1,5 @@
 // Compile against both source entry points without importing the sample.
-import { createLogger, MemoryJournal, createFetchClient, observeXHR, IndexedDBJournal, uploadJournal } from '../../web-sdk/src/index.mjs';
+import { createLogger, MemoryJournal, createFetchClient, observeXHR, IndexedDBJournal, uploadJournal, startJournalDelivery } from '../../web-sdk/src/index.mjs';
 import { noOpLogger, type Logger, type Actor } from '../../web-sdk/src/api.mjs';
 const actor: Actor = { owner: 'integrator', component: 'Customer' };
 const journal = new MemoryJournal();
@@ -18,7 +18,7 @@ async function useLogger(value: Logger) {
   operation.end(); session.end();
 }
 void useLogger; void logger; void noOpLogger;
-async function persist() { const db = await IndexedDBJournal.open({ journalId: 'customer-dev-capture' }); await db.flush(); await uploadJournal(db); await db.close(); }
+async function persist() { const db = await IndexedDBJournal.open({ journalId: 'customer-dev-capture' }); const sender = startJournalDelivery(db, {appId:"external-consumer"}); await db.flush(); await uploadJournal(db, {appId:"external-consumer"}); const exported: string | Promise<string> = db.exportNDJSON(); await exported; sender.stop(); await db.close(); }
 void persist;
 import { createNetworkLogRelay } from '../../web-sdk/dev-relay.mjs';
 const middleware = createNetworkLogRelay({ connectionFile: '/private/connection.json', origin: 'http://127.0.0.1:4180' });

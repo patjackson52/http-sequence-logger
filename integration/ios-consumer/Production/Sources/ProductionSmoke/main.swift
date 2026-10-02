@@ -4,8 +4,8 @@ import AppLogging
     static func main() async {
         let delivery: any CaptureDelivery = NoOpCaptureDelivery()
         precondition(!delivery.isEnabled)
-        await delivery.offerSanitizedFile {
-            fatalError("Production must not inspect capture files")
+        await delivery.appendSanitizedLine {
+            fatalError("Production must not evaluate capture suppliers")
         }
         print("Production no-op passed")
     }

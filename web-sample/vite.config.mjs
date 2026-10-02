@@ -13,7 +13,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
       name: 'development-fixtures-and-relay',
       async configureServer(server) {
         const close = await startFixtures(); server.httpServer.once('close', close);
-        if (process.env.NETWORK_LOG_CONNECTION) server.middlewares.use(createNetworkLogRelay({ connectionFile: process.env.NETWORK_LOG_CONNECTION, origin: 'http://127.0.0.1:4180' }));
+        server.middlewares.use(createNetworkLogRelay({ connectionFile: process.env.NETWORK_LOG_CONNECTION, origin: 'http://127.0.0.1:4180' }));
       },
       generateBundle() {
         if (!debug) for (const id of this.getModuleIds()) if (/web-sdk\/(src\/(?!api\.mjs)|dev-relay)|setup-debug/.test(id)) throw new Error(`Development module in production graph: ${id}`);

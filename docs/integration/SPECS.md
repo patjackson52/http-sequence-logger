@@ -15,13 +15,13 @@ Captures are **UTF-8 NDJSON**: one JSON event per line, newline-terminated by pr
 | Callable Swift transport | [NDJSONTransferSink.swift](../../ios/Sources/NetworkLogTransfer/NDJSONTransferSink.swift), [TransferConnection.swift](../../ios/Sources/NetworkLogTransfer/TransferConnection.swift) |
 | Callable browser API and debug implementation | [api.d.mts](../../web-sdk/src/api.d.mts), [index.d.mts](../../web-sdk/src/index.d.mts), [recorder.mjs](../../web-sdk/src/recorder.mjs), [adapters.mjs](../../web-sdk/src/adapters.mjs); [integration guide](WEB.md) |
 | Browser storage and same-origin delivery | [storage.mjs](../../web-sdk/src/storage.mjs), [transfer.mjs](../../web-sdk/src/transfer.mjs), Node-only [dev-relay.mjs](../../web-sdk/dev-relay.mjs) |
-| Pairing JSON, HTTP endpoints, ACKs, browser SSE | [transfer protocol](../transfer/PROTOCOL.md); transfer version is `1`, independent of capture schema |
+| Pairing JSON, HTTP endpoints, ACKs, browser SSE | [transfer protocol](../transfer/PROTOCOL.md); transfer version is `2`, independent of capture schema |
 | Valid/invalid relationships and cross-event validation | [shared/validate.mjs](../../shared/validate.mjs); command entry [validate.mjs](../../validate.mjs) |
 | Focused synthetic examples | [examples/manifest.json](../../examples/manifest.json), [manual-minimal](../../examples/manual-minimal.ndjson), [handler-http](../../examples/handler-http.ndjson), [stream-read-timeout](../../examples/stream-read-timeout.ndjson) |
-| Actual native captures | [samples/live/manifest.json](../../samples/live/manifest.json), [transfer captures](../../samples/transfer/README.md) |
+| Historical native capture evidence (older format) | [samples/live/manifest.json](../../samples/live/manifest.json), [transfer captures](../../samples/transfer/README.md) |
 | GUI interpretation/design | [viewer/README.md](../../viewer/README.md), [design history](../design/README.md); design images do not define runtime APIs |
 
-The schema accepts event versions `1.0`, `1.1` and `1.2`. Explicit synchronous handler invocation/completion requires `1.1` or later. Browser producers and `dispatch: awaited` require `1.2`. Use one version for **all events in a recording**. Android emits `1.1`; the limited Swift demo emits `1.0`; browser capture emits `1.2`. Proposed metrics, redirect, propagation, or Swift capture APIs in specifications are not necessarily exposed by an SDK. Do not infer implementation from a schema field or a pseudocode snippet.
+The sole event schema is **1.2** for Android, iOS and web. Transfer/pairing uses **2** independently. Earlier captures/state are left untouched and rejected by the current collector; there is no migration or compatibility parser. Handler dispatch can be synchronous or explicitly awaited. Proposed metrics, redirect, propagation or general Swift capture APIs are not necessarily implemented SDK APIs: inspect source and compiled consumer recipes.
 
 ## Producer rules agents must preserve
 
@@ -30,7 +30,7 @@ The schema accepts event versions `1.0`, `1.1` and `1.2`. Explicit synchronous h
 - Method/handler/request parentage is explicit through trace/span context. Repeated URLs do not establish request identity. Transport replay keeps the same event IDs and timestamps.
 - Preserve repeated headers and query parameters. Capture what the client exposes, marking partial/unavailable fields honestly. Logical native calls can hide attempts; do not fabricate per-hop redirects/retries or wire-level completeness.
 - HTTP response headers are not body completion. Preserve HTTP status when later body read fails; distinguish HTTP error, timeout, transport failure, cancellation, intentional close and stopped observation.
-- Sanitize before canonical storage, spool, or upload. The transfer sink performs limited envelope checks and the viewer renders existing content; neither replaces a capture/redaction policy. JSON-valid data can still contain secrets.
+- Sanitize before canonical storage or upload. The transfer sink performs limited envelope checks and the viewer renders existing content; neither replaces a capture/redaction policy. JSON-valid data can still contain secrets.
 - Handler events describe control flow, not argument values or business success. Browser `invokeAsyncHandler` observes explicitly awaited settlement in `1.2`; it does not implement ambient context propagation or suspension/resumption events. Synchronous helpers record immediate return, including returning a Promise. Session shutdown cannot invent an observed return or resolution.
 
 ## Validate a customer capture
