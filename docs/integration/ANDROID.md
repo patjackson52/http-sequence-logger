@@ -164,6 +164,10 @@ Open **http://127.0.0.1:4319/**. Device/app/session navigation, source status an
 
 **Save capture** exports current NDJSON from `artifacts/collector-v2/capture.sqlite`; native originals remain canonical private journals. Viewer pause leaves collection running. Physical LAN delivery uses explicitly paired HTTPS, applicable debug local-network permission and optional NSD candidate discovery. See [TRANSPORT.md](TRANSPORT.md) for trust, paths, bounded recovery and troubleshooting.
 
+On Android 17, apps targeting SDK 37 or higher must declare `android.permission.ACCESS_LOCAL_NETWORK` and request it at runtime before direct LAN access. Apps targeting SDK 36 or lower receive implicit LAN access through `INTERNET`; do not add or request the new permission for those targets. Android 16's opt-in testing uses `NEARBY_WIFI_DEVICES` temporarily. Keep permission declarations and requests in the host's debug integration, and exercise denial and revocation on the actual OS/target combination. These distinctions follow [Android's local-network permission guidance](https://developer.android.com/privacy-and-security/local-network-permission).
+
+The host app owns permission UX. Optional discovery reports availability diagnostics; discovered labels do not authorize enrollment or establish TLS trust. USB delivery and explicit pairing remain separate paths, and successful loopback USB capture does not establish LAN permission behavior.
+
 ## 6. Verify the host integration and release boundary
 
 First reproduce the independent consumer fixture from this repository root with JDK 17 and `ANDROID_HOME` configured:

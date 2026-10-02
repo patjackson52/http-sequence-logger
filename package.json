@@ -37,7 +37,8 @@
     "check:native-simulator-clone": "node scripts/check-native-simulator-clone.mjs",
     "check:native-os-restore": "node scripts/check-native-os-restore.mjs",
     "check:native-cold-boot": "node scripts/check-native-cold-boot.mjs",
-    "check:mobile-chrome": "node scripts/check-mobile-chrome.mjs"
+    "check:mobile-chrome": "node scripts/check-mobile-chrome.mjs",
+    "check:physical-android": "node scripts/check-physical-android.mjs"
   },
   "engines": {
     "node": ">=24.13.0 <25"
