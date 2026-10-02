@@ -22,6 +22,8 @@ The default database is `artifacts/collector-v2/capture.sqlite`. `--dir PATH` re
 
 `status` reads the selected manifest and probes loopback health. `doctor` also checks ADB and Xcode availability. Both emit JSON and return `0` even when `live` is `false`; inspect `live`, `reason` and `next_action`. They do not build the viewer, repair pairing, delete captures or print credentials. Use `--manifest PATH` when diagnosing a non-default collector.
 
+After updating this checkout, restart a long-running collector so its server code matches the newly built viewer. Rebuilding assets alone does not reload the server process. A stale process can still serve the page while rejecting current bootstrap/API requests, leaving the viewer reconnecting. Stop it gracefully and restart with the same supported directory/options; keep captures intact. Historical unsupported directories remain separate and are not migrated.
+
 One directory has one collector owner. An existing active manifest cannot be silently taken over. For an isolated collector without device discovery, choose a distinct directory and port:
 
 ```sh

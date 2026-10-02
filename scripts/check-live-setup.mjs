@@ -21,7 +21,25 @@ try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
+  // Hold real bootstrap retries so the intermediate UI state can be measured.
+  let waitingRetry=false,releaseRetry,allowBootstrap=false;
+  await page.route('**/api/v2/bootstrap',async route=>{
+    if(allowBootstrap){await route.continue();return;}
+    await new Promise(resolve=>{releaseRetry=resolve;waitingRetry=true;});
+    waitingRetry=false;await route.fulfill({status:503,body:'Collector temporarily unavailable'});
+  });
   await page.goto(origin + '/');
+  await expect.poll(()=>waitingRetry).toBe(true);releaseRetry();
+  await expect(page.locator('.live-panel')).toContainText('Waiting for the local collector');
+  const failedPanel=await page.locator('.live-panel').boundingBox();
+  for(let retry=0;retry<2;retry++){
+    await expect.poll(()=>waitingRetry).toBe(true);
+    await expect(page.locator('.live-actions strong')).toHaveText('◌ Reconnecting · 0 events');
+    await expect(page.locator('.live-panel')).toContainText('Waiting for the local collector');
+    assert.deepEqual(await page.locator('.live-panel').boundingBox(),failedPanel,'Retry must not change panel geometry');
+    releaseRetry();await expect.poll(()=>waitingRetry).toBe(false);
+  }
+  allowBootstrap=true;await page.unroute('**/api/v2/bootstrap');
   await expect(page.locator('.live-actions strong')).toHaveText('● Live · 0 events');
   assert.equal(new URL(page.url()).hash, '');
   collector.setAdapterStatus('android',{state:'waiting',reason:'Permission required',devices:[{serial:'unauthorized-usb',state:'unauthorized'}]});
@@ -120,7 +138,7 @@ try {
   assert.equal(blocked, true);
   await page.screenshot({ path: join(artifact, 'automatic-live.png'), fullPage: true });
   assert.deepEqual(errors, []);
-  const result = { browser: browser.version(), checks: ['plain URL automatic connection', 'empty collector waiting state', 'zero-event source registration and device/app navigation', 'adapter diagnostics before events', 'fresh one-installation pairing action', 'multiple installations distinguished', 'incremental events preserve selection and search', 'refresh without token URL or browser storage', 'same-directory restart', 'new collector identity resets rows', 'pause/replacement/resume respects disabled following', 'pause/resume', 'file import stays separate', 'resume to empty collector clears file view', 'follow newest sessions without interrupting inspection', 'localhost alias', 'foreign-origin bootstrap rejected'], errors };
+  const result = { browser: browser.version(), checks: ['bootstrap retry preserves error and panel geometry until live recovery', 'plain URL automatic connection', 'empty collector waiting state', 'zero-event source registration and device/app navigation', 'adapter diagnostics before events', 'fresh one-installation pairing action', 'multiple installations distinguished', 'incremental events preserve selection and search', 'refresh without token URL or browser storage', 'same-directory restart', 'new collector identity resets rows', 'pause/replacement/resume respects disabled following', 'pause/resume', 'file import stays separate', 'resume to empty collector clears file view', 'follow newest sessions without interrupting inspection', 'localhost alias', 'foreign-origin bootstrap rejected'], errors };
   await writeFile(join(artifact, 'browser.json'), JSON.stringify(result, null, 2) + '\n');
   console.log(`PASS Chrome ${result.browser}: ${result.checks.length} automatic live-setup checks`);
 } finally {

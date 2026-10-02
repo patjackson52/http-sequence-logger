@@ -176,9 +176,10 @@ export class CollectorClient {
   }
   async run(){
     this.stop();const controller=new AbortController();this.controller=controller;const signal=controller.signal;
+    this.onStatus({state:this.cursor?'reconnecting':'connecting',count:this.lines.length});
     while(!signal.aborted){
       try{
-        this.onStatus({state:this.cursor?'reconnecting':'connecting',count:this.lines.length});await this.connect(signal);
+        await this.connect(signal);
         const response=await this.request('/api/v2/stream',signal);
         if(signal.aborted){response.body?.cancel().catch(()=>{});break;}
         const reader=response.body.getReader();

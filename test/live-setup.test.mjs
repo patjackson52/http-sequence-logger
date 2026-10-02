@@ -37,6 +37,36 @@ test('stopping bootstrap before its response prevents stale callbacks',async()=>
   let reply;const statuses=[];let resets=0;const client=new CollectorClient({automatic:true,onStatus:s=>statuses.push(s),onReset:()=>resets++,fetcher:()=>new Promise(ok=>reply=ok)});
   const run=client.run();client.stop();reply(Response.json({version:2,collector_id:'new',token:'x'.repeat(32)}));await run;assert.equal(resets,0);assert.ok(statuses.every(s=>s.state!=='live'));
 });
+test('bootstrap retries retain the connection error until a successful refresh',async t=>{
+  for(const count of [0,3])await t.test(count?'retained capture reconnect':'initial connection',async t=>{
+    const statuses=[],bootstrap=[];
+    const client=new CollectorClient({automatic:true,retryMs:1,onStatus:status=>statuses.push(status),fetcher:async path=>{
+      if(path==='/api/v2/bootstrap')return new Promise(resolve=>bootstrap.push(resolve));
+      if(path==='/api/v2/stream')return new Response(new ReadableStream());
+      if(path==='/api/v2/status')return Response.json({adapters:{}});
+      if(path==='/api/v2/sources')return Response.json({collector_id:'collector',event_cursor:0,sources:[]});
+      if(path.startsWith('/api/v2/sessions?'))return Response.json({high_water:0,sessions:[],has_more:false});
+      throw new Error('Unexpected request: '+path);
+    }});
+    client.cursor=count;client.lines=lines.slice(0,count);
+    const running=client.run();t.after(async()=>{client.stop();await running;});
+    assert.deepEqual(statuses,[{state:count?'reconnecting':'connecting',count}]);
+    const failure={state:'reconnecting',count,error:'Waiting for the local collector…'};
+    for(let attempt=0;attempt<3;attempt++){
+      await until(()=>bootstrap.length===attempt+1);
+      if(attempt)assert.deepEqual(statuses.at(-1),failure,'keep the error visible while the next bootstrap request is pending');
+      bootstrap[attempt](new Response(null,{status:503}));
+      await until(()=>statuses.length===attempt+2);
+      assert.deepEqual(statuses.at(-1),failure);
+    }
+    await until(()=>bootstrap.length===4);
+    assert.deepEqual(statuses.slice(1),[failure,failure,failure]);
+    bootstrap[3](Response.json({version:2,collector_id:'collector',token:'x'.repeat(32)}));
+    await until(()=>statuses.at(-1)?.state==='live');
+    assert.deepEqual(statuses.at(-1),{state:'live',count},'successful refresh clears the error');
+    assert.deepEqual(client.lines,lines.slice(0,count),'bootstrap retries retain the capture');
+  });
+});
 test('device listing includes every authorized device and sample install requires explicit ambiguity resolution',()=>{
   const devices=parseDevices('List of devices attached\nemulator-5554 device model:Android_Emulator\nemulator-5556 device\nphone device usb:2-2 model:Pixel_10_Pro\nunauthorized unauthorized\n');
   assert.equal(devices.filter(d=>d.state==='device').length,3);assert.equal(selectDevice(devices,'phone').label,'Pixel 10 Pro');assert.equal(selectDevice(devices,'emulator-5556').serial,'emulator-5556');assert.throws(()=>selectDevice(devices),/explicit device/);assert.throws(()=>selectDevice(devices,'missing'),/explicit device/);
