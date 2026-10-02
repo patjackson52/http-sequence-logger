@@ -1,8 +1,11 @@
+import { createComparisonSnapshot, SNAPSHOT_LIMITS } from './comparison-data.mjs';
+
 // Source registry and session summaries are independent of selected-session capture pages.
 export class CollectorClient {
-  constructor({token,automatic=false,fetcher=(...args)=>fetch(...args),onCapture=()=>{},onStatus=()=>{},onPairing=()=>{},onDevice=()=>{},onReset=()=>{},onSources=()=>{},onSessions=()=>{},retryMs=1000}) {
-    Object.assign(this,{token,automatic,fetcher,onCapture,onStatus,onPairing,onDevice,onReset,onSources,onSessions,retryMs});
+  constructor({token,automatic=false,fetcher=(...args)=>fetch(...args),onCapture=()=>{},onStatus=()=>{},onPairing=()=>{},onDevice=()=>{},onReset=()=>{},onSources=()=>{},onSessions=()=>{},onRevision=()=>{},retryMs=1000}) {
+    Object.assign(this,{token,automatic,fetcher,onCapture,onStatus,onPairing,onDevice,onReset,onSources,onSessions,onRevision,retryMs});
     this.cursor=0;this.lines=[];this.collectorId=null;this.generation=0;this.selection={};this.sessions=[];this.followLatest=true;this._work=Promise.resolve();
+    this.snapshotGeneration=0;this.snapshotReads=new Set();
   }
   async request(path,signal,headers={},options={}) {
     const response=await this.fetcher(path,{...options,headers:{Authorization:`Bearer ${this.token}`,...headers},signal:path.includes('/stream')?signal:signal?AbortSignal.any([signal,AbortSignal.timeout(10000)]):AbortSignal.timeout(10000),cache:'no-store',mode:'same-origin',redirect:'error'});
@@ -16,7 +19,7 @@ export class CollectorClient {
     if(!response.ok)throw new Error('Waiting for the local collector…');
     const session=await response.json();signal.throwIfAborted();
     if(session.version!==2||typeof session.token!=='string'||typeof session.collector_id!=='string')throw new Error('Invalid collector bootstrap');
-    if(this.collectorId&&this.collectorId!==session.collector_id){this.cursor=0;this.lines=[];this.selection={};this.generation++;this.onReset();}
+    if(this.collectorId&&this.collectorId!==session.collector_id){this._cancelSnapshotReads();this.cursor=0;this.lines=[];this.selection={};this.generation++;this.onReset();}
     this.collectorId=session.collector_id;this.token=session.token;
   }
   select(selection={}) {
@@ -40,6 +43,7 @@ export class CollectorClient {
     if(sources.collector_id!==this.collectorId)throw new Error('Collector changed; reconnecting…');
     if(generation!==this.generation)return;
     this.onSources(sources.sources||[]);
+    if(this._comparisonRevision!==sources.event_cursor){this._comparisonRevision=sources.event_cursor;this.onRevision({collector_id:this.collectorId,event_cursor:sources.event_cursor});}
     if(this._sessionGeneration===generation&&this._eventRevision===sources.event_cursor){this.onStatus({state:'live',count:this.lines.length});return;}
     const query=new URLSearchParams();if(this.selection.source_id)query.set('source_id',this.selection.source_id);
     const page=await(await this.request('/api/v2/sessions?'+query,signal)).json();signal.throwIfAborted();
@@ -92,6 +96,84 @@ export class CollectorClient {
       if(!page.has_more){if(this.lines.length>initialLength)this.onCapture(this.lines.join('\n')+'\n',this.lines.length);return;}
     }
   }
+  _cancelSnapshotReads() {
+    this.snapshotGeneration++;
+    for(const controller of this.snapshotReads)controller.abort();
+    this.snapshotReads.clear();
+  }
+  async _snapshotRead(operation,signal) {
+    const controller=new AbortController(),generation=this.snapshotGeneration;
+    this.snapshotReads.add(controller);
+    const combined=signal?AbortSignal.any([signal,controller.signal]):controller.signal;
+    const check=()=>{combined.throwIfAborted();if(generation!==this.snapshotGeneration)throw new DOMException('Collector snapshot replaced.','AbortError');};
+    try{return await operation(combined,check);}finally{this.snapshotReads.delete(controller);}
+  }
+  async _snapshotPages(selection,{signal,check,after=0,highWater,collectorId=this.collectorId,limits=SNAPSHOT_LIMITS}) {
+    if(!selection.session_namespace||!selection.session_id)throw new Error('Select a session by namespace and session ID.');
+    limits={...SNAPSHOT_LIMITS,...limits};
+    let cursor=after,bytes=0,pages=0;
+    const lines=[],events=[],sourceLines=Object.create(null);
+    for(;;){
+      check();if(++pages>limits.pages)throw new Error('Collector snapshot exceeds the bounded page-read limit; no partial snapshot was created.');
+      const query=new URLSearchParams({...selection,after:String(cursor)});
+      if(highWater!==undefined)query.set('high_water',String(highWater));
+      const page=await(await this.request('/api/v2/events?'+query,signal)).json();check();
+      if(collectorId&&page.collector_id!==collectorId){const error=new Error('Collector changed. Retained comparison snapshots still show the previous collector; acquire new snapshots to compare again.');error.name='CollectorResetError';throw error;}
+      collectorId??=page.collector_id;
+      if(typeof collectorId!=='string'||!Array.isArray(page.lines)||!Number.isSafeInteger(page.high_water)||page.high_water<cursor||!Number.isSafeInteger(page.cursor)||page.cursor<cursor||page.cursor>page.high_water||typeof page.has_more!=='boolean'||page.has_more&&page.cursor<=cursor||highWater!==undefined&&page.high_water!==highWater||!page.has_more&&page.cursor!==page.high_water)throw new Error('Invalid collector snapshot page.');
+      highWater??=page.high_water;
+      for(const line of page.lines){
+        if(typeof line!=='string')throw new Error('Invalid collector snapshot line.');
+        bytes+=new TextEncoder().encode(line).length+1;
+        if(bytes>limits.bytes||events.length>=limits.events)throw new Error('Collector snapshot exceeds the comparison input limit; no partial snapshot was created.');
+        let event;try{event=JSON.parse(line);}catch{throw new Error('Malformed collector snapshot event.');}
+        if(event.session_namespace!==selection.session_namespace||event.session_id!==selection.session_id)throw new Error('Collector returned events outside the selected session.');
+        events.push(event);lines.push(line);
+        (sourceLines[event.event_id]??=[]).push({fileName:'Collector snapshot',fileId:collectorId,line:events.length,text:line});
+      }
+      cursor=page.cursor;if(!page.has_more)return {events,lines,sourceLines,collectorId,highWater};
+    }
+  }
+  async snapshotSession(identity,{signal,highWater,limits=SNAPSHOT_LIMITS}={}) {
+    const selection={session_namespace:identity.session_namespace??identity.namespace,session_id:identity.session_id??identity.sessionId??identity.id};
+    if(identity.source_id)selection.source_id=identity.source_id;
+    return this._snapshotRead(async(signal,check)=>{
+      const result=await this._snapshotPages(selection,{signal,check,highWater,limits});check();
+      if(!this.collectorId)this.collectorId=result.collectorId;
+      return createComparisonSnapshot({...selection,events:result.events},{kind:'collector',sourceId:selection.source_id,collectorId:result.collectorId,highWater:result.highWater,sourceLines:result.sourceLines});
+    },signal);
+  }
+  async comparisonSessions({signal,after=0,highWater}={}) {
+    return this._snapshotRead(async(signal,check)=>{
+      const collectorId=this.collectorId,query=new URLSearchParams({after:String(after),limit:'100'});
+      if(highWater!==undefined)query.set('high_water',String(highWater));
+      const page=await(await this.request('/api/v2/sessions?'+query,signal)).json();check();
+      if(collectorId&&page.collector_id!==collectorId){const error=new Error('Collector changed; reload the comparison session catalog.');error.name='CollectorResetError';throw error;}
+      if(typeof page.collector_id!=='string'||!Array.isArray(page.sessions)||!Number.isSafeInteger(page.high_water)||highWater!==undefined&&page.high_water!==highWater||!Number.isSafeInteger(page.next_after)||page.next_after<after||page.has_more&&page.next_after<=after||typeof page.has_more!=='boolean')throw new Error('Invalid comparison session catalog.');
+      if(!this.collectorId)this.collectorId=page.collector_id;
+      return page;
+    },signal);
+  }
+  async comparisonUpdates(snapshots,{signal}={}) {
+    return this._snapshotRead(async(signal,check)=>{
+      const bySnapshot={},collectorSnapshots=snapshots.filter(snapshot=>snapshot.kind==='collector');
+      if(!collectorSnapshots.length)return {changed:false,count:0,bySnapshot,collectorChanged:false};
+      const state=await(await this.request('/api/v2/sources',signal)).json();check();
+      if(collectorSnapshots.some(snapshot=>snapshot.boundary.collector_id!==state.collector_id))return {changed:true,count:0,bySnapshot,collectorChanged:true};
+      if(!Number.isSafeInteger(state.event_cursor))throw new Error('Invalid collector revision.');
+      for(const snapshot of collectorSnapshots){
+        const after=snapshot.boundary.high_water;
+        if(state.event_cursor<after)return {changed:true,count:0,bySnapshot,collectorChanged:true};
+        if(state.event_cursor===after){bySnapshot[snapshot.id]=0;continue;}
+        const selection={session_namespace:snapshot.document.session.namespace,session_id:snapshot.document.session.id};
+        if(snapshot.scope.source_id)selection.source_id=snapshot.scope.source_id;
+        const result=await this._snapshotPages(selection,{signal,check,after,highWater:state.event_cursor,collectorId:state.collector_id});
+        bySnapshot[snapshot.id]=result.events.length;
+      }
+      const count=Object.values(bySnapshot).reduce((sum,value)=>sum+value,0);
+      return {changed:count>0,count,bySnapshot,collectorChanged:false};
+    },signal);
+  }
   async run(){
     this.stop();const controller=new AbortController();this.controller=controller;const signal=controller.signal;
     while(!signal.aborted){
@@ -109,6 +191,7 @@ export class CollectorClient {
     }
   }
   stop(){
+    this._cancelSnapshotReads();
     const controller=this.controller,selectionController=this.selectionController,reader=this._reader;
     this.controller=null;this.selectionController=null;this._reader=null;this.generation++;
     controller?.abort();selectionController?.abort();

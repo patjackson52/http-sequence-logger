@@ -142,7 +142,7 @@ The result always records the applied profile and included/excluded scope.
 
 Counts include recording and operation nodes as well as HTTP calls; `changed_pairs` and `uncertain_pairs` can overlap. Order changes are counted separately, so equal field values do not imply an unchanged sequence. A node ref's `position` is its recording ordinal or span's event-sequence position, not a shared timestamp. Pair-array order is deterministic traversal, not a precomputed aligned visual layout.
 
-All three planned viewer representations consume this format. AI consumers should cite pair IDs plus source event pointers, retain uncertainties and distinguish observed differences from causal hypotheses.
+All three production viewer representations consume this format through the same browser worker. The viewer exports the schema-defined diff separately from its exact canonical input snapshots. AI consumers should cite pair IDs plus source event pointers, retain uncertainties and distinguish observed differences from causal hypotheses.
 
 ## Limits and maintenance
 

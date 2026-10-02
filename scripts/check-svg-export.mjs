@@ -72,9 +72,11 @@ try {
   const http = await download('http-only');
   assert.match(http.text, /↦ inside/); assert.doesNotMatch(http.text, /↩ returned/);
 
-  await open('samples/live/multi-session.ndjson');
+  // The historical samples/live export uses schema 1.1. Exercise the current
+  // schema 1.2 multi-origin and second-session behavior with canonical fixtures.
+  await open(null, Buffer.from((await readFile(root + 'examples/viewer-three-origin.ndjson', 'utf8')) + (await readFile(root + 'examples/http-error.ndjson', 'utf8'))));
   const multi = await download('multi-server');
-  assert.match(multi.text, /jsonplaceholder.typicode.com/);
+  assert.match(multi.text, /tasks.example/);
   await page.getByRole('searchbox', { name: 'Search paths and component names' }).fill('/todos/1');
   const filtered = await download('filtered');
   assert.ok(filtered.width < multi.width); assert.match(filtered.text, /GET \/todos\/1/);
@@ -83,7 +85,7 @@ try {
   await page.getByRole('button', { name: 'Clear filters' }).click();
   await page.locator('.session-nav .session-row').nth(1).click();
   const other = await download('second-session');
-  assert.notEqual(other.title, multi.title); assert.match(other.text, /401/);
+  assert.notEqual(other.title, multi.title); assert.match(other.text, /400/);
 
   await open('examples/multi-session.ndjson');
   const recordings = await download('all-recordings');

@@ -19,7 +19,7 @@ The persisted event contract remains unchanged. The session-document wrapper and
 
 Implemented first slice: strict input/semantic validation; recording and parent-scoped matching; distinct matched/one-sided/unresolved nodes; explicit manual correspondences; structural, content, outcome, capture and optional timing differences; conservative JSON field projections; source evidence; declared unknowns/exclusions; sibling reordering/concurrency; deterministic output and CLI exit codes.
 
-The UI representations below are planned, not yet integrated into the viewer.
+All three representations are now integrated into the production React viewer. The shared controller acquires immutable file/collector snapshots, uses the standalone engine in an owned browser worker, and preserves shared inspection/presentation state. See [implementation acceptance matrix](SESSION-COMPARISON-IMPLEMENTATION.md), [viewer guide](../../viewer/README.md#compare-two-sessions), and [verification record](SESSION-COMPARISON-VERIFICATION.md).
 
 ## Mockup handoff — 2 October 2026
 
@@ -29,7 +29,7 @@ New design details include blue/orange primary/secondary roles, a shared aligned
 
 The prototype also normalizes Swift-style method-name punctuation when establishing correspondence. That behavior is not implemented in the standalone engine and is not implicitly enabled by this import. A future engine change must expose and version any normalization policy, preserve raw names and keep colliding signatures unresolved. The current explicit-pair profile remains available for cross-platform correspondences.
 
-These are imported design assets and updated specifications. Viewer integration, genuine live snapshot recomputation and production diff-engine integration remain the delivery steps below.
+These are imported design assets and updated specifications. The production viewer now implements comparison, genuine collector snapshot recomputation and standalone diff-engine integration. The historical import notes below remain the provenance of the visual reference.
 
 ## Aligned sequences
 
@@ -56,7 +56,7 @@ Offer flow-level grouping and expansion to avoid dense line crossings. Retain or
 - Select exactly two sessions, including namespace and source/build metadata. Primary/secondary are neutral directional roles; allow swap.
 - Freeze comparison inputs as snapshots. New live events should offer recomputation, not silently invalidate the active diff or an agent's citations.
 - Keep pair selection, collapsed state, filters and inspector selection when changing layouts. Filter the same comparison output on both sides; show hidden counts.
-- Separate correspondence from equality. Display unique-key/manual matching basis and unresolved candidates. A future pairing control writes an explicit profile and recomputes the same engine.
+- Separate correspondence from equality. Display unique-key/manual matching basis and unresolved candidates. The pairing control writes an explicit profile and recomputes the same engine.
 - Show unknown capture states distinctly from equal, changed and absent. Unobserved handler arguments/returns cannot be compared.
 - Keep normalization/exclusion rules visible and reproducible. Raw evidence remains available.
 - Expose the schema-defined diff to agents with session identities, engine/profile, source references, changes, matching basis and limitations. AI explanations cite concrete pairs/events and identify causal claims as hypotheses.
@@ -65,10 +65,10 @@ Offer flow-level grouping and expansion to avoid dense line crossings. Retain or
 ## Delivery sequence
 
 1. **Standalone foundation (implemented):** package, input/output schemas, pure engine, CLI, automated tests and usage documentation.
-2. **Viewer data integration:** import or compute a diff in a worker, session selection, snapshot identities, comparison profile and shared selection/inspector state.
-3. **All three representations:** aligned sequences, change outline and order connections share the exact same diff. No layout-specific matching.
-4. **Refinement:** matching override controls, overview navigation, explicit endpoint/component aliases, safe noise profiles, semantic body comparison modes, exports and performance tuning driven by real captures.
-5. **Acceptance:** validate the same underlying differences and uncertainties across every layout and the CLI/agent output.
+2. **Viewer data integration (implemented):** compute a diff in a worker, session selection, bounded immutable snapshots, comparison profile and shared selection/inspector state.
+3. **All three representations (implemented):** aligned sequences, change outline and order connections share the exact same diff. No layout-specific matching.
+4. **Interaction refinement (implemented):** matching overrides, overview navigation, profile rules, exports, keyboard navigation and responsive paired inspection. Automatic endpoint/component aliases and fuzzy semantic body comparison remain outside this version.
+5. **Acceptance (verified):** the same underlying differences and uncertainties agree across layouts, browser worker, module, CLI and exports. See the current [verification record](SESSION-COMPARISON-VERIFICATION.md).
 
 V1 intentionally leaves repeated indistinguishable calls unresolved unless source identity or explicit pairing establishes correspondence. Changed component/endpoint signatures can appear as one-sided subtrees; automatic fuzzy/reparent matching is deferred. Native transaction metrics and uncaptured local-call values are excluded explicitly.
 

@@ -1,6 +1,6 @@
 # Session comparison UI specification
 
-Design handoff, **2 October 2026**. Source: the refreshed [Claude Design mockup sheet](claude-export/Mockups.dc.html) and [interactive prototype](<claude-export/Network Log Lab.dc.html>). This document updates the repository's [comparison plan](SESSION-COMPARISON.md); it does not claim that comparison is implemented in `viewer/`.
+Design handoff, **2 October 2026**. Source: the refreshed [Claude Design mockup sheet](claude-export/Mockups.dc.html) and [interactive prototype](<claude-export/Network Log Lab.dc.html>). This document governs the production comparison implementation in `viewer/`. The [verification record](SESSION-COMPARISON-VERIFICATION.md) records the implemented acceptance gates and actual execution evidence.
 
 The production data authority remains the [standalone module](../../sequence-diff/README.md) and [diff schema](../../sequence-diff/schema/diff.schema.json). Preserve the archived files as received. Resolve prototype/contract differences using the [import record](CLAUDE-IMPORT-2026-10-02.md), not by copying the prototype engine into production.
 

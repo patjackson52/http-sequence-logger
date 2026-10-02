@@ -16,6 +16,7 @@
     "build:viewer": "vite build --config viewer/vite.config.mjs",
     "preview:viewer": "vite preview --config viewer/vite.config.mjs",
     "check:svg-export": "node scripts/check-svg-export.mjs",
+    "check:comparison": "node scripts/check-comparison.mjs",
     "check:live-setup": "node scripts/check-live-setup.mjs",
     "collector": "node collector/cli.mjs",
     "web:sample": "vite --config web-sample/vite.config.mjs",
