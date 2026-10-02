@@ -4,7 +4,7 @@ The registered Shipyard repository is **P-11**, `http-sequence-logger`. Its serv
 checkout is `/home/shipyard/workspace/http-sequence-logger`; `.shipyard.yaml`
 declares `npm test && npm run build:viewer` as the verification gate. Run tests
 from the repository root with Node 24.13.x after `npm ci`. Dispatched work records
-the gate with `shipyard verify --project P-11 --suite full`.
+the gate with `shipyard verify --project P-11`.
 
 Runner **RUN-3** uses the isolated Mac checkout
 `/Users/patrick/workspace/runner-grok/http-sequence-logger`. Its agent **AG-8** has
