@@ -6,6 +6,10 @@ declares `npm test && npm run build:viewer` as the verification gate. Run tests
 from the repository root with Node 24.13.x after `npm ci`. Dispatched work records
 the gate with `shipyard verify --project P-11 --suite full`.
 
+Runner **RUN-3** uses the isolated Mac checkout
+`/Users/patrick/workspace/runner-grok/http-sequence-logger`. Its agent **AG-8** has
+P-11 read/write access, and the checkout has the pinned Node dependencies.
+
 ## Android sample on Shipyard Deploy
 
 Shipyard Deploy project `http-sequence-logger` distributes the **devDebug** sample
@@ -39,6 +43,12 @@ export PATH="$PWD/bin:$PATH"
 Use an existing trusted login and publisher credential. Run `shipyard-deploy
 doctor --json` before publication. Login and credential provisioning remain
 operator tasks; credentials do not live in this repository.
+
+The saved publisher login at onboarding time was scoped to earlier projects.
+An operator must provision publisher access to Deploy project
+`http-sequence-logger` before routine publication through that login. Initial
+registration/publication used the existing administrator credential reference
+only in the command process, without changing the saved login.
 
 ### Build and publish
 
