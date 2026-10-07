@@ -114,6 +114,14 @@ export function parseDevices(text) {
       : [];
   });
 }
+export const DEVICE_UNREACHABLE = "Unable to connect to device";
+// Failed adb child processes carry the full command line and stderr in
+// `message`; show one short line instead.
+export function adbFailureReason(error) {
+  return error && (error.cmd !== undefined || error.killed || error.stderr !== undefined)
+    ? DEVICE_UNREACHABLE
+    : error.message;
+}
 export async function connectedDevices(adb = adbPath(), signal) {
   return parseDevices(
     (
@@ -521,7 +529,7 @@ export async function watchAndroid({
               } catch (error) {
                 status(`android:${d.serial}`, {
                   state: "waiting",
-                  reason: error.message,
+                  reason: adbFailureReason(error),
                 });
               }
             });
@@ -529,7 +537,7 @@ export async function watchAndroid({
         } catch (error) {
           status(`android:${d.serial}`, {
             state: "waiting",
-            reason: error.message,
+            reason: adbFailureReason(error),
           });
         }
       }
@@ -545,7 +553,7 @@ export async function watchAndroid({
         reason:
           error.code === "ENOENT"
             ? "Tool unavailable: Android platform-tools"
-            : error.message,
+            : adbFailureReason(error),
       });
     } finally {
       if (!stopped)
