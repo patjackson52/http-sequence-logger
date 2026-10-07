@@ -20,7 +20,7 @@ export function sequencesFromCapture(input) {
   const parsed = typeof input === 'string' ? parseCapture(input) : { events: input, errors: [], warnings: [] };
   if (!Array.isArray(parsed.events) || parsed.events.length > LIMITS.events) throw new SequenceDiffError('Capture requires at most ' + LIMITS.events + ' events.');
   // Never silently discard malformed input or recover an incomplete final line.
-  if (parsed.errors.length || parsed.warnings.length) throw new SequenceDiffError('Capture parse failed (canonical event schema 1.2 required).', [...parsed.errors, ...parsed.warnings].slice(0, 12));
+  if (parsed.errors.length || parsed.warnings.length) throw new SequenceDiffError('Capture parse failed (canonical event schema 1.3 required).', [...parsed.errors, ...parsed.warnings].slice(0, 12));
   for (const e of parsed.events) if (!validateEvent(e)) throw new SequenceDiffError('Invalid canonical event.');
   // Validate before partitioning: IDs cannot acquire contradictory meanings
   // across sessions in a single capture.

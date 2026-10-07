@@ -96,3 +96,46 @@ test('pairing action coalesces clicks, grants one installation and fences stoppe
   assert.equal(calls.length,2);assert.equal(calls[1].options.method,'POST');assert.equal(JSON.parse(calls[1].options.body).max_sources,1);assert.equal(JSON.parse(calls[1].options.body).principal,'native-pairing');assert.equal(pairings[0][0].enrollment_token,'fresh');
   const stale=client.pairing();await new Promise(resolve=>setImmediate(resolve));client.stop();release();await assert.rejects(stale,{name:'AbortError'});assert.equal(pairings.length,1);
 });
+
+test('related snapshots reread late source records and unchanged revisions preserve capture identity', async()=>{
+  let cursor=3,captures=0;const queries=[];
+  const client=new CollectorClient({token:'read',onCapture:()=>captures++,fetcher:async path=>{
+    queries.push(path);if(path.includes('/sources'))return json({collector_id:'c',event_cursor:cursor,sources:[]});
+    if(path.includes('/status'))return json({adapters:{}});
+    if(path.includes('/sessions'))return json({high_water:cursor,sessions:[{session_namespace:'client',session_id:'session'}],has_more:false});
+    return json({collector_id:'c',cursor,high_water:cursor,lines:['client','server-start'],has_more:false});
+  }});client.selection={session_namespace:'client',session_id:'session'};client.followLatest=false;
+  const signal=new AbortController().signal;await client.refresh(signal);assert.equal(captures,1);
+  await client.refresh(signal);assert.equal(captures,1);
+  cursor++;await client.refresh(signal);assert.equal(captures,1,'global changes without selected records must not rebuild diagram');
+  assert.ok(queries.filter(p=>p.includes('/events')).every(p=>new URL(p,'http://local').searchParams.get('include_related')==='true'));
+});
+
+test('collection jobs publish terminal status and cancellation reaches collector',async()=>{
+  const states=[],requests=[];
+  const client=new CollectorClient({token:'t',onCollection:j=>states.push(j.state),fetcher:async(path,options)=>{requests.push({path,options});return json(options.method==='POST'?{job_id:'job',state:'completed',event_count:0}:{job_id:'job',state:'cancelled'});}});
+  client.selection={session_namespace:'n',session_id:'s'};await client.collectRelated();assert.deepEqual(states,['queued','completed']);
+  client.collectionController=new AbortController();client.collectionJob='job';await client.cancelCollection();assert.equal(requests.at(-1).options.method,'DELETE');assert.equal(states.at(-1),'cancelled');
+});
+
+test('cancelling during job creation waits for its ID then cancels the remote job',async()=>{
+  let created;const pending=new Promise(resolve=>created=resolve),methods=[];
+  const client=new CollectorClient({token:'t',fetcher:async(_path,options)=>{methods.push(options.method);if(options.method==='POST')return pending;return json({state:'cancelled'});}});
+  client.selection={session_namespace:'n',session_id:'s'};const run=client.collectRelated();await client.cancelCollection();
+  created(json({job_id:'created-after-cancel',state:'running'}));await run;assert.deepEqual(methods,['POST','DELETE']);assert.equal(client.collectionController,null);
+});
+
+test('default following excludes newly collected server sessions while explicit server source can follow',async()=>{
+  const requests=[];
+  const client=new CollectorClient({fetcher:async path=>{
+    requests.push(path);
+    if(path.includes('/sources'))return json({collector_id:'c',event_cursor:2,sources:[{source_id:'client-source',platform:'web'},{source_id:'server-source',platform:'server'}]});
+    if(path.includes('/status'))return json({adapters:{}});
+    if(path.includes('/sessions')){const query=new URL(path,'http://local').searchParams;return json({high_water:2,has_more:false,sessions:query.get('latest')?[query.get('client_only')==='true'?{session_namespace:'client',session_id:'s',source_ids:['client-source']}:{session_namespace:'server',session_id:'new',source_ids:['server-source']}]:[{session_namespace:'client',session_id:'s',source_ids:['client-source']},{session_namespace:'server',session_id:'new',source_ids:['server-source']}]});}
+    return json({collector_id:'c',cursor:2,high_water:2,lines:[],has_more:false});
+  }});
+  client.selection={session_namespace:'client',session_id:'s'};
+  await client.refresh(new AbortController().signal);assert.equal(client.selection.session_namespace,'client');assert.ok(requests.some(p=>p.includes('client_only=true')));
+  client.select({source_id:'server-source',session_namespace:'server',session_id:'old'});
+  await client.refresh(new AbortController().signal);assert.equal(client.selection.session_id,'new');assert.ok(!requests.at(-2).includes('client_only=true'));
+});

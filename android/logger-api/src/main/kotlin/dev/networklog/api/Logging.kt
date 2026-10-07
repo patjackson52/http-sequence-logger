@@ -6,7 +6,10 @@ interface Logger {
     fun startSession(name: String, sessionId: String? = null): Session
 }
 /** Opaque handle. Only the debug recorder understands the contents. */
-interface CaptureContext
+interface CaptureContext {
+    /** W3C context for a configured first-party destination; null when capture/propagation is disabled. */
+    fun traceparent(destination: String): String? = null
+}
 
 data class Actor(val owner: String = "integrator", val component: String = "Customer", val method: String? = null)
 

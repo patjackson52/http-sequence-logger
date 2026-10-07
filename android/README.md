@@ -1,6 +1,6 @@
 # Kotlin Android SDK and sample
 
-The debug recorder writes sanitized schema **1.2** events and source-aware transfer **2**. Use [Android integration](../docs/integration/ANDROID.md) for existing apps. `logger-api` contains the shared API/no-op; `logger` and discovery wiring belong only in debug dependencies. API26+, JDK17, Kotlin2.2.20 and SDK35 are the tested baseline.
+The debug recorder writes sanitized schema **1.3** events and source-aware transfer **2**. Use [Android integration](../docs/integration/ANDROID.md) for existing apps. `logger-api` contains the shared API/no-op; `logger` and discovery wiring belong only in debug dependencies. API26+, JDK17, Kotlin2.2.20 and SDK35 are the tested baseline.
 
 ## Run
 
@@ -142,4 +142,4 @@ node validate.mjs artifacts/android-instrumentation/ACTUAL_RUN_UUID/*.ndjson
 
 Choose the actual device with `adb devices -l`; replace `SELECTED_DEVICE` and use the run UUID printed by the harness. `run-android-e2e.sh` delegates to the maintained `check-android-instrumentation.mjs` runner and accepts no positional output/config arguments. It builds and installs Debug app/test APKs, runs actual AndroidJUnitRunner business-flow and transfer tests, validates emitted capture files, and checks collector ACK evidence. New captures, private collector state and reports stay under ignored `artifacts/android-instrumentation/<UUID>/`; existing canonical journals, explicit pairing and reverse routes are preserved. It does not replace checked-in captures.
 
-For current schema 1.2 native evidence, use [realtime captures](../samples/realtime/README.md), including the recorded Android recovery flow available in the viewer sample picker. [Older live captures](../samples/live/manifest.json) remain historical evidence and are unsupported by the current validator/viewer. See [the actual customer connection](app/src/main/kotlin/dev/networklog/app/SampleFlow.kt) for a complete runnable manual integration; repository capture evidence does not verify a different app's integration.
+[Realtime captures](../samples/realtime/README.md) record earlier schema-1.2 native recovery evidence and are historical after the schema-1.3 update. New captures must come from the updated producer; historical recordings are not relabeled as new runtime evidence. [Older live captures](../samples/live/manifest.json) remain historical evidence and are unsupported by the current validator/viewer. See [the actual customer connection](app/src/main/kotlin/dev/networklog/app/SampleFlow.kt) for a complete runnable manual integration; repository capture evidence does not verify a different app's integration.

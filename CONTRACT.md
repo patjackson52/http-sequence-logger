@@ -1,4 +1,4 @@
-# Network and local-control capture contract 1.2 — draft
+# Network and local-control capture contract 1.3 — draft
 
 This document and [event.schema.json](schema/event.schema.json) define a project-specific JSON format. It uses distributed tracing identities but **is not OTLP JSON or HAR**. Future adapters may export those formats with documented loss of custom capture details.
 
@@ -14,7 +14,7 @@ Every event must have:
 
 | Field | Meaning |
 | --- | --- |
-| `schema_version` | Exact current version: `1.2` on every platform |
+| `schema_version` | Exact current version: `1.3` on every platform |
 | `event_type` | Event discriminator from the schema |
 | `event_id` | Collision-resistant identity, stable across re-export/replay |
 | `session_namespace` | Stable project/environment scope, shared across relevant producers |
@@ -61,7 +61,7 @@ These completion fields belong only to handler spans. Generic method operations 
 
 The Kotlin `invokeHandler` helper records entry/exit around actual customer code. It forwards the identical return object or exception, captures no arguments/return payloads, and runs user code outside the recorder lock. For manual integration, `startHandler` exposes a first-terminal-wins handle. Version 1.2 adds `dispatch: awaited` for an explicitly awaited handler: the terminal boundary records fulfillment (`returned`) or rejection (`threw`) of the awaited value. The viewer calls these resolved/rejected. The caller must remain active until this settlement. This does not claim a blocked thread, implicit context propagation, or suspension/resumption events. A synchronous handler that returns a Promise still ends at its immediate return. General asynchronous enqueue/continuation tracing remains future work.
 
-All events use schema version 1.2. Earlier schema versions are rejected; older capture files are left untouched and are not imported into the new collector. [Handler tracing](HANDLER-TRACING.md) defines the API, rendering requirements, and fixtures. Summary `handler_calls`, `unfinished_handler_calls`, and `unknown_handler_outcomes` are separate from HTTP counters.
+All events use schema version 1.3. Earlier schema versions are rejected; older capture files are left untouched and are not imported into the new collector. [Handler tracing](HANDLER-TRACING.md) defines the API, rendering requirements, and fixtures. Summary `handler_calls`, `unfinished_handler_calls`, and `unknown_handler_outcomes` are separate from HTTP counters.
 
 ## Event vocabulary
 
@@ -190,13 +190,17 @@ Importer rules:
 
 The reference validator is a contract aid, not a hardened large-file ingestion service. It reads the whole file in memory. Byte/file limits and worker-based parsing belong in the later viewer. Its success means the implemented checks found no contradictions; it does not establish native capture completeness or accuracy.
 
-## Future server correlation and format changes
+## Distributed server correlation and format changes
 
 Keep trace IDs from day one. Propagation is disabled by default; integrators can enable an origin allowlist. Session IDs are not automatically transmitted. Native instrumentation should share an existing tracing context when available instead of replacing an application's tracing provider.
 
-W3C `traceparent` carries the current client span as the remote parent. An instrumented server uses a distinct server span ID under that parent. Trace/span relationships, rather than session IDs or timestamp proximity, identify the shared exchange. A later server importer must retain both observations and original clocks; it should not double-count them as two requests.
+W3C `traceparent` carries the current client span as the remote parent. An instrumented server uses a distinct server span ID under that parent. Trace/span relationships, rather than session IDs or timestamp proximity, identify the shared exchange. The collector retains both observations and original clocks. Outbound HTTP spans count as HTTP requests; incoming server spans describe request handling as operations rather than duplicating the client HTTP count.
 
-This schema admits mobile and browser producers and reserves remote-parent relationships. Server event types/producer metadata, raw HAR/OTLP import, and multi-machine clock presentation need a later reviewed extension. Trace IDs alone do not establish server timings or retroactively correlate old logs without shared identities.
+Schema 1.3 admits `producer.platform: server` with optional `service_name`, `environment`, and `runtime` metadata. `operation.started.data.span_kind` distinguishes `server` and `internal` work; `http.request.started.data.span_kind: client` identifies outbound calls. Every operation owns its span; remote parent links cross recordings while local links remain within one recording. The viewer resolves unique trace/span identities without merging source clocks.
+
+`log.message` carries application-sanitized `message` and `level`. A complete `context` attaches it to a span; `data.trace_id` preserves trace-only association without inventing a span or parent. Mapped raw logs preserve stable source references and mark unavailable monotonic clocks. Plain messages never synthesize HTTP lifecycles or durations. Collection and parsing are independently extensible, with bounded jobs and explicit sampling/truncation/parse diagnostics.
+
+Server records keep original source, session, recording, and event identities. Client sessions are entry points into related trace snapshots rather than owners of rewritten server events. W3C propagation to configured first-party origins joins actual observations; URLs/time proximity and trace IDs alone do not establish server timings or retroactively correlate old logs. Raw HAR/OTLP import remains future work.
 
 Before an incompatible format change, bump the major schema version. Even additive core fields need an updated schema/version and importer capability declaration because v1 rejects unknown core fields. Use namespaced extensions for optional vendor metadata in the meantime.
 
@@ -209,9 +213,9 @@ Before an incompatible format change, bump the major schema version. Even additi
 - [Android SystemClock](https://developer.android.com/reference/android/os/SystemClock) and [Apple continuous time](https://developer.apple.com/documentation/kernel/1646199-mach_continuous_time) for elapsed time that includes device sleep.
 - [HTTP informational responses](https://www.rfc-editor.org/rfc/rfc9110.html#section-15.2) for interim-before-final ordering.
 
-## Browser producer (1.2)
+## Browser producer (1.3)
 
-The sole supported event version is 1.2, including `producer.platform: web` and awaited handler dispatch. Browser and native recordings may coexist in one capture. Source registration, pairing, upload and ACK use transfer version 2, independently of the event version.
+The sole supported event version is 1.3, including `producer.platform: web` and awaited handler dispatch. Browser and native recordings may coexist in one capture. Source registration, pairing, upload and ACK use transfer version 2, independently of the event version.
 
 The browser observes logical Fetch/XHR calls: browser-added request headers, cookie details, filtered response headers, redirects, preflights and hidden attempts are not fabricated. Header sets are partial. Fetch opaque/opaque-redirect status 0 becomes unavailable status and an unknown observation, not an HTTP response or success. A CORS failure does not establish whether a server processed the request. Trace propagation remains disabled by default.
 

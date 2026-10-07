@@ -47,7 +47,7 @@ final class TransferTests: XCTestCase, @unchecked Sendable {
         json["certificate_sha256"] = pin
         return try TransferConnection.parse(json: JSONSerialization.data(withJSONObject: json))
     }
-    private func line(_ id: String = "event-1", version: String = "1.2") -> String {
+    private func line(_ id: String = "event-1", version: String = "1.3") -> String {
         "{\"schema_version\":\"\(version)\",\"event_id\":\"\(id)\",\"event_type\":\"session.started\",\"data\":{}}"
     }
     private func sink(_ dir: URL, transport: FakeTransport, limits: TransferLimits = TransferLimits(), collector: String = "collector-test") throws -> NDJSONTransferSink {
@@ -169,7 +169,7 @@ final class TransferTests: XCTestCase, @unchecked Sendable {
         var limits = TransferLimits(); limits.initialRetryDelay = 0.02; limits.maximumRetryDelay = 0.03
         let transport = FakeTransport([.offline, .status(503), .ack])
         let transfer = try sink(dir, transport: transport, limits: limits)
-        try await transfer.appendSanitizedLine(line(version: "1.2"))
+        try await transfer.appendSanitizedLine(line(version: "1.3"))
         let failure = await transfer.deliverNow()
         XCTAssertEqual(failure.state, .retrying)
         try await Task.sleep(nanoseconds: 200_000_000)
@@ -234,7 +234,7 @@ final class TransferTests: XCTestCase, @unchecked Sendable {
     func testRelayPreservesIDsAndIgnoresIncompleteTail() async throws {
         let dir = directory(); defer { try? FileManager.default.removeItem(at: dir) }
         let source = directory(); defer { try? FileManager.default.removeItem(at: source) }
-        try (line("event-1") + "\r\n" + line("event-2", version: "1.2") + "\n{incomplete").write(to: source, atomically: true, encoding: .utf8)
+        try (line("event-1") + "\r\n" + line("event-2", version: "1.3") + "\n{incomplete").write(to: source, atomically: true, encoding: .utf8)
         let transfer = try sink(dir, transport: FakeTransport())
         let count = try await transfer.relaySanitizedFile(source)
         XCTAssertEqual(count, 2)

@@ -137,7 +137,7 @@ class NativeCrashTest {
         private val ATOMIC_STAGES=listOf("metadata","cursor").flatMap { kind -> BOUNDARIES.map { "$kind"+"_"+it } }
         private val STAGES=listOf("enqueue","append_partial","append_complete","synced_unpublished","published","cursor_committed","cursor_lost")+ATOMIC_STAGES
         private val UNPUBLISHED=setOf("enqueue","append_partial","append_complete","synced_unpublished")
-        private fun line(id:String)="""{"schema_version":"1.2","event_type":"session.started","event_id":"$id","data":{}}"""
+        private fun line(id:String)="""{"schema_version":"1.3","event_type":"session.started","event_id":"$id","data":{}}"""
         private fun bytes(id:String)=(line(id)+"\n").toByteArray(Charsets.UTF_8)
         private fun allBytes()=bytes("baseline")+bytes("candidate")
         private fun connection()=TransferConnection.parse("""{"version":2,"endpoint":"http://127.0.0.1:4319","source_token":"test-fixture-token","source_id":"source","collector_id":"collector","certificate_sha256":null}""")

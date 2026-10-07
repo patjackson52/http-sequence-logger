@@ -1,6 +1,6 @@
 # Swift development journal and transfer
 
-The debug-only package stores **already-sanitized schema1.2 NDJSON** and implements source-aware transfer2. It provides storage, discovery and transfer; HTTP instrumentation/redaction remain app-owned. [iOS integration](../docs/integration/IOS.md) covers debug dependency isolation. Swift6, iOS15+ and macOS12+ are supported build baselines.
+The debug-only package stores **already-sanitized schema1.3 NDJSON** and implements source-aware transfer2. It provides storage, discovery and transfer; HTTP instrumentation/redaction remain app-owned. [iOS integration](../docs/integration/IOS.md) covers debug dependency isolation. Swift6, iOS15+ and macOS12+ are supported build baselines.
 
 ## Default bootstrap
 

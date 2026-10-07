@@ -6,7 +6,7 @@ Start with the [integration checklist](README.md). This guide targets Swift 6 an
 
 | Repository capability | Status and action |
 | --- | --- |
-| `NetworkLogTransfer` Swift package | Implemented: canonical schema 1.2 journaling, debug discovery/bootstrap and source-scoped version 2 transfer |
+| `NetworkLogTransfer` Swift package | Implemented: canonical schema 1.3 journaling, debug discovery/bootstrap and source-scoped version 2 transfer |
 | Full Swift HTTP/session/operation/handler recorder | Not implemented: use an existing compatible producer or implement an app-owned adapter against the contract |
 | `ios/Demo/ManualCaptureDemo.swift` | Private, one-request demonstration; not a public SDK or general-purpose recorder |
 | Swift recorder snippets in `MANUAL-LOGGING.md` | Proposed APIs; do not import or call these methods as if the package provides them |
@@ -14,7 +14,7 @@ Start with the [integration checklist](README.md). This guide targets Swift 6 an
 
 If the app already produces compatible sanitized NDJSON, installation and transfer integration are small. If it has only ordinary console logs or unstructured request strings, creating a schema-valid capture producer is additional implementation work. State that explicitly in the integration plan and verification report. Do not claim automatic URLSession capture after installing the transfer package.
 
-The demo manually observes a secret-free allowlisted GET and emits schema 1.2 events incrementally to the canonical journal. It illustrates transfer and discovery rather than general URLSession capture. Customer instrumentation must supply its own session/event generation, observation semantics, handler spans, transaction metrics and sanitization; the transfer package does not infer those facts.
+The demo manually observes a secret-free allowlisted GET and emits schema 1.3 events incrementally to the canonical journal. It illustrates transfer and discovery rather than general URLSession capture. Customer instrumentation must supply its own session/event generation, observation semantics, handler spans, transaction metrics and sanitization; the transfer package does not infer those facts.
 
 ## 2. Pin the repository and add the local package
 
@@ -43,7 +43,7 @@ The [external consumer fixture](../../integration/ios-consumer/README.md) compil
 
 ## 4. Initialize one canonical journal
 
-The app supplies sanitized schema 1.2 events; the transfer package does not provide general URLSession instrumentation. In a debug target initialize `DebugCapture.start()` once. It creates installation state, backup-excluded `Library/Application Support/HTTPSequenceLogger/source.json`, a unique process journal under `journals/<uuid>/capture.ndjson`, and one pairing manager. Initialization works before collector startup and before events. Use `await capture.captureURLs` at export time to share all retained generations. `captureURL` identifies the initial generation and `currentCaptureURL` the active one; neither alone represents a rotated history. Do not maintain a second durable upload copy.
+The app supplies sanitized schema 1.3 events; the transfer package does not provide general URLSession instrumentation. In a debug target initialize `DebugCapture.start()` once. It creates installation state, backup-excluded `Library/Application Support/HTTPSequenceLogger/source.json`, a unique process journal under `journals/<uuid>/capture.ndjson`, and one pairing manager. Initialization works before collector startup and before events. Use `await capture.captureURLs` at export time to share all retained generations. `captureURL` identifies the initial generation and `currentCaptureURL` the active one; neither alone represents a rotated history. Do not maintain a second durable upload copy.
 
 A custom directory/app ID is optional. For simulator discovery use the default fixed root and actual bundle identifier, including any debug suffix. If the root is customized, automatic fixed-path discovery is unavailable until its explicit discovery convention is configured. The app's production backup policy remains unchanged.
 
@@ -88,7 +88,7 @@ Use [SPECS.md](SPECS.md) to find the normative contract, standalone per-event JS
 - Capture available HTTP response metadata before reporting a completion-handler transport error. An HTTP error status is distinct from a transport failure. For streaming APIs, receiving headers is not body completion; retain partial data and end only at the observed EOF/close/failure/cancellation boundary. Unknown data stays explicitly unavailable, not an invented empty body or success.
 - Bound body snapshots and redact headers, URL query values, bodies, effective URLs, and optional metrics **before persistence**. If safe structured redaction cannot be performed, omit content with an explicit reason. The demo's limited endpoint-specific policy is insufficient for arbitrary customer data.
 - Record the actual initiator/executor component and integrator/SDK ownership. Propagate parent context explicitly through async callbacks. Do not infer ancestry from URLs, timing, or threads.
-- For SDK → app handler → SDK transitions, emit the schema **1.2** handler operation fields and explicit `returned`/`threw`/`cancelled`/`observation_stopped` completion described in [HANDLER-TRACING.md](../../HANDLER-TRACING.md). Parent app HTTP calls to the handler span, preserve its actual integrator executor, and invoke the handler exactly once. A missing end is incomplete observation. All events use current schema 1.2; earlier captures are not imported.
+- For SDK → app handler → SDK transitions, emit the schema **1.3** handler operation fields and explicit `returned`/`threw`/`cancelled`/`observation_stopped` completion described in [HANDLER-TRACING.md](../../HANDLER-TRACING.md). Parent app HTTP calls to the handler span, preserve its actual integrator executor, and invoke the handler exactly once. A missing end is incomplete observation. All events use current schema 1.3; earlier captures are not imported.
 
 Do not enable outbound trace headers by default. Cross-server correlation requires an explicit propagation policy and supporting server instrumentation; it is separate from the local session ID and delivery pairing.
 

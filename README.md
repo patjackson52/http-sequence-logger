@@ -1,6 +1,6 @@
 # HTTP sequence logger
 
-Current **1.2** capture format and **version 2** source-aware transfer for mobile and browser development SDKs. Includes Kotlin Android and browser recorders with auth samples, a Swift transfer package and manually instrumented iOS demo, a local desktop collector, and an interactive web sequence viewer.
+Current **1.3** capture format and **version 2** source-aware transfer for mobile, browser and server development SDKs. Includes Kotlin Android and browser recorders with auth samples, a Swift transfer package and manually instrumented iOS demo, a local desktop collector, and an interactive web sequence viewer.
 
 Repository: [patjackson52/http-sequence-logger](https://github.com/patjackson52/http-sequence-logger) · [MIT license](LICENSE).
 
@@ -17,6 +17,7 @@ Start with **[AGENTS.md — task routes and agent directions](AGENTS.md)**. Read
 | Agent task | Entry point |
 | --- | --- |
 | Integrate SDK capture/transfer into an existing client | [Integration guide](docs/integration/README.md), then Android, iOS or web guide and its callable API index |
+| Integrate server capture or raw logs | [Server integration](docs/integration/SERVER.md) and [collection/parsing adapters](docs/integration/ADAPTERS.md) |
 | Start/diagnose collector or retrieve logs | [Collector guide](collector/README.md) and `npm run collector -- --help` |
 | Compare captures in a script/CI/agent | [Diff module/CLI](sequence-diff/README.md) and `npm run diff:sequence -- --help` |
 | Inspect captures or compare sessions visually | [Viewer guide](viewer/README.md) |
@@ -87,6 +88,10 @@ Open **http://127.0.0.1:4319/** normally after refresh. Devices and environments
 
 The collector retains captures in `artifacts/collector-v2/capture.sqlite`; **Save capture** downloads NDJSON and **Download SVG** saves the current diagram. Native originals stay in private canonical journals; browser originals stay in IndexedDB. Earlier state/captures are left untouched, with no migration or compatibility requirement. Keep pairing, manifest, credentials and TLS files private. [Collector defaults and diagnostics](collector/README.md) · [Locations and retrieval](docs/integration/TRANSPORT.md#where-every-file-lives) · [Troubleshooting](docs/integration/TRANSPORT.md#troubleshooting-by-symptom) · [Viewer controls](viewer/README.md).
 
+## Related server sources
+
+Server contexts emit structured JSON through existing application logging. Configure bounded local journal or authenticated Cloudflare retained-log collection separately from canonical/mapping/custom parsing. Select a client session and use **Refresh related logs** to query matching trace IDs, track status and cancel. The viewer connects remote spans across independent recordings and preserves original provenance. [Server setup](docs/integration/SERVER.md) · [Adapters](docs/integration/ADAPTERS.md) · [Reusable integration skill](skills/http-sequence-logger/SKILL.md).
+
 ## Desktop viewer examples
 
 Actual desktop captures of the viewer, using the included sanitized logs. Each server origin has its own lane; selecting a request or local invocation opens its details. Click an image to view it at full size.
@@ -132,7 +137,7 @@ The [browser SDK](web-sdk/README.md) includes manual customer-client recording, 
 
 See [Android setup and integration](android/README.md). The MIT-licensed sample makes real HTTPS requests to three free public services, records both SDK-owned and manually instrumented app requests, and exports local NDJSON. No service registration is required.
 
-- [Current schema-1.2 native captures](samples/realtime/README.md): Android emulator and iOS simulator delivery evidence.
+- [Historical schema-1.2 native captures](samples/realtime/README.md): Android emulator and iOS simulator delivery evidence.
 - Historical Android schema-1.1 captures: [success](samples/live/successful-sign-in.ndjson), [recovery](samples/live/recovered-sign-in.ndjson), [both sessions](samples/live/multi-session.ndjson). These preserve previous evidence and are unsupported by the current importer/collector.
 - [End-to-end verification](E2E.md).
 - [Native captures delivered through the collector](samples/transfer/README.md): Android recovery and iOS HTTP/TLS/offline recovery.
@@ -207,7 +212,7 @@ npm test
 
 The tests check generated-file reproducibility, all reference examples, import recovery, and rejection of contradictory records. Modify the authoring sources and regenerate; do not edit generated files independently.
 
-Version `1.1` introduced synchronous handler calls and returns; current `1.2` adds browser producers and explicitly awaited handler settlement. Historical recordings retain their original bytes as evidence, but current tools accept only schema `1.2`. SDKs are source-integrated development prototypes, not published production releases. Dependencies and lockfile are scoped to this repository, independent of the surrounding application.
+Version `1.1` introduced synchronous handler calls and returns; current `1.3` adds browser producers and explicitly awaited handler settlement. Historical recordings retain their original bytes as evidence, but current tools accept only schema `1.3`. SDKs are source-integrated development prototypes, not published production releases. Dependencies and lockfile are scoped to this repository, independent of the surrounding application.
 
 ## Interactive viewer
 

@@ -77,7 +77,7 @@ import {
   validateDiff, formatDiffText, SequenceDiffError
 } from '@http-sequence-logger/sequence-diff';
 
-// Each string contains existing canonical event-schema 1.2 NDJSON.
+// Each string contains existing canonical event-schema 1.3 NDJSON.
 const [primary] = sequencesFromCapture(primaryNDJSON);
 const [secondary] = sequencesFromCapture(secondaryNDJSON);
 
@@ -108,7 +108,7 @@ Functions do not mutate their inputs. Output has no generation timestamp or rand
 }
 ```
 
-The illustrative empty array must be replaced with actual schema-1.2 events. It is invalid as an input on its own. The wrapper preserves canonical event data, including body bytes/text, repeated headers and queries. It does not change native/browser producer contracts or serialize the viewer's internal objects. Reconstruction is a derived model.
+The illustrative empty array must be replaced with actual schema-1.3 events. It is invalid as an input on its own. The wrapper preserves canonical event data, including body bytes/text, repeated headers and queries. It does not change native/browser producer contracts or serialize the viewer's internal objects. Reconstruction is a derived model.
 
 Schema validation plus semantic validation reject contradictory events. Identical replayed event IDs deduplicate. Missing observations can remain valid partial captures with explicit warnings. Input event pointers refer to the original input document; event IDs retain traceability across normalization.
 

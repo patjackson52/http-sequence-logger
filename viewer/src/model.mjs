@@ -63,6 +63,7 @@ export function importFiles(inputFiles, limits = IMPORT_LIMITS) {
     }
   }
   const sessions = reconstruct(validation.events, sourceLines, diagnostics);
+  connectDistributedSessions(sessions);
   return { valid: !diagnostics.some(d => d.severity === 'error'), sessions, diagnostics, summary: validation.summary, events: validation.events, files, sourceLines };
 }
 
@@ -93,8 +94,8 @@ function reconstruct(events, sources, diagnostics) {
       recording.diagnostics = diagnostics.filter(d => d.recordingId === recording.id);
       recording.invalid = recording.diagnostics.some(d => d.severity === 'error');
       const spans = new Map();
-      for (const e of recording.events.filter(e => e.context)) {
-        const id = spanId(e);
+      for (const e of recording.events.filter(e => e.context || e.event_type === 'log.message')) {
+        const id = e.context ? spanId(e) : `log/${e.event_id}`;
         if (!spans.has(id)) spans.set(id, []);
         spans.get(id).push(e);
       }
@@ -102,11 +103,12 @@ function reconstruct(events, sources, diagnostics) {
         const start = observations.find(e => ['operation.started', 'http.request.started'].includes(e.event_type)) ?? null;
         const end = observations.find(e => ['operation.ended', 'http.ended'].includes(e.event_type)) ?? null;
         const first = start ?? observations[0];
-        const context = first.context;
+        const context = first.context || {};
         const observedDurationNs = end?.data.duration_ns ?? null;
         const stopped = end?.data.completion === 'observation_stopped' || end?.data.end_reason === 'observation_stopped';
         const durationNs = stopped ? null : observedDurationNs;
-        const base = { id, spanId: context.span_id, traceId: context.trace_id, recordingId: recording.id, sessionId: session.id, parentId: context.parent_span_id ? `${context.trace_id}/${context.parent_span_id}` : null, parentScope: context.parent_scope, start, end, rawEvents: observations, rawSources: observations.map(e => sources[e.event_id]?.[0] ?? null), outcome: end?.data.outcome ?? 'unfinished', error: end?.data.error ?? null, durationNs, durationMs: nsToMs(durationNs), observedDurationNs, observedDurationMs: nsToMs(observedDurationNs), stopped, incomplete: !end, orphan: !start, invalid: recording.invalid, depth: 0, childIds: [], childRequestIds: [], ancestorIds: [] };
+        const serviceName = recording.producer?.service_name ?? recording.start?.extensions?.['server.service_name'] ?? first.extensions?.['source.service_name'] ?? (['server', 'node', 'cloudflare'].includes(recording.producer?.platform) ? recording.producer?.app_id : null);
+        const base = { serviceName, spanRole: first.data.span_kind ?? first.extensions?.['span.kind'] ?? null, provenance: first.extensions?.['source.reference'] ?? null, contextSpanKey: context.trace_id && context.span_id ? `${context.trace_id}/${context.span_id}` : null, clockUncertain: context.parent_scope === 'remote' || first.extensions?.['source.clock'] === 'monotonic_unavailable', id, spanId: context.span_id, traceId: context.trace_id ?? first.data.trace_id, recordingId: recording.id, sessionId: session.id, parentId: context.parent_span_id ? `${context.trace_id}/${context.parent_span_id}` : null, parentScope: context.parent_scope, start, end, rawEvents: observations, rawSources: observations.map(e => sources[e.event_id]?.[0] ?? null), outcome: end?.data.outcome ?? 'unfinished', error: end?.data.error ?? null, durationNs, durationMs: nsToMs(durationNs), observedDurationNs, observedDurationMs: nsToMs(observedDurationNs), stopped, incomplete: !end, orphan: !start, invalid: recording.invalid, depth: 0, childIds: [], childRequestIds: [], ancestorIds: [] };
         if (observations.some(e => e.event_type.startsWith('http.'))) {
           const responseEvent = observations.find(e => e.event_type === 'http.response.headers' && e.data.phase === 'final') ?? null;
           const request = start?.data.request ?? null;
@@ -117,13 +119,14 @@ function reconstruct(events, sources, diagnostics) {
           let path = 'Request not recorded', query = [];
           try { const parsed = new URL(url); path = `${parsed.pathname}${parsed.search}`; query = [...parsed.searchParams].map(([name, value]) => ({ name, value })); } catch { /* Orphan data does not invent a URL. */ }
           const timeToHeadersNs = deltaNs(start, responseEvent);
-          const exchange = { ...base, kind: 'http', request, response, responseEvent, requestBody: observations.find(e => e.event_type === 'http.body.captured' && e.data.direction === 'request')?.data.body ?? null, responseBody: observations.find(e => e.event_type === 'http.body.captured' && e.data.direction === 'response')?.data.body ?? null, trailers: observations.filter(e => e.event_type === 'http.trailers'), metrics: observations.filter(e => e.event_type === 'http.metrics'), informational: observations.filter(e => e.event_type === 'http.response.headers' && e.data.phase === 'informational'), initiator, executor, owner: executor.owner, component: executor.component, method: request?.method ?? 'Not recorded', url, origin: originOf(url), path, query, status: end?.data.status_code ?? response?.status_code ?? null, applicationOutcome: end?.data.application_outcome ?? 'unknown', timeToHeadersNs, timeToHeadersMs: nsToMs(timeToHeadersNs), returnedEarly: false, attempt: start?.data.attempt ?? null, adapter: start?.data.adapter ?? null, manual: start?.data.adapter?.name === 'customer.manual', operationId: base.parentId };
+          const exchange = { ...base, messages: observations.filter(e => e.event_type === 'log.message'), kind: 'http', request, response, responseEvent, requestBody: observations.find(e => e.event_type === 'http.body.captured' && e.data.direction === 'request')?.data.body ?? null, responseBody: observations.find(e => e.event_type === 'http.body.captured' && e.data.direction === 'response')?.data.body ?? null, trailers: observations.filter(e => e.event_type === 'http.trailers'), metrics: observations.filter(e => e.event_type === 'http.metrics'), informational: observations.filter(e => e.event_type === 'http.response.headers' && e.data.phase === 'informational'), initiator, executor, owner: executor.owner, component: executor.component, method: request?.method ?? 'Not recorded', url, origin: originOf(url), path, query, status: end?.data.status_code ?? response?.status_code ?? null, applicationOutcome: end?.data.application_outcome ?? 'unknown', timeToHeadersNs, timeToHeadersMs: nsToMs(timeToHeadersNs), returnedEarly: false, attempt: start?.data.attempt ?? null, adapter: start?.data.adapter ?? null, manual: start?.data.adapter?.name === 'customer.manual', operationId: base.parentId };
           exchange.classification = classifyOutcome(exchange);
           recording.exchanges.push(exchange);
         } else {
           const origin = start?.data.origin ?? unknownActor();
           const isHandler = Boolean(start?.data.invocation || end?.data.completion);
-          const operation = { ...base, kind: isHandler ? 'handler' : 'operation', name: start?.data.name ?? 'Operation start not recorded', origin, owner: origin.owner, component: origin.component, method: origin.method, invocation: start?.data.invocation ?? null, isHandler, completion: end?.data.completion ?? null, repeatIndex: 1, repeatCount: 1 };
+          const messages = observations.filter(e => e.event_type === 'log.message');
+          const operation = { ...base, id: !start && messages.length ? `log/${messages[0].event_id}` : base.id, messages, kind: !start && messages.length ? 'log' : isHandler ? 'handler' : 'operation', name: start?.data.name ?? messages[0]?.data.message ?? 'Operation start not recorded', origin, owner: origin.owner, component: origin.component, method: origin.method, invocation: start?.data.invocation ?? null, isHandler, completion: end?.data.completion ?? null, repeatIndex: 1, repeatCount: 1 };
           operation.classification = classifyOutcome(operation);
           recording.operations.push(operation);
         }
@@ -145,11 +148,11 @@ function reconstruct(events, sources, diagnostics) {
           item.parentOperationKind = operation?.kind ?? null;
           item.parentOperationName = operation?.name ?? null;
           item.parentEndedAt = operation?.end ?? null;
-          item.returnedEarly = Boolean(operation?.end && item.rawEvents.at(-1).sequence > operation.end.sequence);
-          item.completedAfterParentReturn = Boolean(operation?.end && item.end && !item.stopped && item.end.sequence > operation.end.sequence);
+          item.returnedEarly = Boolean(operation?.recordingId === item.recordingId && operation?.end && item.rawEvents.at(-1).sequence > operation.end.sequence);
+          item.completedAfterParentReturn = Boolean(operation?.recordingId === item.recordingId && operation?.end && item.end && !item.stopped && item.end.sequence > operation.end.sequence);
           const handler = item.ancestorIds.map(id => byId.get(id)).find(s => s.isHandler);
           item.handlerId = handler?.id ?? null;
-          item.completedAfterHandlerReturn = Boolean(handler?.completion === 'returned' && item.end && !item.stopped && item.end.sequence > handler.end.sequence);
+          item.completedAfterHandlerReturn = Boolean(handler?.recordingId === item.recordingId && handler?.completion === 'returned' && item.end && !item.stopped && item.end.sequence > handler.end.sequence);
         }
       }
       const repeats = new Map();
@@ -174,6 +177,52 @@ function reconstruct(events, sources, diagnostics) {
     session.summary = { requests: session.exchanges.filter(e => !e.orphan).length, handler_calls: session.handlers.length, failed_requests: session.exchanges.filter(e => e.classification === 'failed').length, cancelled_requests: session.exchanges.filter(e => e.outcome === 'cancelled').length, unknown_outcomes: session.exchanges.filter(e => e.outcome === 'unknown').length, unfinished_requests: session.exchanges.filter(e => e.incomplete && !e.orphan).length, unfinished_handler_calls: session.handlers.filter(e => e.incomplete).length, unknown_handler_outcomes: session.handlers.filter(e => e.stopped).length, recordings: session.recordings.length, origins: session.origins.length };
   }
   return [...sessionMap.values()];
+}
+
+/** Resolve causality by trace/span identity, while preserving every producer's own clock and session. */
+function connectDistributedSessions(sessions) {
+  const originalItems = sessions.flatMap(s => [...s.operations, ...s.exchanges]);
+  for (const log of originalItems.filter(i => i.kind === 'log' && i.traceId && i.spanId)) {
+    const targets = originalItems.filter(i => i.kind !== 'log' && i.id === log.contextSpanKey);
+    if (targets.length !== 1) continue;
+    targets[0].messages = [...(targets[0].messages || []), ...log.messages];
+    targets[0].rawEvents.push(...log.rawEvents);targets[0].rawSources.push(...log.rawSources);
+    for (const session of sessions) { session.operations = session.operations.filter(i => i !== log); for (const r of session.recordings) r.operations = r.operations.filter(i => i !== log); }
+  }
+  const all = sessions.flatMap(s => [...s.operations, ...s.exchanges]);
+  const candidates = new Map();
+  for (const item of all) { const list = candidates.get(item.id) || []; list.push(item); candidates.set(item.id, list); }
+  const parentOf = item => {
+    const list = candidates.get(item.parentId) || [];
+    const matches = list.filter(p => item.parentScope === 'local' ? p.recordingId === item.recordingId : item.parentScope === 'remote' && p.recordingId !== item.recordingId);
+    return matches.length === 1 ? matches[0] : null; // Ambiguous IDs do not establish a connection.
+  };
+  for (const item of all) { item.childIds = []; item.childRequestIds = []; item.ancestorIds = []; }
+  for (const item of all) {
+    const direct = parentOf(item); item.parentResolved = Boolean(direct);
+    if (direct) direct.childIds.push(item.id);
+    const seen = new Set([item.id]); let parent = direct;
+    while (parent && !seen.has(parent.id)) {
+      seen.add(parent.id); item.ancestorIds.push(parent.id);
+      if (item.kind === 'http') parent.childRequestIds.push(item.id);
+      parent = parentOf(parent);
+    }
+    item.depth = item.ancestorIds.length;
+  }
+  // Each selectable session is an entry point into a trace graph, not a rewritten session.
+  const originals = sessions.map(s => ({ session: s, recordings: s.recordings, items: [...s.operations, ...s.exchanges] }));
+  for (const { session, recordings, items } of originals) {
+    const traces = new Set(items.map(i => i.traceId).filter(Boolean));
+    const related = originals.filter(s => s.session !== session).flatMap(s => s.recordings).filter(r => [...r.operations, ...r.exchanges].some(i => traces.has(i.traceId)));
+    if (!related.length) continue;
+    session.recordings = [...recordings, ...related.map(r => ({ ...r, related: true, operations: r.operations.filter(i => traces.has(i.traceId)), exchanges: r.exchanges.filter(i => traces.has(i.traceId)) }))];
+    session.operations = session.recordings.flatMap(r => r.operations);
+    session.exchanges = session.recordings.flatMap(r => r.exchanges);
+    session.handlers = session.operations.filter(i => i.isHandler);
+    session.origins = unique(session.exchanges.map(i => i.origin).filter(Boolean));
+    session.relatedRecordings = related.length;
+    session.summary = { ...session.summary, requests: session.exchanges.filter(i => !i.orphan).length, failed_requests: session.exchanges.filter(i => i.classification === 'failed').length, unknown_outcomes: session.exchanges.filter(i => i.outcome === 'unknown').length, unfinished_requests: session.exchanges.filter(i => i.incomplete && !i.orphan).length, handler_calls: session.handlers.length, recordings: session.recordings.length, origins: session.origins.length };
+  }
 }
 
 function orderItems(a, b) { return (a.start?.sequence ?? a.rawEvents[0].sequence) - (b.start?.sequence ?? b.rawEvents[0].sequence); }

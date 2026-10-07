@@ -6,6 +6,7 @@ This repository contains development network logging, device/browser transfer, a
 
 | Task | Read first | Next authority/check |
 | --- | --- | --- |
+| Integrate server capture or raw log collection | [server guide](docs/integration/SERVER.md), [adapters](docs/integration/ADAPTERS.md) | `server-sdk/index.mjs`, `collector/adapters.mjs`; validate real host local/cloud trace and rendered remote links |
 | Integrate an existing Android/iOS/web client | [integration entry](docs/integration/README.md), then its one platform guide | [transport map](docs/integration/TRANSPORT.md), [callable API/spec index](docs/integration/SPECS.md), [independent consumer examples](integration/README.md); test the host's real flow and shipping artifact |
 | Start/diagnose collection, retrieve captures | [collector guide](collector/README.md) | `npm run collector -- --help`, `status`, `doctor`; [file locations](docs/integration/TRANSPORT.md#where-every-file-lives) and [protocol](docs/transfer/PROTOCOL.md) |
 | Compare files or consume a machine diff | [sequence-diff guide](sequence-diff/README.md) | `npm run diff:sequence -- --help`; package-local sequence/diff schemas and `sequence-diff/index.mjs` |
@@ -19,6 +20,7 @@ Commands run from this checkout with Node **24.13.x** after `npm ci`. In a host-
 - Android Kotlin: `android/logger-api` is the small shared API/no-op; `android/logger` is the debug-only recorder and transfer implementation. Manual customer HTTP clients and synchronous SDK → app handler → SDK tracing are implemented.
 - iOS Swift: `ios/` is the local `NetworkLogTransfer` package for **already-sanitized NDJSON**, plus a limited manual demo. It is not a general Swift capture SDK. The Swift API sketches in design documents are not implemented symbols.
 - Browser: `web-sdk/` supplies a zero-runtime-dependency ESM/TypeScript package. Its default entry is the production no-op; `/debug` adds Fetch/XHR/manual capture, synchronous/awaited handlers, bounded journals and continuous foreground delivery. `/dev-relay` is Node-only. See [WEB.md](docs/integration/WEB.md) and the build-separated `web-sample/`.
+- Servers: `server-sdk/` emits canonical JSON through an app-owned logger with explicit per-request contexts. Local/Cloudflare collection adapters and independent parsers normalize retained logs; Cloudflare retrieval uses an authenticated host endpoint. See [server integration](docs/integration/SERVER.md).
 - Desktop: `collector/` receives or retrieves files and serves `viewer/dist/`; `viewer/` is the React sequence inspector. The viewer does not belong in the mobile production binary.
 - Comparison: `sequence-diff/` owns matching, field comparison and order interpretation. The viewer runs this module in a worker; layouts only render its result. Never use the archived prototype's `nll-diff.js` or invent a second matching implementation.
 - No published Maven/npm package, root Swift package, hosted collector, or account setup is supplied. Pin a source checkout; use the documented source/local-package recipes.
@@ -27,14 +29,18 @@ Commands run from this checkout with Node **24.13.x** after `npm ci`. In a host-
 
 1. Actual public source APIs and tested consumer examples determine callable methods and build behavior.
 2. [schema/event.schema.json](schema/event.schema.json) defines each JSON event; [CONTRACT.md](CONTRACT.md) defines cross-event semantics. Read [the spec index](docs/integration/SPECS.md) before writing a producer.
-3. [docs/transfer/PROTOCOL.md](docs/transfer/PROTOCOL.md) defines pairing, ingestion, ACKs and browser access. Transfer version `2` is distinct from the sole supported event schema `1.2` on all platforms. No legacy source, state or capture migration is required.
+3. [docs/transfer/PROTOCOL.md](docs/transfer/PROTOCOL.md) defines pairing, ingestion, ACKs and browser access. Transfer version `2` is distinct from the sole supported event schema `1.3` on all platforms. No legacy source, state or capture migration is required.
 4. `ADAPTERS.md`, `MANUAL-LOGGING.md`, and `HANDLER-TRACING.md` mix implemented behavior with broader requirements/design sketches. Check platform status before using a named API.
-5. [sequence.schema.json](sequence-diff/schema/sequence.schema.json) and [diff.schema.json](sequence-diff/schema/diff.schema.json) are separate schema-1.0 wrappers/output over schema-1.2 events. Capture, transfer, sequence and diff versions are independent. A diff is evidence, not a replayable patch; preserve snapshots, profile, unknowns and exact source references.
+5. [sequence.schema.json](sequence-diff/schema/sequence.schema.json) and [diff.schema.json](sequence-diff/schema/diff.schema.json) are separate schema-1.0 wrappers/output over schema-1.3 events. Capture, transfer, sequence and diff versions are independent. A diff is evidence, not a replayable patch; preserve snapshots, profile, unknowns and exact source references.
+
+A reusable integration skill is included at [skills/http-sequence-logger/SKILL.md](skills/http-sequence-logger/SKILL.md). Install/copy it through the harness's normal skill workflow when needed; the repository guides remain API authority.
 
 ## Integration invariants
 
 - Keep business HTTP clients and handlers functional with logging disabled. Shared Android code imports `dev.networklog.api`; only debug wiring imports `dev.networklog.logger`. iOS production targets have no transfer package dependency. Runtime flags alone do not remove code/resources.
 - Browser build aliases must exclude the debug entry/setup, journals, uploader and development UI from shipping chunks/assets/maps. Keep pairing JSON in the Node dev server, never public frontend configuration. Do not loosen collector CORS or instrument the uploader.
+- Native shared code can use `exchange.context.traceparent(destination)`; only the debug bridge returns context for `NetworkLog.propagationOrigins`. Production no-op returns null. Use the actual outbound request span, never an enclosing operation span.
+- Distributed capture preserves independent source/session/recording/event identities. Trace IDs locate operations; span IDs and remote parents establish causal links. Never align independent monotonic clocks or infer confirmed links from URLs/timestamps. Retrieval and parsing remain separate; bound jobs and expose failure/truncation/cancellation. Viewer unchanged polling retains layout and selection.
 - Preserve existing callback, body consumption, retry, redirect, cancellation, and error behavior. Record observed metadata or mark it unavailable; never invent wire headers, timings, attempts, or successful completion.
 - Use app-specific namespace and an opaque session ID; reuse supplied session IDs when appropriate. Pass method/handler contexts explicitly. Synchronous handler tracing does not implement coroutine/async context propagation.
 - Browser `invokeAsyncHandler` explicitly observes awaited settlement; it does not propagate ambient context. Fetch readers observe application-chosen consumption without cloning; XHR observers need disposal before reuse. Do not invent original bytes from parsed response objects.

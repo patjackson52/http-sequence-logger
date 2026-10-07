@@ -1,6 +1,6 @@
 # Source-aware transfer protocol
 
-Transfer version **2** is the sole supported transport. Capture events use schema **1.2**. Start with a new collector directory; earlier state and routes are unsupported and left untouched.
+Transfer version **2** is the sole supported transport. Capture events use schema **1.3**. Start with a new collector directory; earlier state and routes are unsupported and left untouched.
 
 The collector runs an HTTP viewer on loopback and optionally a separate HTTPS upload listener. Producer credentials authorize only upload and own-source presence. Reader authority never enters producer configuration. The HTTPS listener does not serve the viewer or read APIs.
 
@@ -67,3 +67,7 @@ Optional Bonjour advertises `_nlog._tcp` service version/collector ID/hostname, 
 The initial collector caps uploads at eight globally/two per source, store event jobs at 16 MiB aggregate/2 MiB per source, sources at 1,000, control JSON at 16 KiB and SSE viewers at 32. Fair source rotation and reserved bounded control capacity keep admission independent of SQLite work. Retryable overload returns 429/503 with bounded retry; storage capacity errors, including actual SQLite full/ENOSPC failures, use 507. Uncertain I/O failures remain 503 and never return a success ACK. Existing identical replay remains acknowledgeable at logical event capacity. DB/index/WAL budgets and a free-space reserve constrain physical storage; no automatic retention deletion occurs. Unsupported directories, unsafe files, permission errors and source failures are diagnosed instead of adopting or deleting state.
 
 These limits and durability configuration are implementation constraints, not a claim that every device lifecycle, power-loss, performance or physical-browser acceptance gate has passed. See the implementation evidence record for executed checks and outstanding platform gates.
+
+## Related server collection
+
+Version-2 source registration also accepts `platform: server`. Configured retrieval adapters enroll independently of client sessions. The collector preserves canonical identity and expands snapshots by trace ID; provider credentials remain collector-owned. Collection jobs are a separate API from source upload/ACK. See [collection/parsing setup and exact job endpoints](../../collector/README.md#server-sources-and-parsing-adapters).

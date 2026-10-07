@@ -16,7 +16,7 @@ export interface Operation { readonly context: Context | null; end(outcome?: 'su
 export interface OperationOptions { name: string; origin: Actor; parent?: Context | null }
 export interface HandlerOptions extends OperationOptions { caller: Actor; dispatch?: 'synchronous' | 'awaited' }
 export interface Session {
-  readonly enabled: boolean; readonly sessionId: string | null; readonly recordingId: string | null;
+  readonly enabled: boolean; readonly propagationOrigins?: readonly string[]; readonly sessionId: string | null; readonly recordingId: string | null;
   startOperation(options: OperationOptions | (() => OperationOptions)): Operation;
   startHandler(options: HandlerOptions | (() => HandlerOptions)): Operation;
   startRequest(supplier: () => RequestObservation): Exchange;
@@ -26,7 +26,7 @@ export interface Session {
 }
 export interface Logger { readonly enabled: boolean; startSession(options?: { name?: string; sessionId?: string }): Session }
 export interface Sink { append(line: string): boolean | void }
-export interface LoggerOptions { namespace: string; appId: string; appVersion?: string; sink: Sink; policy?: { bodyLimitBytes?: number; redactHeaders?: string[]; redactQueryKeys?: string[]; redactBodyKeys?: string[] }; onDiagnostic?: (code: string) => void }
+export interface LoggerOptions { propagationOrigins?: string[]; namespace: string; appId: string; appVersion?: string; sink: Sink; policy?: { bodyLimitBytes?: number; redactHeaders?: string[]; redactQueryKeys?: string[]; redactBodyKeys?: string[] }; onDiagnostic?: (code: string) => void }
 export const noOpLogger: Logger;
 export function createLogger(options?: LoggerOptions): Logger;
 export interface FetchClient {

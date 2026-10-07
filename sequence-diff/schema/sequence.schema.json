@@ -47,13 +47,13 @@
   "$defs": {
     "event": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "urn:mobile-network-log:event:1.2",
-      "title": "Network log event, contract 1.2",
+      "$id": "urn:mobile-network-log:event:1.3",
+      "title": "Network log event, contract 1.3",
       "description": "One NDJSON record. See CONTRACT.md for cross-event and capture semantics. Custom format, not OTLP JSON.",
       "type": "object",
       "properties": {
         "schema_version": {
-          "const": "1.2"
+          "const": "1.3"
         },
         "event_type": {
           "enum": [
@@ -67,7 +67,8 @@
             "http.ended",
             "http.trailers",
             "http.metrics",
-            "capture.gap"
+            "capture.gap",
+            "log.message"
           ]
         },
         "event_id": {
@@ -257,6 +258,16 @@
               "$ref": "#/$defs/captureGap"
             },
             "context": false
+          }
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "log.message"
+            },
+            "data": {
+              "$ref": "#/$defs/logMessage"
+            }
           }
         }
       ],
@@ -937,7 +948,8 @@
                   "enum": [
                     "android",
                     "ios",
-                    "web"
+                    "web",
+                    "server"
                   ]
                 },
                 "app_id": {
@@ -955,6 +967,20 @@
                 "sdk_version": {
                   "type": "string",
                   "minLength": 1
+                },
+                "service_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "environment": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "runtime": {
+                  "enum": [
+                    "node",
+                    "cloudflare"
+                  ]
                 }
               },
               "required": [
@@ -1074,6 +1100,34 @@
           ],
           "additionalProperties": false
         },
+        "logMessage": {
+          "type": "object",
+          "properties": {
+            "trace_id": {
+              "$ref": "#/$defs/traceId"
+            },
+            "message": {
+              "type": "string",
+              "maxLength": 16384
+            },
+            "level": {
+              "enum": [
+                "debug",
+                "info",
+                "warn",
+                "error"
+              ]
+            },
+            "attributes": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "message",
+            "level"
+          ],
+          "additionalProperties": false
+        },
         "operationStart": {
           "type": "object",
           "properties": {
@@ -1083,6 +1137,12 @@
             },
             "origin": {
               "$ref": "#/$defs/actor"
+            },
+            "span_kind": {
+              "enum": [
+                "server",
+                "internal"
+              ]
             },
             "invocation": {
               "type": "object",
@@ -1169,6 +1229,11 @@
             },
             "request": {
               "$ref": "#/$defs/request"
+            },
+            "span_kind": {
+              "enum": [
+                "client"
+              ]
             },
             "attempt": {
               "type": "object",

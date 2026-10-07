@@ -19,6 +19,7 @@ Both are read-only and return 0 even when live=false; inspect the JSON report.
 Neither starts a collector, repairs pairing, or prints credentials.
 
 Start options:
+  --sources PATH       Local owner JSON file configuring server log adapters
   --dir PATH           Capture/state directory (default artifacts/collector-v2;
                        relative paths resolve from this checkout)
   --port PORT          Loopback HTTP/viewer port (default 4319)
@@ -40,7 +41,7 @@ Start options:
 Participating apps need capture hooks and debug bootstrap. Discovery does not
 install/instrument apps or boot simulators. npm run android:live installs the sample.
 Open http://127.0.0.1:4319/ normally; reader bootstrap/reconnect is automatic.
-Capture schema 1.2; transfer version 2. State/pairing files contain private keys
+Capture schema 1.3; transfer version 2. State/pairing files contain private keys
 or credentials; export sanitized NDJSON with Save capture instead of sharing them.
 Ctrl+C stops this collector. It cannot take over an active owner.
 Guide: collector/README.md; connection and file map: docs/integration/TRANSPORT.md`,
@@ -69,6 +70,7 @@ Guide: collector/README.md; connection and file map: docs/integration/TRANSPORT.
   }
   if (
     ![
+      "--sources",
       "--dir",
       "--port",
       "--android",

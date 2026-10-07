@@ -28,7 +28,7 @@ function fixture(name) {
 function awaitedFixture(name) {
   const text = readFileSync(new URL(`../examples/${name}.ndjson`, import.meta.url), 'utf8');
   const events = text.trim().split('\n').map(JSON.parse).map(event => {
-    event.schema_version = '1.2';
+    event.schema_version = '1.3';
     if (event.data.producer) event.data.producer.platform = 'web';
     if (event.data.invocation) event.data.invocation.dispatch = 'awaited';
     return event;
@@ -140,4 +140,14 @@ test('HTTP 200 inspection exposes body-read timeout and separate application fai
   assert.match(html, /HTTP 200/);
   assert.match(html, /class="badge failed">✕ Application error/);
   assert.doesNotMatch(html, /class="badge success"/);
+});
+
+test('standalone trace-only logs open as observations without invented lifecycle', async()=>{
+  const {createJSONMappingParser}=await import('../collector/adapters.mjs');
+  const parser=createJSONMappingParser({namespace:'raw',service:'Server A',fields:{message:'message',timestamp:'time',trace_id:'trace'}});
+  const events=parser({message:'legacy event',time:'2026-10-07T12:00:00.000Z',trace:'11111111111111111111111111111111'},'line1');
+  const session=importFiles([{name:'raw',text:events.map(JSON.stringify).join('\n')+'\n'}]).sessions[0];
+  const html=render(session.operations[0],session);
+  assert.match(html,/class="badge neutral">· Log/);assert.match(html,/aria-label="Logs"/);assert.match(html,/legacy event/);
+  assert.doesNotMatch(html,/Local method invocation|Unfinished| elapsed/);
 });

@@ -194,6 +194,8 @@ CREATE TABLE IF NOT EXISTS credentials(token TEXT PRIMARY KEY,source_id TEXT NOT
 CREATE TABLE IF NOT EXISTS registrations(principal TEXT NOT NULL,operation TEXT NOT NULL,fingerprint TEXT NOT NULL,result TEXT NOT NULL,PRIMARY KEY(principal,operation));
 CREATE TABLE IF NOT EXISTS recordings(id TEXT PRIMARY KEY,source_id TEXT NOT NULL REFERENCES sources(id),identity TEXT NOT NULL,namespace TEXT NOT NULL,session TEXT NOT NULL,contiguous INTEGER NOT NULL DEFAULT 0,event_count INTEGER NOT NULL DEFAULT 0,first_position INTEGER,last_position INTEGER,name TEXT,name_position INTEGER);
 CREATE TABLE IF NOT EXISTS events(position INTEGER PRIMARY KEY AUTOINCREMENT,event_id TEXT UNIQUE NOT NULL,recording_id TEXT NOT NULL REFERENCES recordings(id),sequence INTEGER NOT NULL,line TEXT NOT NULL,normalized TEXT NOT NULL,bytes INTEGER NOT NULL,UNIQUE(recording_id,sequence));
+CREATE INDEX IF NOT EXISTS events_trace_id ON events(coalesce(json_extract(normalized,'$.context.trace_id'),json_extract(normalized,'$.data.trace_id')),position);
+CREATE INDEX IF NOT EXISTS events_recording_position ON events(recording_id,position);
 CREATE INDEX IF NOT EXISTS recordings_session ON recordings(namespace,session,source_id);
 CREATE TABLE IF NOT EXISTS checkpoints(key TEXT PRIMARY KEY,value TEXT NOT NULL);
 PRAGMA user_version=3;`);
@@ -238,7 +240,7 @@ function revision() {
   ).run();
 }
 function metadata(m) {
-  if (!m || m.version !== 2 || !["android", "ios", "web"].includes(m.platform))
+  if (!m || m.version !== 2 || !["android", "ios", "web", "server"].includes(m.platform))
     fail(400, "Invalid source platform/version");
   for (const k of [
     "registration_id",
@@ -540,8 +542,8 @@ const api = {
       } catch {
         fail(400, "Invalid JSON");
       }
-      if (e.schema_version !== "1.2" || !validateEvent(e))
-        fail(400, "Current capture schema 1.2 required");
+      if (e.schema_version !== "1.3" || !validateEvent(e))
+        fail(400, "Current capture schema 1.3 required");
       return {
         e,
         line,
@@ -730,6 +732,7 @@ const api = {
     session_namespace,
     session_id,
     limit = 500,
+    trace_id, include_related = false,
   }) {
     const w = watermarks();
     const H = high_water ?? w.event_cursor;
@@ -743,19 +746,17 @@ const api = {
       fail(400, "Invalid event cursor");
     if (!Number.isSafeInteger(limit) || limit < 1)
       fail(400, "Invalid page limit");
+    if (trace_id != null && !/^(?!0{32}$)[0-9a-f]{32}$/.test(trace_id)) fail(400, "Invalid trace ID");
+    const values = [source_id ?? null,source_id ?? null,session_namespace ?? null,session_namespace ?? null,session_id ?? null,session_id ?? null];
+    let prefix = '', parameters = [], related = '';
+    if (trace_id || include_related) {
+      prefix = `with seed_traces as (select distinct coalesce(json_extract(seed.normalized,'$.context.trace_id'),json_extract(seed.normalized,'$.data.trace_id')) trace_id from events seed join recordings sr on sr.id=seed.recording_id where seed.position<=? and ${trace_id ? "coalesce(json_extract(seed.normalized,'$.context.trace_id'),json_extract(seed.normalized,'$.data.trace_id'))=?" : "(? is null or sr.source_id=?) and (? is null or sr.namespace=?) and (? is null or sr.session=?)"}), related_recordings as (select distinct linked.recording_id from seed_traces st join events linked on coalesce(json_extract(linked.normalized,'$.context.trace_id'),json_extract(linked.normalized,'$.data.trace_id'))=st.trace_id where linked.position<=?) `;
+      parameters = [H,...(trace_id ? [trace_id] : values),H];
+      related = ' or e.recording_id in (select recording_id from related_recordings)';
+    }
     const rows = prepare(
-      `select e.position,case when (? is null or r.source_id=?) and (? is null or r.namespace=?) and (? is null or r.session=?) then e.line else NULL end line from events e join recordings r on r.id=e.recording_id where e.position>? and e.position<=? order by e.position limit ?`,
-    ).iterate(
-      source_id ?? null,
-      source_id ?? null,
-      session_namespace ?? null,
-      session_namespace ?? null,
-      session_id ?? null,
-      session_id ?? null,
-      after,
-      H,
-      Math.min(limit, 500),
-    );
+      `${prefix}select e.position,case when (${trace_id ? '0 and' : ''} (? is null or r.source_id=?) and (? is null or r.namespace=?) and (? is null or r.session=?))${related} then e.line else NULL end line from events e join recordings r on r.id=e.recording_id where e.position>? and e.position<=? order by e.position limit ?`,
+    ).iterate(...parameters,...values,after,H,Math.min(limit,500));
     let next = after,
       bytes = 0,
       found = false;
@@ -780,7 +781,12 @@ const api = {
       ...w,
     };
   },
-  sessions({ source_id, after = 0, limit = 100, high_water, latest = false }) {
+  traceSeeds({source_id, session_namespace, session_id} = {}) {
+    const rows = prepare("select distinct coalesce(json_extract(e.normalized,'$.context.trace_id'),json_extract(e.normalized,'$.data.trace_id')) trace_id from events e join recordings r on r.id=e.recording_id where coalesce(json_extract(e.normalized,'$.context.trace_id'),json_extract(e.normalized,'$.data.trace_id')) is not null and (? is null or r.source_id=?) and (? is null or r.namespace=?) and (? is null or r.session=?) limit 65").all(source_id ?? null,source_id ?? null,session_namespace ?? null,session_namespace ?? null,session_id ?? null,session_id ?? null);
+    if (rows.length > 64) fail(400, "Selection exceeds 64 traces; narrow capture or specify trace_ids");
+    return rows.map(x => x.trace_id);
+  },
+  sessions({ source_id, after = 0, limit = 100, high_water, latest = false, client_only = false }) {
     const w = watermarks();
     const H = high_water ?? w.event_cursor;
     if (
@@ -792,14 +798,15 @@ const api = {
     )
       fail(400, "Invalid session watermark");
     const L = Math.min(limit, 100);
+    const clientFilter = client_only ? " and source_id in (select id from sources where json_extract(metadata,'$.platform') <> 'server')" : '';
     let rows;
     if (H === w.event_cursor) {
       rows = prepare(
-        `select namespace session_namespace,session session_id,min(first_position) first_position,max(last_position) last_position,sum(event_count) event_count,group_concat(distinct source_id) source_ids,max(name) name from recordings where (? is null or source_id=?) group by namespace,session having max(last_position)>? order by last_position ${latest ? "desc" : "asc"} limit ?`,
+        `select namespace session_namespace,session session_id,min(first_position) first_position,max(last_position) last_position,sum(event_count) event_count,group_concat(distinct source_id) source_ids,max(name) name from recordings where (? is null or source_id=?)${clientFilter} group by namespace,session having max(last_position)>? order by last_position ${latest ? "desc" : "asc"} limit ?`,
       ).all(source_id ?? null, source_id ?? null, after, L);
     } else {
       rows = prepare(
-        `select r.namespace session_namespace,r.session session_id,min(e.position) first_position,max(e.position) last_position,count(*) event_count,group_concat(distinct r.source_id) source_ids,max(case when r.name_position<=? then r.name end) name from recordings r join events e on e.recording_id=r.id where e.position<=? and (? is null or r.source_id=?) group by r.namespace,r.session having max(e.position)>? order by last_position ${latest ? "desc" : "asc"} limit ?`,
+        `select r.namespace session_namespace,r.session session_id,min(e.position) first_position,max(e.position) last_position,count(*) event_count,group_concat(distinct r.source_id) source_ids,max(case when r.name_position<=? then r.name end) name from recordings r join events e on e.recording_id=r.id where e.position<=? and (? is null or r.source_id=?)${clientFilter} group by r.namespace,r.session having max(e.position)>? order by last_position ${latest ? "desc" : "asc"} limit ?`,
       ).all(H, H, source_id ?? null, source_id ?? null, after, L);
     }
     return {

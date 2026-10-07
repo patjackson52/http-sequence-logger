@@ -47,7 +47,7 @@ export async function reconcileOwnedInstall(device,{app,installAttempted,sdkLaun
  return {attempted:true,present_before:true,installed_apk_sha256:expectedAPKHash,absence_verified:true};
 }
 export function assertObservedFlow(events,session){
- assert(events.every(e=>e.schema_version==='1.2'&&e.session_id===session));
+ assert(events.every(e=>e.schema_version==='1.3'&&e.session_id===session));
  assert.equal(events.filter(e=>e.event_type==='session.started').length,1);assert.equal(events.filter(e=>e.event_type==='session.ended').length,1);
  const ended=events.filter(e=>e.event_type==='http.ended');assert.equal(ended.length,1);assert.equal(ended[0].data.outcome,'success');assert.equal(ended[0].data.status_code,200);assert.equal(ended[0].data.end_reason,'body_eof');
  const handlers=events.filter(e=>e.event_type==='operation.started'&&e.data.invocation?.kind==='handler');assert.equal(handlers.length,1);assert.equal(handlers[0].data.invocation.dispatch,'synchronous');

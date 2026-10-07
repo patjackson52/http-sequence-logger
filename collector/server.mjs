@@ -1,4 +1,5 @@
 import http from "node:http";
+import { CollectionManager } from "./collections.mjs";
 import https from "node:https";
 import { timingSafeEqual, createHash, X509Certificate } from "node:crypto";
 import { readFile, realpath } from "node:fs/promises";
@@ -115,7 +116,9 @@ export async function startCollector({
   testClock,
   testFilesystemFaults,
   exportTimeoutMs = 120000,
+  sources = [],
 } = {}) {
+  const collectionManager = new CollectionManager(null, sources);
   const store = new CaptureStore(directory, limits, {
     testCommitGate,
     testClock,
@@ -306,6 +309,16 @@ export async function startCollector({
         publish();
         return;
       }
+      if (route === "/api/v2/collections" || route.startsWith("/api/v2/collections/")) {
+        if (!authenticated(req, store.config.browser_token)) throw new TransferError(401, "Reconnect to the local collector");
+        if (req.method === "GET") {
+          reply(res, 200, route === "/api/v2/collections" ? collectionManager.list() : collectionManager.get(route.slice("/api/v2/collections/".length))); return;
+        }
+        if (req.headers["sec-fetch-site"] !== "same-origin" || req.headers["x-network-log-viewer"] !== "1") throw new TransferError(403, "Use the trusted local viewer");
+        if (req.method === "POST" && route === "/api/v2/collections") { reply(res, 202, await collectionManager.start(await controlJSON(req))); return; }
+        if (req.method === "DELETE" && route.startsWith("/api/v2/collections/")) { reply(res, 200, collectionManager.cancel(route.slice("/api/v2/collections/".length))); return; }
+        throw new TransferError(405, "Method not allowed");
+      }
       if (route.startsWith("/api/")) {
         if (!authenticated(req, store.config.browser_token))
           throw new TransferError(401, "Reconnect to the local collector");
@@ -325,6 +338,8 @@ export async function startCollector({
           session_namespace:
             url.searchParams.get("session_namespace") || undefined,
           session_id: url.searchParams.get("session_id") || undefined,
+          trace_id: url.searchParams.get("trace_id") || undefined,
+          include_related: url.searchParams.get("include_related") === "true",
         };
         if (route === "/api/v2/events") {
           reply(res, 200, await store.page(query));
@@ -338,6 +353,7 @@ export async function startCollector({
               ...query,
               limit: int("limit", 100),
               latest: url.searchParams.get("latest") === "true",
+              client_only: url.searchParams.get("client_only") === "true",
             }),
           );
           return;
@@ -526,7 +542,7 @@ export async function startCollector({
   }, 10000);
   presenceTimer.unref();
   let closePromise;
-  return {
+  const collector = {
     store,
     origin,
     connections,
@@ -569,8 +585,13 @@ export async function startCollector({
               }),
           ),
         );
+        await collectionManager.close();
         await store.close();
       })());
     },
   };
+  collectionManager.collector = collector;
+  collectionManager.changed = publish;
+  collector.collections = collectionManager;
+  return collector;
 }

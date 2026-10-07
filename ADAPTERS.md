@@ -1,5 +1,7 @@
 # Native adapter contract — draft
 
+For server log retrieval and raw/custom parsing, use [collection and parsing adapters](docs/integration/ADAPTERS.md). This document concerns HTTP capture adapters.
+
 The Android and iOS implementations should share the JSON contract and these lifecycle rules. This document describes the target API. A Kotlin recorder and opt-in HttpURLConnection client now exist; see [implemented capabilities and boundaries](android/README.md). Broader native wrappers and iOS remain proposals.
 
 ## Recorder boundary

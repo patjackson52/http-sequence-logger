@@ -40,7 +40,7 @@ function recording(name, { sessionId = `session-${name}`, platform = 'android', 
   const emit = (type, ms, data, ctx) => {
     const sequence = events.length + 1;
     const event = {
-      schema_version: '1.2', event_type: type, event_id: `${recordingId}/event-${sequence}`,
+      schema_version: '1.3', event_type: type, event_id: `${recordingId}/event-${sequence}`,
       session_namespace: 'com.example.shop/development', session_id: sessionId, recording_id: recordingId,
       sequence, timestamp: stamp(offset + ms), monotonic_ns: String(ms * 1_000_000),
       ...(ctx ? { context: ctx } : {}), data,

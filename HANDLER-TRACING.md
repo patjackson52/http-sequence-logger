@@ -62,7 +62,7 @@ On method exit, the same span emits `operation.ended.data`:
 
 The enclosing SDK operation stays open during the synchronous handler. A known handler completion must precede its known caller completion. Nested HTTP requests use the handler context as their parent and retain their actual app executor. If a handler launches asynchronous work and returns early, that HTTP span may outlive the handler. Its causal parent does not extend the method's lifetime. The caller operation represents one invocation, not every thread inside the SDK.
 
-A recording uses one exact schema version throughout. The Kotlin recorder now writes **1.1**. The validator reads **1.0**, **1.1** and **1.2**; older 1.0 files retain their original interpretation. Handler fields and unknown operation outcomes are rejected in 1.0. A generic 1.0 method block lacks an explicit handler caller/return boundary: a viewer must not invent that metadata.
+A recording uses one exact schema version throughout. Current producers and validators use **1.3** only. Earlier captures retain their original contents and are unsupported; no compatibility parser or migration is supplied. A method block without an explicit handler caller/return boundary does not establish that metadata.
 
 ## Kotlin SDK integration
 

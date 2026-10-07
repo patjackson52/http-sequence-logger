@@ -8,7 +8,7 @@ struct EventLine: Sendable {
         var text=line; if text.hasSuffix("\n") { text.removeLast(); if text.hasSuffix("\r") { text.removeLast() } }
         guard text.utf8.count+1<=maximumBytes else { throw TransferError.eventTooLarge }
         guard !text.contains("\n"), !text.contains("\r"), let raw=text.data(using:.utf8),
-            let object=(try? JSONSerialization.jsonObject(with:raw)) as? [String:Any], object["schema_version"] as? String == "1.2",
+            let object=(try? JSONSerialization.jsonObject(with:raw)) as? [String:Any], object["schema_version"] as? String == "1.3",
             let id=object["event_id"] as? String, !id.isEmpty, object["event_type"] is String, object["data"] is [String:Any] else { throw TransferError.invalidEvent }
         return EventLine(id:id,bytes:raw+Data([10]))
     }

@@ -90,7 +90,7 @@ final class SimulatorDeliveryTests: XCTestCase, @unchecked Sendable {
         for (index, id) in ids.enumerated() {
             // Complete schema-valid records; missing earlier lifecycle observations are permitted.
             let event: [String: Any] = [
-                "schema_version": "1.2", "event_type": "session.ended", "event_id": id,
+                "schema_version": "1.3", "event_type": "session.ended", "event_id": id,
                 "session_namespace": "com.example.networklog/development", "session_id": recordingPrefix,
                 "recording_id": "\(recordingPrefix)-\(index)", "sequence": 1,
                 "timestamp": timestamp, "monotonic_ns": "0",

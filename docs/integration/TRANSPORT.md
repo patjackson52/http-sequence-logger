@@ -49,7 +49,7 @@ Use the reported collector identity, directory, endpoint, tool status and reason
 | Physical iOS/Android | Explicit paired HTTPS; optional Bonjour finds candidates | Reachable hostname/IP, host firewall, trusted endpoint/certificate pairing, relevant debug local-network permissions. Foreground delivery only. |
 | Desktop browser app | Page → own frontend origin → Node relay → collector | Debug integration and origin-scoped journal. Relay stays mounted when collector is absent. |
 | Mobile/remote browser | Same-origin reachable HTTPS frontend/relay behind authenticated development access | Authorize the frontend session, bind handles to it, require CSRF protection and exact Origin/Host. Valid headers alone do not authenticate a LAN client. |
-| Offline | Export canonical NDJSON and import in viewer | Current schema 1.2. Pairing/SQLite/IndexedDB internals are not capture imports. |
+| Offline | Export canonical NDJSON and import in viewer | Current schema 1.3. Pairing/SQLite/IndexedDB internals are not capture imports. |
 
 Android debug wiring uses `DebugTransfer.open(context)` once per process lifetime. The helper creates an installation descriptor and a unique journal, then observes private pairing changes while the app remains open. The collector discovers all eligible packages, pairs each installation and replays the same canonical event IDs when necessary. Native push and local file retrieval share the authenticated source owner. Local adapters reuse a validated same-collector installation credential and bind its verified device alias rather than issuing a second source. An explicit app selection takes priority over automatic proposals.
 
@@ -58,7 +58,7 @@ Swift `DebugCapture.start()` publishes its descriptor and creates the default ca
 For physical HTTPS, choose a reachable desktop hostname or address:
 
 ```sh
-npm start -- --lan 192.168.1.25
+npm start -- --lan 192.168.1.35
 ```
 
 The optional HTTPS listener defaults to port `4320`. The desktop viewer stays on loopback. Use the private `connection-lan.json` as enrollment input in the app's debug setup. The generated certificate has a bounded lifetime; validate hostname, dates and the paired SHA-256 certificate fingerprint. Certificate pinning supplements server-certificate and hostname checks; see [TLS identity and certificate requirements](../transfer/PROTOCOL.md) for the transport rules. Changed/expired trust needs explicit repair and pairing. LAN viewer, bootstrap and read/export routes remain unavailable. Do not install a global trust override.
@@ -135,7 +135,7 @@ Collector enrollment/source credentials remain exclusively in Node. The browser 
 
 ## Pairing and delivery contract
 
-The sole transfer/configuration version is **2**. Enrollment input carries `endpoint`, `collector_id`, `enrollment_token` and an optional `certificate_sha256`. Registered configuration carries `source_id` and `source_token` instead. The endpoint is an origin; clients append their own protocol route. Capture events independently use **1.2**. No v1 routes or parsers are retained.
+The sole transfer/configuration version is **2**. Enrollment input carries `endpoint`, `collector_id`, `enrollment_token` and an optional `certificate_sha256`. Registered configuration carries `source_id` and `source_token` instead. The endpoint is an origin; clients append their own protocol route. Capture events independently use **1.3**. No v1 routes or parsers are retained.
 
 | Route | Authority |
 | --- | --- |

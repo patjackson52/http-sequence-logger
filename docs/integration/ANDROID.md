@@ -78,7 +78,7 @@ val logger: dev.networklog.api.Logger = RecordingLogger(NetworkLog(
 
 Initialization performs synchronous filesystem work. Run `open`, `initialize` and private configuration writes on a worker thread, as the external consumer does. Callback-safe append admission does not make initial journal creation or setup UI-thread safe.
 
-Supply an opaque existing session ID or generate one; do not use tokens as IDs. All events use schema 1.2. `recording_id` separates recording periods even when logical session IDs are shared across sources. Logging-disabled business identity must not depend on a generated debug ID.
+Supply an opaque existing session ID or generate one; do not use tokens as IDs. All events use schema 1.3. `recording_id` separates recording periods even when logical session IDs are shared across sources. Logging-disabled business identity must not depend on a generated debug ID.
 
 Append takes an immutable sanitized snapshot into a bounded queue. One serial writer performs serialization/grouped append/sync away from callback threads. `sink.flush()` returns a `CompletableFuture<Unit>` persistence barrier; await it off the UI thread when a durable prefix is required. An unflushed tail may be lost on process kill. Admission/storage failure is an observation diagnostic and must not replace application responses or callback results. Construction still needs the complete factory's setup failure/no-op boundary.
 
@@ -189,3 +189,15 @@ Then verify the actual host:
 6. Verify real business requests and customer callbacks still run exactly once with the no-op logger. Do not use `-assumenosideeffects` on methods that invoke application code, broad package keep rules, or runtime `BuildConfig.DEBUG` branches as a substitute for source/dependency separation.
 
 The recorder disables its Release variant. Custom production build types must not fall back to its Debug variant. A custom development type must deliberately opt into recorder dependencies and debug wiring; merely setting `isDebuggable=true` does not add them. Keep the pinned commit, tooling compatibility decisions, file paths, source-set changes, validation result, transfer mode, and shipping-binary evidence in the host's integration notes.
+
+## First-party server correlation
+
+Configure debug `NetworkLog(..., propagationOrigins = listOf("https://your-server.example"))`. Its session metadata declares the normalized origin allowlist. Shared HTTP code calls `exchange.context.traceparent(actualDestination)` after starting the **outbound request** and adds the returned header when non-null. The shared API default/no-op returns null; production does not generate trace IDs or emit headers. The debug bridge returns that request's W3C trace/span identity only for exact configured origins, preserving the operation parent and distinct concurrent/retry spans.
+
+```kotlin
+exchange.context.traceparent(url)?.let { connection.setRequestProperty("traceparent", it) }
+```
+
+Keep app networking and header application under host ownership. The helper does not install an interceptor or propagate arbitrary destinations. Instrument the receiving server using [server contexts](SERVER.md), then configure the collector's [retrieval/parsing adapters](ADAPTERS.md). A server recording has its own session/recording IDs; lookup and remote arrows join by trace/parent span identity.
+
+Propagation allowlists authorize the initial destination. Automatic redirects can forward ordinary custom headers outside instrumentation visibility; the host owns redirect/header-forwarding policy for allowed endpoints. The logger preserves existing HTTP behavior and does not fabricate per-hop observations.

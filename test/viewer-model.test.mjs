@@ -268,3 +268,28 @@ test('repeated/nested fixture pairs distinct handler spans and attributes callba
   assert.equal(filterSessionItems(session, { owner: 'sdk' }).exchanges.length, 1);
   assert.equal(filterSessionItems(session, { owner: 'app' }).exchanges.length, 2);
 });
+
+test('distributed graph connects remote server parent without mixing session identity or clock durations',async()=>{
+  const client=parse('success'),parent=client.find(e=>e.event_type==='http.request.started');
+  const server=structuredClone([client[0],client[1],client.find(e=>e.event_type==='operation.ended'&&e.context.span_id===client[1].context.span_id),client.at(-1)]);
+  for(const [i,e] of server.entries()){e.event_id='server/'+i;e.recording_id='server-recording';e.session_namespace='server/development';e.session_id='server-session';e.sequence=i+1;if(e.context)e.context={trace_id:parent.context.trace_id,span_id:'9999999999999999',parent_span_id:parent.context.span_id,parent_scope:'remote'};}
+  server[0].data.producer={...server[0].data.producer,platform:'server',service_name:'Server A',runtime:'node'};server[1].data.span_kind='server';
+  const result=importFiles([{name:'client',text:serialize(client)},{name:'server',text:serialize(server)}]);assert.equal(result.valid,true,JSON.stringify(result.diagnostics));
+  const session=result.sessions[0],remote=session.operations.find(i=>i.recordingId==='server-recording');
+  assert.equal(remote.parentResolved,true);assert.equal(remote.parentId,`${parent.context.trace_id}/${parent.context.span_id}`);assert.equal(remote.serviceName,'Server A');assert.equal(remote.clockUncertain,true);assert.equal(remote.sessionId,JSON.stringify(['server/development','server-session']));assert.equal(remote.rawSources[0].fileName,'server');
+  const {layoutSequence}=await import('../viewer/src/layout.mjs');const layout=layoutSequence(session);assert.ok(layout.lanes.some(l=>l.service==='Server A'));assert.equal(layout.localArrows.filter(a=>a.kind==='remote').length,1);assert.ok(layout.localArrows.find(a=>a.kind==='remote').sub.includes('clocks independent'));
+});
+
+test('raw messages keep distinct selection IDs and honest trace-only correlation', async()=>{
+  const {createJSONMappingParser}=await import('../collector/adapters.mjs');
+  const client=parse('success'),request=client.find(e=>e.event_type==='http.request.started');
+  const parser=createJSONMappingParser({namespace:'raw/server',service:'Raw A',fields:{message:'message',timestamp:'timestamp',trace_id:'trace',span_id:'span'}});
+  const raw=[...parser({message:'first',timestamp:request.timestamp,trace:request.context.trace_id,span:'8888888888888888'},'line1'),...parser({message:'second',timestamp:request.timestamp,trace:request.context.trace_id,span:'8888888888888888'},'line2'),...parser({message:'trace only',timestamp:request.timestamp,trace:request.context.trace_id},'line3')];
+  const result=importFiles([{name:'client',text:serialize(client)},{name:'raw',text:serialize(raw)}]);
+  assert.equal(result.valid,true,JSON.stringify(result.diagnostics));
+  const logs=result.sessions[0].operations.filter(i=>i.kind==='log');
+  assert.equal(logs.length,3);assert.equal(new Set(logs.map(i=>i.id)).size,3);
+  assert.equal(logs.find(i=>i.name==='trace only').spanId,undefined);
+  assert.ok(logs.every(i=>i.traceId===request.context.trace_id&&i.serviceName==='Raw A'));
+  assert.deepEqual(logs.map(i=>i.messages[0].data.message),['first','second','trace only']);
+});

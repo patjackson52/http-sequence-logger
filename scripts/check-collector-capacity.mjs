@@ -18,7 +18,7 @@ try {
     const pending=sources.map((source,i)=>{
       const events=[];
       for(let j=begin;j<Math.min(begin+batchSize,perSource);j++){
-        const sequence=j+1;events.push(JSON.stringify({schema_version:'1.2',event_type:'capture.gap',event_id:`capacity-${i}-${sequence}`,session_namespace:'capacity',session_id:'session-'+i,recording_id:'recording-'+i,sequence,timestamp:'2026-10-01T00:00:00.000Z',monotonic_ns:String(j*1000),data:{dropped_events:1,reason:'synthetic_capacity_fixture'}}));
+        const sequence=j+1;events.push(JSON.stringify({schema_version:'1.3',event_type:'capture.gap',event_id:`capacity-${i}-${sequence}`,session_namespace:'capacity',session_id:'session-'+i,recording_id:'recording-'+i,sequence,timestamp:'2026-10-01T00:00:00.000Z',monotonic_ns:String(j*1000),data:{dropped_events:1,reason:'synthetic_capacity_fixture'}}));
       }
       const text=events.join('\n')+'\n';bytes+=Buffer.byteLength(text);const work=store.ingest(source.source_token,text);maxQueueBytes=Math.max(maxQueueBytes,store.bytes);return work;
     });

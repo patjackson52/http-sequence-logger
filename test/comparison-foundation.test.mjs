@@ -82,10 +82,11 @@ test('worker returns explicit input, engine-limit and profile failures without a
   assert.equal(compareRequest({ id: 5, operation: 'import', files: [{ text: text + '{' }] }).snapshots, undefined);
 });
 
-test('canonical Android/iOS native captures and browser captures agree in worker, module and CLI',t=>{
+test('current canonical platform fixtures agree in worker, module and CLI; historical captures are rejected',t=>{
   const directory=mkdtempSync(join(tmpdir(),'comparison-platforms-'));t.after(()=>rmSync(directory,{recursive:true,force:true}));
-  for(const file of ['samples/realtime/android-adb-emulator-5556-user-0.ndjson','samples/realtime/ios-simulator-8638be44-26c3-44a3-9815-901395ca8d84.ndjson','samples/web/browser-multi-session.ndjson']){
-    const documents=sequencesFromCapture(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
+  for (const file of ['samples/realtime/android-adb-emulator-5556-user-0.ndjson','samples/realtime/ios-simulator-8638be44-26c3-44a3-9815-901395ca8d84.ndjson','samples/web/browser-multi-session.ndjson']) assert.throws(() => sequencesFromCapture(readFileSync(new URL('../'+file,import.meta.url),'utf8')), /schema 1.3 required/);
+  for(const platform of ['android','ios','web']){
+    const documents=[comparisonFixture(['/verify'],'current-'+platform,{platform})];
     for(const doc of documents){
       const expected=diffSequences(doc,doc);assert.equal(expected.summary.field_changes,0);assert.equal(expected.summary.order_changes,0);
       assert.deepEqual(compareRequest({id:1,primary:doc,secondary:doc}).diff,expected);validateSourceReferences(expected,doc,doc);

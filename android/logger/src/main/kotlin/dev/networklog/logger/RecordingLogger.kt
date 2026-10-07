@@ -15,7 +15,9 @@ class RecordingLogger(private val recorder: NetworkLog) : Logger {
     override val enabled = true
     override fun startSession(name: String, sessionId: String?): ApiSession = RecordingSession(recorder.startSession(name, sessionId))
 }
-private class RecordingContext(val native: CaptureContext) : ApiContext
+private class RecordingContext(val native: CaptureContext) : ApiContext {
+    override fun traceparent(destination: String): String? = native.traceparent(destination)
+}
 private fun ApiContext?.native() = (this as? RecordingContext)?.native
 private fun ApiActor.native() = Actor(owner, component, method)
 private fun (() -> ApiHeaders).nativeHeaders(): HeaderCapture = try {

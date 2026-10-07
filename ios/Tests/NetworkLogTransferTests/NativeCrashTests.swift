@@ -9,7 +9,7 @@ private let atomicCrashStages=["metadata","cursor"].flatMap { kind in atomicCras
 private let cursorUncommitted=["cursor_temp_written","cursor_temp_synced"]
 private let cursorCommitted=["cursor_renamed","cursor_directory_synced"]
 private let crashStages=["enqueue","append_partial","append_complete","synced_unpublished","published","cursor_committed","cursor_lost"]+atomicCrashStages
-private func crashLine(_ id:String)->String { "{\"schema_version\":\"1.2\",\"event_type\":\"session.started\",\"event_id\":\"\(id)\",\"data\":{}}" }
+private func crashLine(_ id:String)->String { "{\"schema_version\":\"1.3\",\"event_type\":\"session.started\",\"event_id\":\"\(id)\",\"data\":{}}" }
 private func crashBytes(_ id:String)->Data { Data((crashLine(id)+"\n").utf8) }
 private var crashAllBytes:Data { crashBytes("baseline")+crashBytes("candidate") }
 private func stopCrashFixture(_ root:URL,_ stage:String) throws {

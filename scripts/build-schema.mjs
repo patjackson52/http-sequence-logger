@@ -74,9 +74,9 @@ const definitions = {
   sessionStart: object({
     name: text, id_source: choices('provided', 'generated'),
     producer: object({
-      platform: choices('android', 'ios', 'web'), app_id: text, app_version: text,
-      os_version: text, sdk_version: text,
-    }),
+      platform: choices('android', 'ios', 'web', 'server'), app_id: text, app_version: text,
+      os_version: text, sdk_version: text, service_name: text, environment: text, runtime: choices('node', 'cloudflare'),
+    }, ['platform', 'app_id', 'app_version', 'os_version', 'sdk_version']),
     adapters: array(object({ adapter: ref('adapter'), capabilities: ref('capabilities') })),
     capture_policy: object({
       profile: { const: 'development' }, body_limit_bytes: count,
@@ -87,7 +87,8 @@ const definitions = {
     propagation_origins: array(url),
   }),
   sessionEnd: object({ reason: choices('completed', 'stopped'), dropped_events: count }),
-  operationStart: object({ name: text, origin: ref('actor'),
+  logMessage: object({ trace_id: ref('traceId'), message: { type: 'string', maxLength: 16384 }, level: choices('debug', 'info', 'warn', 'error'), attributes: { type: 'object' } }, ['message', 'level']),
+  operationStart: object({ name: text, origin: ref('actor'), span_kind: choices('server', 'internal'),
     invocation: object({ kind: { const: 'handler' }, dispatch: choices('synchronous', 'awaited'), caller: ref('actor') }),
   }, ['name', 'origin']),
   operationEnd: object({
@@ -95,13 +96,13 @@ const definitions = {
     completion: choices('returned', 'threw', 'cancelled', 'observation_stopped'),
   }, ['outcome', 'duration_ns', 'error']),
   requestStart: object({
-    name: text, origin: ref('origin'), adapter: ref('adapter'), request: ref('request'),
+    name: text, origin: ref('origin'), adapter: ref('adapter'), request: ref('request'), span_kind: choices('client'),
     attempt: object({
       index: count, visibility: choices('individual', 'logical'),
       reason: choices('initial', 'retry', 'redirect', 'auth_challenge'),
       previous_span_id: nullable(ref('spanId')),
     }),
-  }),
+  }, ['name', 'origin', 'adapter', 'request', 'attempt']),
   responseHeaders: object({ phase: choices('informational', 'final'), response: ref('response') }),
   bodyCaptured: object({ direction: choices('request', 'response'), body: ref('body') }),
   trailers: object({ direction: choices('request', 'response'), headers: ref('headers') }),
@@ -162,15 +163,15 @@ const events = [
   ['http.request.started', 'requestStart', true], ['http.response.headers', 'responseHeaders', true],
   ['http.body.captured', 'bodyCaptured', true], ['http.ended', 'httpEnd', true],
   ['http.trailers', 'trailers', true],
-  ['http.metrics', 'metrics', true], ['capture.gap', 'captureGap', false],
+  ['http.metrics', 'metrics', true], ['capture.gap', 'captureGap', false], ['log.message', 'logMessage', 'optional'],
 ];
 const schema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
-  $id: 'urn:mobile-network-log:event:1.2',
-  title: 'Network log event, contract 1.2',
+  $id: 'urn:mobile-network-log:event:1.3',
+  title: 'Network log event, contract 1.3',
   description: 'One NDJSON record. See CONTRACT.md for cross-event and capture semantics. Custom format, not OTLP JSON.',
   ...object({
-    schema_version: { const: '1.2' },
+    schema_version: { const: '1.3' },
     event_type: { enum: events.map(([name]) => name) },
     event_id: ref('id'), session_namespace: ref('id'), session_id: ref('id'), recording_id: ref('id'),
     sequence: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
@@ -179,7 +180,7 @@ const schema = {
   }, ['schema_version', 'event_type', 'event_id', 'session_namespace', 'session_id', 'recording_id', 'sequence', 'timestamp', 'monotonic_ns', 'data']),
   oneOf: events.map(([name, data, span]) => ({
     properties: { event_type: { const: name }, data: ref(data), ...(!span ? { context: false } : {}) },
-    ...(span ? { required: ['context'] } : {}),
+    ...(span === true ? { required: ['context'] } : {}),
   })),
   $defs: definitions,
 };

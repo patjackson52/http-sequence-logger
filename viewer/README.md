@@ -13,15 +13,23 @@ Run `npm start` from the contract repository. Open the collector's ordinary loop
 
 Devices and environments → Apps → Sessions lists enrolled sources, including apps with no events. Browser environments are origin-scoped local IDs, not verified physical devices. Native labels use actual package/bundle identifiers. Last-seen means recent presence is unknown; it does not complete a session.
 
-Session summaries are paged separately from capture events. Selecting a source or logical session fetches only its retained events at a fixed high-water mark. Selection, pause and collector changes fence old responses. Shared logical sessions preserve their identity across sources; source filtering restricts displayed recordings. Very large selected sessions exceed the diagram limit and require capture export/smaller file inspection.
+Session summaries are paged separately from capture events. Selecting a source or logical session uses its retained trace IDs as entry points and includes related server events at a fixed high-water mark. Selection, pause and collector changes fence old responses. Shared logical sessions preserve their identity across sources; source filtering restricts the seed client recordings; correlated server recordings remain visible. Very large selected sessions exceed the diagram limit and require capture export/smaller file inspection.
 
 Pause live stops viewer updates; collection continues. Importing a file pauses live viewing. Resume live returns to the collector. Save capture exports collector retention, rather than only the selected session. Static `npm run viewer` remains a local file viewer.
 
 Build with `npm run build:viewer`; verify live bootstrap/reconnect/import/pause/resume through `npm run check:live-setup` with installed Google Chrome.
 
+## Related server logs
+
+**Refresh related logs** starts a bounded collector job across its configured source adapters for the selected session's trace IDs. The same control becomes **Cancel refresh** while running. The compact status shows queued/collecting, updated, no new logs, no configured sources, partial logs, cancellation or failure. Hover the status for per-source diagnostics. Partial logs include sampling, truncation or parse errors; completed lookup does not prove every downstream call was recorded. Configure adapters and server logging before executing the request; refreshing retrieves retained observations.
+
+Server services have their own lanes. Remote parent arrows connect matching trace and parent span IDs across recordings and sessions. Recording blocks retain each producer's sequence; the arrows establish causality, not exact timing between independent clocks. Attribution shows the original session and recording, and raw-event pointers preserve provenance. Correlated application messages appear in the inspector's **Logs** tab. Uncorrelated parsed messages remain standalone observations.
+
+Unchanged collector notifications and identical refresh results retain the existing diagram, selection, inspector tab and scroll. Follow newest session follows the selected client entry point, rather than switching to a newly collected server session. Imported multi-source files resolve the same graph locally; they never trigger collector jobs. Run `node scripts/check-viewer-distributed.mjs` with installed Chrome for real collection, cross-service linkage and unchanged-update UI verification.
+
 ## Compare two sessions
 
-Open a session and choose **Compare with…**, then select exactly one secondary session or import more canonical schema-1.2 NDJSON files. The picker identifies sessions by namespace and ID and shows recorded producer/source context. Its retained collector catalog includes other devices and sources, even when the primary navigator is source-filtered.
+Open a session and choose **Compare with…**, then select exactly one secondary session or import more canonical schema-1.3 NDJSON files. The picker identifies sessions by namespace and ID and shows recorded producer/source context. Its retained collector catalog includes other devices and sources, even when the primary navigator is source-filtered.
 
 Comparison freezes canonical snapshots and runs the standalone `sequence-diff` engine in a browser worker. File input with invalid/skipped records cannot become a completed comparison. Limits fail explicitly: 20,000 events, 5,000 nodes and 16 MiB per snapshot, with additional engine work/change limits described in [sequence-diff](../sequence-diff/README.md). A collector primary preserves an explicitly selected source scope; an unfiltered primary and retained secondary read all retained sources for their session. Presentation filters do not change this input scope or engine profile.
 

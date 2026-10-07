@@ -45,7 +45,7 @@ const proof=()=>[
  {event_type:'http.ended',context:{span_id:'request'},data:{outcome:'success',status_code:200,end_reason:'body_eof'}},
  {event_type:'operation.ended',context:{span_id:'handler'},data:{outcome:'success',completion:'returned'}},
  {event_type:'session.ended',data:{}}
-].map(e=>({...e,schema_version:'1.2',session_id:'own'}));
+].map(e=>({...e,schema_version:'1.3',session_id:'own'}));
 test('physical proof refuses partial HTTP observation and unobserved success',()=>{
  assertObservedFlow(proof(),'own');
  for(const change of [{outcome:'unknown'},{status_code:500},{end_reason:'body_closed'}]){const events=proof();Object.assign(events[3].data,change);assert.throws(()=>assertObservedFlow(events,'own'));}

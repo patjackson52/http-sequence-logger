@@ -1,0 +1,8 @@
+{
+  "name": "@http-sequence-logger/server",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Explicit request context HTTP sequence logging for Node and Cloudflare Workers",
+  "exports": { ".": { "types": "./index.d.mts", "import": "./index.mjs" } }
+}

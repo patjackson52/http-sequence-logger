@@ -93,7 +93,7 @@ export function validateEvents(parsedEvents, initial = {}) {
       } else if (event.sequence !== 1) warn(event, 'recording begins after sequence 1');
       previous = event;
       if (event.event_type === 'capture.gap' || event.event_type === 'session.ended' && event.data.dropped_events > 0) warn(event, 'producer reports dropped events');
-      if (event.context) {
+      if (event.context && event.event_type !== 'log.message') {
         const key = spanKey(event.context);
         if (!spans.has(key)) spans.set(key, []);
         spans.get(key).push(event);

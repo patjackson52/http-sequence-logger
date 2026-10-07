@@ -104,7 +104,7 @@ import UIKit
             sequence += 1
             let clock = ISO8601DateFormatter()
             clock.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            var event: [String: Any] = ["schema_version": "1.2", "event_type": kind,
+            var event: [String: Any] = ["schema_version": "1.3", "event_type": kind,
                 "event_id": "\(recordingID)/\(sequence)", "session_namespace": "com.example.networklog/development",
                 "session_id": sessionID, "recording_id": recordingID, "sequence": sequence,
                 "timestamp": clock.string(from: Date()), "monotonic_ns": String(ns), "data": data]

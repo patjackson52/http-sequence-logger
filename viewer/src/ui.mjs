@@ -6,6 +6,7 @@ export const duration = (ns) => {
  return ms<1?`${ms.toFixed(3)} ms`:ms<1000?`${ms.toFixed(ms<10?1:0)} ms`:`${(ms/1000).toFixed(2)} s`;
 };
 export function statusInfo(item) {
+ if(item?.kind==='log')return ['neutral','·','Log'];
  const outcome=item?.outcome;
  if(item?.applicationOutcome==='error'||item?.end?.data.application_outcome==='error')return ['failed','✕','Application error'];
  if(item?.isHandler){

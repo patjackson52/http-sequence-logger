@@ -2,8 +2,8 @@ import { createComparisonSnapshot, SNAPSHOT_LIMITS } from './comparison-data.mjs
 
 // Source registry and session summaries are independent of selected-session capture pages.
 export class CollectorClient {
-  constructor({token,automatic=false,fetcher=(...args)=>fetch(...args),onCapture=()=>{},onStatus=()=>{},onPairing=()=>{},onDevice=()=>{},onReset=()=>{},onSources=()=>{},onSessions=()=>{},onRevision=()=>{},retryMs=1000}) {
-    Object.assign(this,{token,automatic,fetcher,onCapture,onStatus,onPairing,onDevice,onReset,onSources,onSessions,onRevision,retryMs});
+  constructor({token,automatic=false,fetcher=(...args)=>fetch(...args),onCapture=()=>{},onStatus=()=>{},onPairing=()=>{},onDevice=()=>{},onReset=()=>{},onSources=()=>{},onSessions=()=>{},onRevision=()=>{},onCollection=()=>{},retryMs=1000}) {
+    Object.assign(this,{token,automatic,fetcher,onCapture,onStatus,onPairing,onDevice,onReset,onSources,onSessions,onRevision,onCollection,retryMs});
     this.cursor=0;this.lines=[];this.collectorId=null;this.generation=0;this.selection={};this.sessions=[];this.followLatest=true;this._work=Promise.resolve();
     this.snapshotGeneration=0;this.snapshotReads=new Set();
   }
@@ -24,7 +24,7 @@ export class CollectorClient {
   }
   select(selection={}) {
     this.selection={...selection};this.generation++;this.selectionController?.abort();this.selectionController=new AbortController();this.cursor=0;this.lines=[];
-    this.onCapture('',0);this._schedule();
+    this._captureText='';this.onCapture('',0);this._schedule();this.cancelCollection().catch(()=>{});
   }
   _schedule() {
     this._requested=true;
@@ -37,21 +37,21 @@ export class CollectorClient {
     const generation=this.generation;
     const status=await(await this.request('/api/v2/status',signal)).json();signal.throwIfAborted();
     if(generation!==this.generation)return;
-    this.onDevice(status.adapters||{});
+    this._publish('device',status.adapters||{},this.onDevice);
     const sources=await(await this.request('/api/v2/sources',signal)).json();signal.throwIfAborted();
     if(!this.collectorId)this.collectorId=sources.collector_id;
     if(sources.collector_id!==this.collectorId)throw new Error('Collector changed; reconnecting…');
     if(generation!==this.generation)return;
-    this.onSources(sources.sources||[]);
+    this._publish('sources',sources.sources||[],this.onSources);
     if(this._comparisonRevision!==sources.event_cursor){this._comparisonRevision=sources.event_cursor;this.onRevision({collector_id:this.collectorId,event_cursor:sources.event_cursor});}
     if(this._sessionGeneration===generation&&this._eventRevision===sources.event_cursor){this.onStatus({state:'live',count:this.lines.length});return;}
     const query=new URLSearchParams();if(this.selection.source_id)query.set('source_id',this.selection.source_id);
     const page=await(await this.request('/api/v2/sessions?'+query,signal)).json();signal.throwIfAborted();
     if(generation!==this.generation)return;
-    this.sessionHighWater=page.high_water;this.sessions=page.sessions||[];this.nextSessions=page.has_more?page.next_after:null;this.onSessions(this.sessions,this.nextSessions);
+    this.sessionHighWater=page.high_water;this.sessions=page.sessions||[];this.nextSessions=page.has_more?page.next_after:null;this._publish('sessions',{sessions:this.sessions,next:this.nextSessions},v=>this.onSessions(v.sessions,v.next));
     let newest=this.sessions.at(-1);
     if(this.followLatest||!this.selection.session_id) {
-      const latestQuery=new URLSearchParams(query);latestQuery.set('latest','true');latestQuery.set('limit','1');latestQuery.set('high_water',String(page.high_water));
+      const latestQuery=new URLSearchParams(query);latestQuery.set('latest','true');latestQuery.set('limit','1');const selectedSource=(sources.sources||[]).find(s=>s.source_id===this.selection.source_id);const selectedSession=this.sessions.find(s=>s.session_namespace===this.selection.session_namespace&&s.session_id===this.selection.session_id);const selectedServer=selectedSource?.platform==='server'||(!this.selection.source_id&&selectedSession?.source_ids?.length&&selectedSession.source_ids.every(id=>(sources.sources||[]).find(s=>s.source_id===id)?.platform==='server'));if(!selectedServer)latestQuery.set('client_only','true');latestQuery.set('high_water',String(page.high_water));
       const latest=await(await this.request('/api/v2/sessions?'+latestQuery,signal)).json();signal.throwIfAborted();if(generation!==this.generation)return;newest=latest.sessions?.[0]||newest;
     }
     if(newest&&(!this.selection.session_id||this.followLatest)) {
@@ -79,22 +79,57 @@ export class CollectorClient {
     const query=new URLSearchParams({after:String(this.nextSessions),high_water:String(this.sessionHighWater)});if(this.selection.source_id)query.set('source_id',this.selection.source_id);
     const page=await(await this.request('/api/v2/sessions?'+query,signal)).json();
     if(generation!==this.generation)return;
-    this.sessions.push(...page.sessions);this.nextSessions=page.has_more?page.next_after:null;this.onSessions(this.sessions,this.nextSessions);
+    this.sessions.push(...page.sessions);this.nextSessions=page.has_more?page.next_after:null;this._publish('sessions',{sessions:this.sessions,next:this.nextSessions},v=>this.onSessions(v.sessions,v.next));
   }
   async catchUp(signal,generation=this.generation) {
     const selectedSignal=this.selectionController?.signal;
     const combined=selectedSignal?AbortSignal.any([signal,selectedSignal]):signal;
-    let highWater;const initialLength=this.lines.length;
+    let highWater,cursor=0;const lines=[];
     for(;;){
-      const query=new URLSearchParams({after:String(this.cursor),...this.selection});if(highWater!==undefined)query.set('high_water',String(highWater));
+      const query=new URLSearchParams({after:String(cursor),...this.selection,include_related:'true'});if(highWater!==undefined)query.set('high_water',String(highWater));
       const page=await(await this.request('/api/v2/events?'+query,combined)).json();combined.throwIfAborted();
       if(generation!==this.generation)return;
-      if(page.collector_id!==this.collectorId||!Array.isArray(page.lines)||!Number.isSafeInteger(page.cursor)||page.cursor<this.cursor||(page.has_more&&page.cursor<=this.cursor))throw new Error('Invalid collector page');
+      if(page.collector_id!==this.collectorId||!Array.isArray(page.lines)||!Number.isSafeInteger(page.cursor)||page.cursor<cursor||(page.has_more&&page.cursor<=cursor))throw new Error('Invalid collector page');
       highWater??=page.high_water;
-      if(this.lines.length+page.lines.length>100000)throw new Error('Selected session exceeds diagram limit; export capture to inspect it in smaller files');
-      this.lines.push(...page.lines);this.cursor=page.cursor;
-      if(!page.has_more){if(this.lines.length>initialLength)this.onCapture(this.lines.join('\n')+'\n',this.lines.length);return;}
+      if(lines.length+page.lines.length>100000)throw new Error('Selected session exceeds diagram limit; export capture to inspect it in smaller files');
+      lines.push(...page.lines);cursor=page.cursor;
+      if(!page.has_more){this.lines=lines;this.cursor=cursor;const text=this.lines.length?this.lines.join('\n')+'\n':'';if(text!==this._captureText){this._captureText=text;this.onCapture(text,this.lines.length);}return;}
     }
+  }
+  _publish(key,value,callback) {
+    const text=JSON.stringify(value);this._published??={};
+    if(this._published[key]===text)return;
+    this._published[key]=text;callback(value);
+  }
+  async collectRelated() {
+    if(this.collectionController)return;
+    if(!this.selection.session_id)throw new Error('Select a session to collect related logs.');
+    const controller=new AbortController(),generation=this.generation;
+    this.collectionController=controller;this.collectionCancelRequested=false;
+    this._publish('collection',{state:'queued'},this.onCollection);
+    try {
+      const response=await this.request('/api/v2/collections',controller.signal,{'X-Network-Log-Viewer':'1','Content-Type':'application/json'},{method:'POST',body:JSON.stringify(this.selection)});
+      let job=await response.json();controller.signal.throwIfAborted();this.collectionJob=job.job_id;
+      if(this.collectionCancelRequested||generation!==this.generation){await this.cancelCollection();return;}
+      for (;;) {
+        if(generation!==this.generation)return;
+        this._publish('collection',job,this.onCollection);
+        if(!['queued','running'].includes(job.state)) { await this._schedule();return job; }
+        await new Promise((resolve,reject)=>{const timer=setTimeout(done,750);function done(){clearTimeout(timer);controller.signal.removeEventListener('abort',abort);resolve();}function abort(){clearTimeout(timer);reject(new DOMException('Collection stopped','AbortError'));}controller.signal.addEventListener('abort',abort,{once:true});});
+        job=await(await this.request('/api/v2/collections/'+encodeURIComponent(this.collectionJob),controller.signal)).json();
+      }
+    } catch(error) { if(error.name!=='AbortError'&&generation===this.generation)this._publish('collection',{state:'failed',error:error.message},this.onCollection); }
+    finally { if(this.collectionController===controller){this.collectionController=null;this.collectionJob=null;} }
+  }
+  async cancelCollection() {
+    const controller=this.collectionController,job=this.collectionJob;
+    if(!controller)return;
+    this.collectionCancelRequested=true;
+    this._publish('collection',{state:'cancelled'},this.onCollection);
+    // Let an in-flight creation return its ID so cancellation cannot orphan the remote job.
+    if(!job)return;
+    controller.abort();this.collectionController=null;this.collectionJob=null;
+    await this.request('/api/v2/collections/'+encodeURIComponent(job),undefined,{'X-Network-Log-Viewer':'1'},{method:'DELETE'});
   }
   _cancelSnapshotReads() {
     this.snapshotGeneration++;
@@ -192,6 +227,7 @@ export class CollectorClient {
     }
   }
   stop(){
+    this.cancelCollection().catch(()=>{});
     this._cancelSnapshotReads();
     const controller=this.controller,selectionController=this.selectionController,reader=this._reader;
     this.controller=null;this.selectionController=null;this._reader=null;this.generation++;

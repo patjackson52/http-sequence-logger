@@ -287,3 +287,23 @@ test('adapters integrate with recorder, async handler parenting, redaction, and 
   assert.deepEqual(terminal.map((event) => event.data.outcome), ['success', 'http_error', 'unknown']);
   assert.equal(validation.events.find((event) => event.event_type === 'operation.started' && event.data.invocation).data.invocation.dispatch, 'awaited');
 });
+
+test('allowlisted Fetch sends its outbound span context and preserves foreign requests and host trace context', async () => {
+  const lines=[];
+  const logger=createLogger({namespace:'propagation/test',appId:'test',sink:{append:line=>lines.push(line)},propagationOrigins:['https://first.test']});
+  const session=logger.startSession();const calls=[];
+  const client=createFetchClient(session,{origin,fetchImpl:async(input,init)=>{calls.push({input,init});return new Response(null,{status:204});}});
+  const init={method:'POST',body:'payload',headers:{'X-App':'retained'}};
+  await client.fetch('https://first.test/operation',init);
+  const request=lines.map(JSON.parse).find(e=>e.event_type==='http.request.started');
+  assert.equal(calls[0].init.headers.get('traceparent'),`00-${request.context.trace_id}-${request.context.span_id}-01`);
+  assert.equal(calls[0].init.body,'payload');assert.equal(calls[0].init.headers.get('x-app'),'retained');assert.equal(init.headers.traceparent,undefined);
+  await client.fetch('https://foreign.test/operation',init);assert.equal(calls[1].init,init);
+  await client.fetch('https://first.test/__networklog/ingest',init);assert.equal(calls[2].init,init);
+  const traceparent='00-11111111111111111111111111111111-2222222222222222-01';const hostInit={headers:{traceparent}};
+  const operation=session.startOperation({name:'Host operation',origin:{owner:'integrator',component:'Host'}});
+  await client.fetch(new Request('https://first.test/host',{method:'POST',body:'stream'}),hostInit,{parent:operation.context});operation.end();
+  assert.equal(calls[3].init,hostInit);
+  const host=lines.map(JSON.parse).filter(e=>e.event_type==='http.request.started').at(-1);assert.equal(host.context.trace_id,'11111111111111111111111111111111');assert.equal(host.context.span_id,'2222222222222222');assert.equal(host.context.parent_span_id,null);assert.equal(host.context.parent_scope,'none');
+  session.end();assert.equal(validateCapture(lines.join('')).valid,true);
+});

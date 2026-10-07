@@ -1,7 +1,7 @@
 import { noOpLogger } from './api.mjs';
 import { createPolicy, cleanURL, cleanHeaders, cleanBody, missingBody, safeError } from './policy.mjs';
 
-export const SDK_VERSION = '0.1.0';
+export const SDK_VERSION = '0.2.0';
 const fallback = noOpLogger.startSession();
 const label = (value, fallbackValue = 'unknown') => typeof value === 'string' && value.length ? value.slice(0, 512) : fallbackValue;
 const actor = value => ({ owner: ['integrator', 'sdk', 'system', 'unknown'].includes(value?.owner) ? value.owner : 'unknown', component: label(value?.component), method: value?.method ? label(value.method) : null });
@@ -13,9 +13,10 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const adapters = ['customer.manual', 'browser.fetch', 'browser.xhr'].map(name => ({ adapter: { name, version: SDK_VERSION }, capabilities: { attempts: 'logical', request_body: 'partial', response_body: 'partial', transaction_metrics: false } }));
 
 /** Development recorder. Supply a journal explicitly; no global session or automatic interception. */
-export function createLogger({ namespace, appId, appVersion = 'development', sink, policy: policyOptions, onDiagnostic } = {}) {
+export function createLogger({ namespace, appId, appVersion = 'development', sink, policy: policyOptions, onDiagnostic, propagationOrigins = [] } = {}) {
   if (!validId(namespace) || !appId || !sink || typeof sink.append !== 'function') throw new TypeError('namespace, appId and append sink are required');
   const policy = createPolicy(policyOptions);
+  const allowedOrigins = [...new Set(propagationOrigins.map(value => {const url=new URL(value);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw new TypeError('Invalid propagation origin');return url.origin;}))];
   const diagnostic = code => { try { onDiagnostic?.(code); } catch { /* application diagnostics cannot break requests */ } };
   const attempt = (fn, other) => { try { return fn(); } catch { diagnostic('capture_failed'); return other; } };
   return Object.freeze({
@@ -34,14 +35,17 @@ export function createLogger({ namespace, appId, appVersion = 'development', sin
     function emit(eventType, data, context, extensions) {
       const time = sequence === 0 ? 0n : BigInt(Math.max(0, Math.floor((performance.now() - epoch) * 1e6)));
       lastTime = time > lastTime ? time : lastTime;
-      const event = { schema_version: '1.2', event_type: eventType, event_id: id(), ...binding, sequence: ++sequence, timestamp: new Date().toISOString(), monotonic_ns: String(lastTime), ...(context ? { context } : {}), data: typeof data === 'function' ? data(lastTime) : data, ...(extensions ? { extensions } : {}) };
+      const event = { schema_version: '1.3', event_type: eventType, event_id: id(), ...binding, sequence: ++sequence, timestamp: new Date().toISOString(), monotonic_ns: String(lastTime), ...(context ? { context } : {}), data: typeof data === 'function' ? data(lastTime) : data, ...(extensions ? { extensions } : {}) };
       try { if (sink.append(`${JSON.stringify(event)}\n`) === false) { dropped++; diagnostic('journal_full'); } }
       catch { dropped++; diagnostic('journal_write_failed'); }
       return lastTime;
     }
-    const contextFor = parent => {
+    const contextFor = (parent, traceparent) => {
       if (parent && !contexts.has(parent)) throw new TypeError('Parent must belong to this recording');
-      const context = Object.freeze({ trace_id: parent?.trace_id || hex(16), span_id: hex(8), parent_span_id: parent?.span_id || null, parent_scope: parent ? 'local' : 'none' });
+      const wire = typeof traceparent === 'string' ? /^00-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}$/.exec(traceparent) : null;
+      const validWire = wire && !/^0+$/.test(wire[1]) && !/^0+$/.test(wire[2]);
+      const linkedParent = parent && (!validWire || parent.trace_id === wire[1]);
+      const context = Object.freeze({ trace_id: validWire ? wire[1] : parent?.trace_id || hex(16), span_id: validWire ? wire[2] : hex(8), parent_span_id: linkedParent ? parent.span_id : null, parent_scope: linkedParent ? 'local' : 'none' });
       return context;
     };
     const guarded = (fn, defaultValue) => (...args) => closed ? defaultValue : attempt(() => fn(...args), defaultValue);
@@ -49,7 +53,7 @@ export function createLogger({ namespace, appId, appVersion = 'development', sin
       name: label(name), id_source: sessionId ? 'provided' : 'generated',
       producer: { platform: 'web', app_id: label(appId), app_version: label(appVersion), os_version: 'browser (not collected)', sdk_version: SDK_VERSION }, adapters: clone(adapters),
       capture_policy: { profile: 'development', body_limit_bytes: policy.bodyLimit, redact_headers: policy.headers, redact_query_keys: policy.queries, redact_body_paths: policy.keys.map(key => `**.${key}`) },
-      trace_propagation: 'disabled', propagation_origins: [],
+      trace_propagation: allowedOrigins.length ? 'allowlist' : 'disabled', propagation_origins: allowedOrigins,
     }, null, { 'browser.clock': 'performance.now; precision reduced; sleep behavior engine dependent' });
 
     function startOperation(options, handler = false) {
@@ -81,7 +85,7 @@ export function createLogger({ namespace, appId, appVersion = 'development', sin
       return handle;
     }
     function startRequest(supplier) {
-      const meta = supplier(), context = contextFor(meta.parent), url = cleanURL(meta.url, policy);
+      const meta = supplier(), context = contextFor(meta.parent, meta.traceparent), url = cleanURL(meta.url, policy);
       const method = String(meta.method || 'GET');
       if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(method)) throw new TypeError('Invalid method');
       const adapter = adapters.find(a => a.adapter.name === (meta.adapter || 'customer.manual'))?.adapter;
@@ -123,7 +127,7 @@ export function createLogger({ namespace, appId, appVersion = 'development', sin
       });
     }
     const session = {
-      enabled: true, sessionId: binding.session_id, recordingId,
+      enabled: true, propagationOrigins: Object.freeze([...allowedOrigins]), sessionId: binding.session_id, recordingId,
       startOperation: guarded(options => startOperation(options), fallback.startOperation()),
       startHandler: guarded(options => startOperation(options, true), fallback.startHandler()),
       startRequest: guarded(startRequest, fallback.startRequest()),

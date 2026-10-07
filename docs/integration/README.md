@@ -15,9 +15,9 @@ For a task that only starts/diagnoses desktop collection, use the [collector gui
 | General Swift capture SDK | **Not implemented** | If no producer exists, implement an app-owned adapter against the format; this is additional work, not a package-install step |
 | Browser JavaScript/TypeScript capture | Fetch/XHR/manual HTTP, methods, synchronous/awaited handlers, redaction, memory/IndexedDB, continuous foreground delivery | Install pinned `web-sdk/` source package; wire debug/no-op build aliases, app-owned contexts and a same-origin development relay or export |
 | Desktop collector/viewer | All-device Android and booted-simulator discovery, source registry, scoped HTTP/HTTPS upload, durable SQLite worker and SSE hints, file import, interactive sequence and three-layout session comparison | Start local tools for the actual app; initialize native debug bootstrap or browser journal/relay; physical iOS uses explicit HTTPS pairing |
-| Client/server trace merging | Format has correlation concepts; no turnkey server instrumentation/merge integration | Future work; don't enable trace headers or claim distributed tracing automatically |
+| Server capture and related-source traces | Explicit request-context SDK, W3C first-party propagation, trace-indexed collection and remote links | Read [server integration](SERVER.md), configure [retrieval/parsing adapters](ADAPTERS.md), and prove real local/deployed requests |
 
-Read [Android integration](ANDROID.md), [iOS integration](IOS.md), or [browser integration](WEB.md), then [connection and file map](TRANSPORT.md). Consult [the JSON/spec index](SPECS.md) when implementing adapters or diagnosing validation failures. The independent examples under [integration/](../../integration/) verify consumption without importing the sample apps.
+Read [server integration](SERVER.md) and [adapters](ADAPTERS.md) for server sources. Read [Android integration](ANDROID.md), [iOS integration](IOS.md), or [browser integration](WEB.md), then [connection and file map](TRANSPORT.md). Consult [the JSON/spec index](SPECS.md) when implementing adapters or diagnosing validation failures. The independent examples under [integration/](../../integration/) verify consumption without importing the sample apps.
 
 ## Start from the URL
 
@@ -62,6 +62,6 @@ An integration is complete when its own app has evidence for these checks:
 
 Leave the upstream commit, build configurations, logger/provider owner, canonical journal/pairing paths (or browser origin/database/journal and relay setup), session policy, adapters, redaction keys, collector invocation, release-audit evidence, and known limitations in the host's integration note. Never include pairing tokens, private keys, real credentials or raw unsanitized payloads in that note.
 
-For repository examples and evidence see [Android setup](../../android/README.md), [iOS setup](../../ios/README.md), [browser SDK](../../web-sdk/README.md), [current canonical native captures](../../samples/realtime/README.md), [browser captures](../../samples/web/README.md), and [release review](../RELEASE-REVIEW.md). These establish a baseline, not proof that a different app is already integrated. Older [transfer evidence](../../samples/transfer/README.md) is historical and may use an unsupported format.
+For repository examples and evidence see [Android setup](../../android/README.md), [iOS setup](../../ios/README.md), [browser SDK](../../web-sdk/README.md), [historical schema-1.2 native captures](../../samples/realtime/README.md), [historical browser captures](../../samples/web/README.md), and [release review](../RELEASE-REVIEW.md). These establish a baseline, not proof that a different app is already integrated. Older [transfer evidence](../../samples/transfer/README.md) is historical and may use an unsupported format.
 
 The [agent integration review](REVIEW.md) records the plan-review decisions, independent consumer checks, and their limits.

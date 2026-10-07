@@ -1,7 +1,7 @@
 #if DEBUG
 import Foundation
 
-/// Development-only transfer for already-sanitized schema 1.2 records.
+/// Development-only transfer for already-sanitized schema 1.3 records.
 /// It never instruments network traffic or regenerates event IDs/timestamps.
 public actor NDJSONTransferSink {
     private struct Acknowledgement: Decodable {

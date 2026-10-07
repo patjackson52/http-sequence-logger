@@ -21,7 +21,7 @@ test('manual browser capture, supplied sessions, awaited handlers and complete H
     await Promise.resolve(); http.complete(); return 42;
   });
   assert.equal(result, 42); op.end(); s.session.end(); const resultCapture = s.validate(); assert.equal(resultCapture.summary.handler_calls, 1);
-  assert.equal(s.events()[0].schema_version, '1.2'); assert.equal(s.events()[0].data.producer.platform, 'web');
+  assert.equal(s.events()[0].schema_version, '1.3'); assert.equal(s.events()[0].data.producer.platform, 'web');
   assert.ok(!s.lines.join('').includes('SENTINEL_PRIVATE_VALUE')); assert.equal(s.events().find(e => e.data.invocation)?.data.invocation.dispatch, 'awaited');
   const second = s.logger.startSession({ sessionId: 'existing' }); second.end(); assert.notEqual(second.recordingId, s.session.recordingId); assert.equal(s.validate().summary.sessions, 1);
 });
@@ -64,7 +64,7 @@ test('no-op does no metadata work and preserves requests, reads and handler beha
   const response = new Response('{"ok":true}'); const args = []; const client = createFetchClient(session, { fetchImpl: async (...v) => { args.push(v); return response; } });
   const init = { headers: { A: 'B' } }; assert.equal(await client.fetch('https://one.example', init), response); assert.equal(args[0][1], init); assert.deepEqual(await client.readJson(response), { ok: true });
 });
-test('web and awaited vocabulary require the sole current schema1.2', () => {
+test('web and awaited vocabulary require the sole current schema1.3', () => {
   const s = setup(); s.session.invokeHandler({ name: 'Handler', origin: app, caller: sdk }, () => {}); s.session.end(); s.validate();
   for (const version of ['1.0', '1.1']) assert.equal(validateCapture(s.lines.map(line => JSON.stringify({ ...JSON.parse(line), schema_version: version })).join('\n') + '\n').valid, false);
 });

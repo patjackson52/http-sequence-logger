@@ -1,7 +1,5 @@
 const files = import.meta.glob('../../examples/*.ndjson', { query: '?raw', import: 'default' });
-const nativeCurrent = import.meta.glob('../../samples/realtime/android-adb-emulator-5556-user-0.ndjson', {query:'?raw',import:'default'});
 export const sampleOptions = [
- ['realtime-android','Android emulator · recorded current capture'],
  ['viewer-three-origin','Three origins · SDK and customer handler'],
  ['handler-no-http','Handler · no HTTP'], ['handler-throw','Handler · throws, SDK continues'],
  ['handler-cancelled','Handler · cancelled'], ['handler-stopped','Handler · observation stopped'],
@@ -12,8 +10,8 @@ export const sampleOptions = [
  ['redirect','Redirect'], ['retry','Retry'], ['interrupted','Interrupted recording'],
 ];
 export async function loadSample(id) {
- const key=id==='realtime-android'?'../../samples/realtime/android-adb-emulator-5556-user-0.ndjson':`../../examples/${id}.ndjson`;
- return [{name:`${id}.ndjson`,text:await (nativeCurrent[key]||files[key])()}];
+ const key=`../../examples/${id}.ndjson`;if(!files[key])throw new Error('Unknown sample');
+ return [{name:`${id}.ndjson`,text:await files[key]()}];
 }
 export async function loadMalformedSample() {
  const [file]=await loadSample('handler-no-http');

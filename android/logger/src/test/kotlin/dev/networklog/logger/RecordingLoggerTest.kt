@@ -53,4 +53,30 @@ class RecordingLoggerTest {
         assertTrue(lines.joinToString().contains("metadata_supplier_failed"))
         assertFalse(lines.joinToString().contains("supplier failed"))
     }
+    @Test fun propagationUsesEachOutboundSpanAndExactAllowedOrigin() {
+        val lines = mutableListOf<String>()
+        val logger = RecordingLogger(NetworkLog(EventSink { lines.add(it) }, "test", osVersion = "test", propagationOrigins = listOf("https://SERVER.test:443"), clock = object : CaptureClock {
+            var now = 0L
+            override fun monotonicNanos() = ++now
+            override fun timestamp() = "2026-10-07T00:00:00.000Z"
+        }))
+        val session = logger.startSession("propagation")
+        val op = session.startOperation("call")
+        val first = session.startRequest("GET", "https://server.test/a", parent = op.context)
+        val second = session.startRequest("GET", "https://server.test/b", parent = op.context)
+        val firstHeader = first.context.traceparent("https://server.test/a")!!
+        val secondHeader = second.context.traceparent("https://server.test/b")!!
+        assertNotEquals(firstHeader, secondHeader)
+        assertEquals(firstHeader.split('-')[1], secondHeader.split('-')[1])
+        assertNull(first.context.traceparent("https://foreign.test/a"))
+        assertNull(first.context.traceparent("https://server.test.evil/a"))
+        assertNull(first.context.traceparent("https://user:password@server.test/a"))
+        val request = lines.map(::JSONObject).first { it.getString("event_type") == "http.request.started" }
+        assertEquals("00-${request.getJSONObject("context").getString("trace_id")}-${request.getJSONObject("context").getString("span_id")}-01", firstHeader)
+        assertEquals("allowlist", JSONObject(lines.first()).getJSONObject("data").getString("trace_propagation"))
+        session.end()
+        assertNull(first.context.traceparent("https://server.test/a"))
+        assertNull(session.startRequest("GET", "https://server.test/late").context.traceparent("https://server.test/late"))
+    }
+
 }

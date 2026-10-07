@@ -11,6 +11,7 @@ class NoOpLoggerTest {
         assertEquals("", session.sessionId)
         val exchange = session.startRequest("GET", "https://example.test", headers = { error("metadata must remain lazy") })
         assertSame(exchange, session.startRequest("POST", "https://example.test"))
+        assertNull(exchange.context.traceparent("https://example.test"))
         exchange.captureRequestBody { error("no serialization/copy in release") }
         exchange.captureResponseBody { error("no body supplier in release") }
         exchange.receiveResponseHeaders(200, { error("no headers in release") })

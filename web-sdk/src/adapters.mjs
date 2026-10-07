@@ -1,5 +1,5 @@
 // These opt-in adapters observe application-visible data. They never install a
-// global interceptor, clone a body, or add headers to a business request.
+// global interceptor or clone a body. Trace propagation is explicitly allowlisted.
 const noop = () => {};
 const inertExchange = Object.freeze({
   context: null, responseHeaders: noop, requestBody: noop, responseBody: noop,
@@ -70,6 +70,7 @@ export function createFetchClient(session, { fetchImpl, origin, parent } = {}) {
         origin: metadata?.origin ?? origin,
         parent: metadata?.parent ?? parent,
         adapter: 'browser.fetch',
+        traceparent: safe(() => new Headers(init?.headers ?? request?.headers).get('traceparent')),
       };
     });
     // The recorder evaluates these suppliers only while recording is enabled.
@@ -80,8 +81,22 @@ export function createFetchClient(session, { fetchImpl, origin, parent } = {}) {
       return bodySnapshot(init?.body, type, !request || hasOverride);
     });
     const signal = enabled ? signalOf(input, init) : undefined;
+    let outgoing = init;
+    // Only configured first-party origins receive trace context. Keep native input/body ownership.
+    safe(() => {
+      const url=new URL(isRequest(input)?input.url:String(input),globalThis.location?.href);
+      const context=exchange.context;
+      if(enabled && session.propagationOrigins?.includes(url.origin) && !url.pathname.startsWith('/__networklog') && context && /^[0-9a-f]{32}$/.test(context.trace_id) && /^[0-9a-f]{16}$/.test(context.span_id)) {
+        const headers=new Headers(init?.headers ?? (isRequest(input)?input.headers:undefined));
+        // A pre-existing context belongs to the host's tracing setup; do not replace it.
+        if(!headers.has('traceparent')) {
+          headers.set('traceparent',`00-${context.trace_id}-${context.span_id}-01`);
+          outgoing={...init,headers};
+        }
+      }
+    });
     let response;
-    try { response = await send(input, init); }
+    try { response = await send(input, outgoing); }
     catch (error) { failure(exchange, error, signal, 'unknown'); throw error; }
 
     safe(() => { exchanges.set(response, exchange); signals.set(response, signal); });

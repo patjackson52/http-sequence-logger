@@ -1,7 +1,8 @@
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { adaptersFromConfig } from "./adapters.mjs";
 import { startCollector } from "./server.mjs";
 import { localCertificate } from "./tls.mjs";
 import { adbPath, watchAndroid } from "./android-live.mjs";
@@ -40,6 +41,7 @@ export async function startDesktopCollector(options = {}) {
     directory,
     port: options.port || 4319,
     tls,
+    sources: options.sources ? adaptersFromConfig(JSON.parse(readFileSync(resolve(options.sources), "utf8"))) : [],
   });
   let watcher, simulators, manifest, advertisement;
   try {

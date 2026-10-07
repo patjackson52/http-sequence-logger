@@ -20,7 +20,7 @@ const COMPARE_OPTIONS = `Compare options:
   --check                  Exit 0 equal, 1 different, 3 inconclusive; errors exit 2
 `;
 const INPUT_GUIDANCE = `
-Inputs: canonical event-schema 1.2 NDJSON or http-sequence 1.0 session JSON.
+Inputs: canonical event-schema 1.3 NDJSON or http-sequence 1.0 session JSON.
 Regular local files only; no URL or stdin input. Limit: 16 MiB per file.
 JSON stdout contains only the result; fatal errors go to stderr and exit 2.
 Use -- before filenames beginning with --. Help reads/writes no input/output files.

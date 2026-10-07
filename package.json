@@ -1,6 +1,6 @@
 {
   "name": "http-sequence-logger",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Structured mobile and browser HTTP and handler logging with a local sequence viewer",
@@ -39,7 +39,8 @@
     "check:native-os-restore": "node scripts/check-native-os-restore.mjs",
     "check:native-cold-boot": "node scripts/check-native-cold-boot.mjs",
     "check:mobile-chrome": "node scripts/check-mobile-chrome.mjs",
-    "check:physical-android": "node scripts/check-physical-android.mjs"
+    "check:physical-android": "node scripts/check-physical-android.mjs",
+    "check:viewer-distributed": "node scripts/check-viewer-distributed.mjs"
   },
   "engines": {
     "node": ">=24.13.0 <25"

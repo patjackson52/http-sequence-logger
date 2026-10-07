@@ -7,6 +7,8 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import java.net.URI
+import java.util.concurrent.atomic.AtomicBoolean
 
 fun interface EventSink { fun append(line: String); fun appendEvent(event: JSONObject) = append(event.toString()) }
 
@@ -22,8 +24,11 @@ class AndroidCaptureClock : CaptureClock {
 
 @ConsistentCopyVisibility
 data class CaptureContext internal constructor(
-    internal val recordingId: String, val traceId: String, val spanId: String, val parentSpanId: String?
+    internal val recordingId: String, val traceId: String, val spanId: String, val parentSpanId: String?,
+    internal val propagationOrigins: Set<String> = emptySet(),
+    internal val captureActive: AtomicBoolean = AtomicBoolean(false)
 ) {
+    fun traceparent(destination: String): String? = if (captureActive.get() && httpOrigin(destination) in propagationOrigins) "00-$traceId-$spanId-01" else null
     internal fun json() = obj("trace_id" to traceId, "span_id" to spanId, "parent_span_id" to parentSpanId,
         "parent_scope" to if (parentSpanId == null) "none" else "local")
 }
@@ -35,16 +40,18 @@ class NetworkLog(
     private val policy: CapturePolicy = CapturePolicy(),
     private val clock: CaptureClock = AndroidCaptureClock(),
     private val osVersion: String = Build.VERSION.RELEASE ?: "unknown",
+    propagationOrigins: List<String> = emptyList(),
     private val diagnostic: (String) -> Unit = {}
 ) {
+    private val origins = propagationOrigins.map { requireNotNull(httpOrigin(it)) { "Invalid propagation origin" } }.toSet()
     fun startSession(name: String, sessionId: String? = null): Session =
-        Session(sink, appId, namespace, policy, clock, osVersion, diagnostic, name, sessionId)
+        Session(sink, appId, namespace, policy, clock, osVersion, diagnostic, name, sessionId, origins)
 }
 
 class Session internal constructor(
     private val sink: EventSink, private val appId: String, private val namespace: String,
     internal val policy: CapturePolicy, private val clock: CaptureClock, private val osVersion: String,
-    private val diagnostic: (String) -> Unit, name: String, providedId: String?
+    private val diagnostic: (String) -> Unit, name: String, providedId: String?, private val propagationOrigins: Set<String>
 ) {
     val sessionId = providedId ?: UUID.randomUUID().toString()
     val recordingId = UUID.randomUUID().toString()
@@ -52,6 +59,7 @@ class Session internal constructor(
     private val origin = clock.monotonicNanos()
     private var sequence = 0L
     private var dropped = 0L
+    private val captureActive = AtomicBoolean(true)
     internal var ended = false
     private val requests = mutableSetOf<Exchange>()
     private val operations = mutableSetOf<Operation>()
@@ -60,10 +68,10 @@ class Session internal constructor(
         require(sessionId.isNotEmpty() && sessionId.length <= 512)
         guarded {
             emit("session.started", null, obj("name" to name, "id_source" to if (providedId == null) "generated" else "provided",
-                "producer" to obj("platform" to "android", "app_id" to appId, "app_version" to "0.1.0", "os_version" to osVersion, "sdk_version" to "0.2.0"),
+                "producer" to obj("platform" to "android", "app_id" to appId, "app_version" to "0.2.0", "os_version" to osVersion, "sdk_version" to "0.2.0"),
                 "adapters" to array(listOf("customer.manual", "httpurlconnection").map { adapter ->
                     obj("adapter" to adapter(adapter), "capabilities" to obj("attempts" to "logical", "request_body" to "partial", "response_body" to "partial", "transaction_metrics" to false))
-                }), "capture_policy" to policy.json(), "trace_propagation" to "disabled", "propagation_origins" to array(emptyList<Any>())), 0L)
+                }), "capture_policy" to policy.json(), "trace_propagation" to if (propagationOrigins.isEmpty()) "disabled" else "allowlist", "propagation_origins" to array(propagationOrigins.toList())), 0L)
         }
     }
     internal fun adapter(name: String) = obj("name" to name, "version" to "0.1.0")
@@ -74,7 +82,7 @@ class Session internal constructor(
     }
     internal fun emit(type: String, context: CaptureContext?, data: JSONObject, time: Long = now(), extensions: JSONObject? = null) {
         if (ended) return
-        val event = obj("schema_version" to "1.2", "event_type" to type, "event_id" to UUID.randomUUID().toString(),
+        val event = obj("schema_version" to "1.3", "event_type" to type, "event_id" to UUID.randomUUID().toString(),
             "session_namespace" to namespace, "session_id" to sessionId, "recording_id" to recordingId,
             "sequence" to ++sequence, "timestamp" to clock.timestamp(), "monotonic_ns" to time.toString(), "data" to data)
         context?.let { event.put("context", it.json()) }
@@ -84,7 +92,7 @@ class Session internal constructor(
     internal fun context(parent: CaptureContext?): CaptureContext {
         val usable = parent?.takeIf { it.recordingId == recordingId }
         if (parent != null && usable == null) report("Cross-recording parent ignored")
-        return CaptureContext(recordingId, usable?.traceId ?: id(), id().take(16), usable?.spanId)
+        return CaptureContext(recordingId, usable?.traceId ?: id(), id().take(16), usable?.spanId, propagationOrigins, captureActive)
     }
     fun startOperation(name: String, actor: Actor = Actor(), parent: CaptureContext? = null): Operation = synchronized(lock) {
         Operation(this, context(parent), now()).also { op -> guarded {
@@ -123,7 +131,7 @@ class Session internal constructor(
         retryOf: Exchange? = null, attemptReason: String = "retry"
     ): Exchange = synchronized(lock) {
         val previous = retryOf?.takeIf { it.session === this && it.terminal }
-        val context = if (previous != null) CaptureContext(recordingId, previous.context.traceId, id().take(16), previous.context.parentSpanId) else context(parent)
+        val context = if (previous != null) CaptureContext(recordingId, previous.context.traceId, id().take(16), previous.context.parentSpanId, propagationOrigins, captureActive) else context(parent)
         Exchange(this, context, now(), previous?.let { it.attemptIndex + 1 } ?: 0).also { exchange -> guarded {
             if (!ended) {
                 val safe = policy.url(url)
@@ -149,6 +157,7 @@ class Session internal constructor(
             operations.toList().forEach { it.complete("cancelled") }
             emit("session.ended", null, obj("reason" to "completed", "dropped_events" to dropped))
             ended = true
+            captureActive.set(false)
         }
     }
     private fun id() = UUID.randomUUID().toString().replace("-", "")
@@ -237,3 +246,12 @@ class Exchange internal constructor(internal val session: Session, val context: 
 }
 internal fun safeError(error: Throwable, stage: String) = obj("type" to error.javaClass.simpleName,
     "message" to "Network operation failed", "stage" to stage)
+
+/** Normalize an HTTP origin without leaking credentials or throwing from request metadata. */
+private fun httpOrigin(value: String): String? = runCatching {
+    val uri = URI(value)
+    val scheme = uri.scheme?.lowercase()
+    val host = uri.host?.lowercase()
+    if (scheme !in listOf("http", "https") || host == null || uri.rawUserInfo != null) null
+    else "$scheme://$host" + if (uri.port < 0 || (scheme == "http" && uri.port == 80) || (scheme == "https" && uri.port == 443)) "" else ":${uri.port}"
+}.getOrNull()

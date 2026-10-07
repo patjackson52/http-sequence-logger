@@ -170,6 +170,7 @@ export class CaptureStore {
   page(args) {
     return this.call("page", typeof args === "number" ? { after: args } : args);
   }
+  traceSeeds(args) { return this.call("traceSeeds", args); }
   sessions(args) {
     return this.call("sessions", args);
   }

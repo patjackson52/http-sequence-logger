@@ -39,8 +39,8 @@ export function layoutSequence(session, options = {}) {
   const opMap = new Map(operations.map((o) => [o.id, o]));
   const entityMap = new Map([...operations, ...exchanges].map((e) => [e.id, e]));
   const ancestors = (entity) => {
-    const result = [], seen = new Set([entity.id]); let parent = entity.parentScope === 'local' ? opMap.get(entity.parentId) : null;
-    while (parent && !seen.has(parent.id)) { result.push(parent); seen.add(parent.id); parent = parent.parentScope === 'local' ? opMap.get(parent.parentId) : null; }
+    const result = [], seen = new Set([entity.id]); let parent = entity.parentResolved ? entityMap.get(entity.parentId) : null;
+    while (parent && !seen.has(parent.id)) { result.push(parent); seen.add(parent.id); parent = parent.parentResolved ? entityMap.get(parent.parentId) : null; }
     return result;
   };
   const hiddenByCollapse = (entity) => ancestors(entity).some((o) => collapsed.has(o.id));
@@ -51,7 +51,7 @@ export function layoutSequence(session, options = {}) {
   const descendantCounts = (op) => ({ requests: exchanges.filter((x) => ancestors(x).some((a) => a.id === op.id)).length, calls: operations.filter((o) => o.isHandler && ancestors(o).some((a) => a.id === op.id)).length });
 
   // First two owner lanes are stable even in a no-HTTP recording. Extra owners are explicit.
-  const actors = operations.map((o) => o.origin).concat(exchanges.map((x) => x.executor), operations.filter((o) => o.isHandler).map((o) => o.invocation?.caller)).filter(Boolean);
+  const actors = operations.filter(o => !o.serviceName).map((o) => o.origin).concat(exchanges.filter(x => !x.serviceName).map((x) => x.executor), operations.filter((o) => !o.serviceName && o.isHandler).map((o) => o.invocation?.caller)).filter(Boolean);
   const owners = ['integrator', 'sdk'];
   for (const actor of actors) if (!owners.includes(ownerOf(actor))) owners.push(ownerOf(actor));
   const lanes = [], ownerGroups = []; let nextX = 16;
@@ -74,8 +74,12 @@ export function layoutSequence(session, options = {}) {
     let label = origin; try { label = new URL(origin).host; } catch { /* Invalid metadata is inert text. */ }
     lanes.push({ id: origin, origin, label, title: origin, sub: origin.startsWith('https:') ? 'HTTPS' : origin.startsWith('http:') ? 'HTTP' : 'Origin', kind: 'server', left: nextX, width: laneWidth, x: nextX + laneWidth / 2, muted: !selectedExchanges.some((x) => x.origin === origin) }); nextX += laneWidth;
   }
+  for (const service of [...new Set([...operations, ...exchanges].map(i => i.serviceName).filter(Boolean))]) {
+    lanes.push({ id: `service:${service}`, service, label: service, title: `${service} · recorded server activity`, sub: 'Service · independent clock', kind: 'service', left: nextX, width: laneWidth, x: nextX + laneWidth / 2 }); nextX += laneWidth;
+  }
   const width = nextX + 16;
-  const actorLane = (actor) => {
+  const actorLane = (actor, entity) => {
+    if (entity?.serviceName) return lanes.find(l => l.service === entity.serviceName) || lanes[0];
     const ownerLanes = lanes.filter((l) => l.kind === 'client' && l.owner === ownerOf(actor));
     return ownerLanes.find((l) => l.component === actor?.component || l.members?.includes(actor?.component)) || ownerLanes[0] || lanes[0];
   };
@@ -84,7 +88,7 @@ export function layoutSequence(session, options = {}) {
   const rows = [], recordingEnds = new Map(); let cursor = 8;
   const push = (row) => { row.height = ROW_HEIGHT[row.kind]; row.y = cursor + row.height / 2; cursor += row.height; rows.push(row); };
   for (const [recordingIndex, recording] of recordings.entries()) {
-    push({ kind: 'recording', recording, label: `Recording ${recordingIndex + 1} · schema ${recording.schemaVersion}${recording.incomplete ? ' · incomplete' : ''}`, sub: recordings.length > 1 ? 'Independent clock · event order' : 'Event order · spacing is not duration' });
+    push({ kind: 'recording', recording, label: `${recording.producer?.service_name ? recording.producer.service_name + ' · ' : ''}Recording ${recordingIndex + 1} · schema ${recording.schemaVersion}${recording.incomplete ? ' · incomplete' : ''}`, sub: recordings.length > 1 ? 'Independent clock · event order' : 'Event order · spacing is not duration' });
     const pending = [];
     const add = (rowKind, entity, event, priority = 0, extra = {}) => pending.push({ kind: rowKind, entity, entityId: entity.id, event, priority, ...extra });
     for (const operation of selectedOperations.filter((o) => o.recordingId === recording.id)) {
@@ -126,7 +130,7 @@ export function layoutSequence(session, options = {}) {
   const occupied = new Map();
   for (const operation of selectedOperations) {
     const row = rowFor(operation.id, ['operation', 'ancestry']); if (!row) continue;
-    const lane = actorLane(operation.origin), counts = descendantCounts(operation);
+    const lane = actorLane(operation.origin, operation), counts = descendantCounts(operation);
     const method = displayMethod(operation), repeated = operation.repeatCount > 1;
     const label = `${method}${repeated ? ` #${operation.repeatIndex || 1}` : ''}`;
     if (row.kind === 'ancestry') {
@@ -141,11 +145,18 @@ export function layoutSequence(session, options = {}) {
     bars.push({ entityId: operation.id, operation, kind: operation.isHandler ? 'handler' : 'method', x: lane.x - 7 + slot * 3, y, width: 14, height: Math.max(20, bottom - y), labelX: lane.x + 15 + slot * 3, labelY: row.y - 14, label, component: operation.component || 'Component not recorded', counts, depth: operation.depth || ancestors(operation).length, slot, open: !operation.end, stopped: operation.completion === 'observation_stopped', collapsed: collapsed.has(operation.id), endY: endRow?.y, tone: operation.isHandler ? (operation.completion === 'threw' ? 'error' : operation.completion === 'cancelled' ? 'neutral' : !operation.end || operation.completion === 'observation_stopped' ? 'warning' : 'local') : 'neutral' });
   }
   const barMap = new Map(bars.map((b) => [b.entityId, b]));
+  for (const entity of [...selectedOperations, ...selectedExchanges].filter(i => i.parentScope === 'remote' && i.parentResolved)) {
+    const parent = entityMap.get(entity.parentId), row = rowFor(entity.id, ['operation', 'ancestry', 'request', 'orphan']);
+    if (!parent || !row) continue;
+    const from = actorLane(parent.executor || parent.origin, parent), to = actorLane(entity.executor || entity.origin, entity);
+    localArrows.push({ key: `${entity.id}:remote`, entityId: entity.id, kind: 'remote', x1: from.x, x2: to.x, y: row.y - 16, label: 'remote parent', sub: 'Causal link · clocks independent', dashed: true, tone: 'local', title: `Remote parent ${parent.spanId} → ${entity.spanId}. Causality recorded; cross-source elapsed time unknown.` });
+  }
+
   for (const row of rows) {
     const entity = row.entity;
     if (!entity) continue;
     if (['request', 'response', 'terminal'].includes(row.kind) || (row.kind === 'unfinished' && !opMap.has(entity.id))) {
-      const lane = actorLane(entity.executor), server = originLane(entity.origin); if (!server) continue;
+      const lane = actorLane(entity.executor, entity), server = originLane(entity.origin); if (!server) continue;
       const [glyph, outcome, tone] = outcomeMeta(entity.end ? entity.outcome : 'unfinished');
       const successfulTransfer = entity.end && ['success', 'http_error'].includes(entity.outcome);
       let label = '', sub = '', rowTone = tone;
@@ -159,7 +170,7 @@ export function layoutSequence(session, options = {}) {
     if (row.kind === 'call' || row.kind === 'return') {
       const bar = barMap.get(entity.id); if (!bar) continue;
       const parent = entity.parentScope === 'local' ? opMap.get(entity.parentId) : null, parentBar = parent ? barMap.get(entity.parentId) : null, caller = entity.invocation?.caller;
-      const callerLane = actorLane(caller), calleeLane = actorLane(entity.origin);
+      const callerLane = actorLane(caller), calleeLane = actorLane(entity.origin, entity);
       const callerX = parentBar ? parentBar.x + 7 : callerLane.x, calleeX = bar.x + 7;
       const sameRole = ownerOf(caller) === ownerOf(entity.origin);
       const callerName = [caller?.component, caller?.method].filter(Boolean).join('.') || 'Caller not recorded';
