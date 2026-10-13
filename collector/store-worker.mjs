@@ -755,18 +755,20 @@ const api = {
       related = ' or e.recording_id in (select recording_id from related_recordings)';
     }
     const rows = prepare(
-      `${prefix}select e.position,case when (${trace_id ? '0 and' : ''} (? is null or r.source_id=?) and (? is null or r.namespace=?) and (? is null or r.session=?))${related} then e.line else NULL end line from events e join recordings r on r.id=e.recording_id where e.position>? and e.position<=? order by e.position limit ?`,
+      `${prefix}select e.position,e.recording_id,r.source_id,case when (${trace_id ? '0 and' : ''} (? is null or r.source_id=?) and (? is null or r.namespace=?) and (? is null or r.session=?))${related} then e.line else NULL end line from events e join recordings r on r.id=e.recording_id where e.position>? and e.position<=? order by e.position limit ?`,
     ).iterate(...parameters,...values,after,H,Math.min(limit,500));
     let next = after,
       bytes = 0,
       found = false;
     const lines = [];
+    const recording_sources = Object.create(null);
     for (const r of rows) {
       found = true;
       if (r.line !== null) {
         const size = Buffer.byteLength(r.line) + 1;
         if (lines.length && bytes + size > limits.batchBytes) break;
         lines.push(r.line);
+        recording_sources[r.recording_id] = r.source_id;
         bytes += size;
       }
       next = r.position;
@@ -774,6 +776,7 @@ const api = {
     if (!found) next = H;
     return {
       lines,
+      recording_sources,
       cursor: next,
       next_after: next,
       has_more: next < H,

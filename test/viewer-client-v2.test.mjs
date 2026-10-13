@@ -139,3 +139,24 @@ test('default following excludes newly collected server sessions while explicit 
   client.select({source_id:'server-source',session_namespace:'server',session_id:'old'});
   await client.refresh(new AbortController().signal);assert.equal(client.selection.session_id,'new');assert.ok(!requests.at(-2).includes('client_only=true'));
 });
+
+test('request export provenance accumulates only selected generation pages',async()=>{
+  const captures=[];let pages=0;
+  const client=new CollectorClient({onCapture:(...args)=>captures.push(args),fetcher:async()=>json(++pages===1?{collector_id:'c',lines:['one'],recording_sources:{r1:'s1'},cursor:1,high_water:2,has_more:true}:{collector_id:'c',lines:['two'],recording_sources:{r2:'s2'},cursor:2,high_water:2,has_more:false})});
+  client.collectorId='c';await client.catchUp(new AbortController().signal);
+  assert.deepEqual({...captures[0][2]},{r1:'s1',r2:'s2'});
+  client.select({session_id:'other'});assert.deepEqual(client.recordingSources,{});assert.deepEqual(captures.at(-1)[2],{});
+});
+
+test('replaced collector republishes identical canonical lines with new source provenance',async()=>{
+ const captures=[];const client=new CollectorClient({automatic:true,onCapture:(...args)=>captures.push(args),fetcher:async url=>json(url.includes('/bootstrap')?{version:2,collector_id:'new',token:'read'}:{collector_id:'new',lines:['same'],recording_sources:{recording:'new-source'},cursor:1,high_water:1,has_more:false})});
+ client.collectorId='old';client._captureText='same\n';client.recordingSources={recording:'old-source'};
+ const signal=new AbortController().signal;await client.connect(signal);assert.deepEqual(client.recordingSources,{});await client.catchUp(signal);assert.equal(captures.length,1);assert.equal(captures[0][2].recording,'new-source');
+});
+
+test('a stale selected page cannot replace request source provenance',async()=>{
+ let release;const captures=[];const client=new CollectorClient({onCapture:(...args)=>captures.push(args),fetcher:()=>new Promise(resolve=>release=resolve)});client.collectorId='c';
+ const work=client.catchUp(new AbortController().signal);client.select({session_id:'new'});
+ release(json({collector_id:'c',lines:['stale'],recording_sources:{old:'old-source'},cursor:1,high_water:1,has_more:false}));await work;
+ assert.deepEqual(client.recordingSources,{});assert.deepEqual(captures,[['',0,{}]]);
+});

@@ -4,7 +4,7 @@ import { createComparisonSnapshot, SNAPSHOT_LIMITS } from './comparison-data.mjs
 export class CollectorClient {
   constructor({token,automatic=false,fetcher=(...args)=>fetch(...args),onCapture=()=>{},onStatus=()=>{},onPairing=()=>{},onDevice=()=>{},onReset=()=>{},onSources=()=>{},onSessions=()=>{},onRevision=()=>{},onCollection=()=>{},retryMs=1000}) {
     Object.assign(this,{token,automatic,fetcher,onCapture,onStatus,onPairing,onDevice,onReset,onSources,onSessions,onRevision,onCollection,retryMs});
-    this.cursor=0;this.lines=[];this.collectorId=null;this.generation=0;this.selection={};this.sessions=[];this.followLatest=true;this._work=Promise.resolve();
+    this.cursor=0;this.lines=[];this.recordingSources={};this.collectorId=null;this.generation=0;this.selection={};this.sessions=[];this.followLatest=true;this._work=Promise.resolve();
     this.snapshotGeneration=0;this.snapshotReads=new Set();
   }
   async request(path,signal,headers={},options={}) {
@@ -19,12 +19,12 @@ export class CollectorClient {
     if(!response.ok)throw new Error('Waiting for the local collector…');
     const session=await response.json();signal.throwIfAborted();
     if(session.version!==2||typeof session.token!=='string'||typeof session.collector_id!=='string')throw new Error('Invalid collector bootstrap');
-    if(this.collectorId&&this.collectorId!==session.collector_id){this._cancelSnapshotReads();this.cursor=0;this.lines=[];this.selection={};this.generation++;this.onReset();}
+    if(this.collectorId&&this.collectorId!==session.collector_id){this._cancelSnapshotReads();this.cursor=0;this.lines=[];this.recordingSources={};this._captureText='';this.selection={};this.generation++;this.onReset();}
     this.collectorId=session.collector_id;this.token=session.token;
   }
   select(selection={}) {
     this.selection={...selection};this.generation++;this.selectionController?.abort();this.selectionController=new AbortController();this.cursor=0;this.lines=[];
-    this._captureText='';this.onCapture('',0);this._schedule();this.cancelCollection().catch(()=>{});
+    this._captureText='';this.recordingSources={};this.onCapture('',0,this.recordingSources);this._schedule();this.cancelCollection().catch(()=>{});
   }
   _schedule() {
     this._requested=true;
@@ -56,7 +56,7 @@ export class CollectorClient {
     }
     if(newest&&(!this.selection.session_id||this.followLatest)) {
       const next={...this.selection,session_namespace:newest.session_namespace,session_id:newest.session_id};
-      if(next.session_id!==this.selection.session_id||next.session_namespace!==this.selection.session_namespace){this.selection=next;this.cursor=0;this.lines=[];}
+      if(next.session_id!==this.selection.session_id||next.session_namespace!==this.selection.session_namespace){this.selection=next;this.cursor=0;this.lines=[];this.recordingSources={};this._captureText='';}
     }
     if(this.selection.session_id)await this.catchUp(signal,generation);
     if(generation===this.generation){this._sessionGeneration=generation;this._eventRevision=sources.event_cursor;}
@@ -84,7 +84,7 @@ export class CollectorClient {
   async catchUp(signal,generation=this.generation) {
     const selectedSignal=this.selectionController?.signal;
     const combined=selectedSignal?AbortSignal.any([signal,selectedSignal]):signal;
-    let highWater,cursor=0;const lines=[];
+    let highWater,cursor=0;const lines=[],recordingSources=Object.create(null);
     for(;;){
       const query=new URLSearchParams({after:String(cursor),...this.selection,include_related:'true'});if(highWater!==undefined)query.set('high_water',String(highWater));
       const page=await(await this.request('/api/v2/events?'+query,combined)).json();combined.throwIfAborted();
@@ -92,8 +92,9 @@ export class CollectorClient {
       if(page.collector_id!==this.collectorId||!Array.isArray(page.lines)||!Number.isSafeInteger(page.cursor)||page.cursor<cursor||(page.has_more&&page.cursor<=cursor))throw new Error('Invalid collector page');
       highWater??=page.high_water;
       if(lines.length+page.lines.length>100000)throw new Error('Selected session exceeds diagram limit; export capture to inspect it in smaller files');
+      Object.assign(recordingSources,page.recording_sources||{});
       lines.push(...page.lines);cursor=page.cursor;
-      if(!page.has_more){this.lines=lines;this.cursor=cursor;const text=this.lines.length?this.lines.join('\n')+'\n':'';if(text!==this._captureText){this._captureText=text;this.onCapture(text,this.lines.length);}return;}
+      if(!page.has_more){this.lines=lines;this.recordingSources=recordingSources;this.cursor=cursor;const text=this.lines.length?this.lines.join('\n')+'\n':'';if(text!==this._captureText){this._captureText=text;this.onCapture(text,this.lines.length,recordingSources);}return;}
     }
   }
   _publish(key,value,callback) {

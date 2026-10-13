@@ -138,3 +138,18 @@ test('ordinary provider banners are unmatched while canonical parse failures ret
   assert.equal(parsed.unmatched,1);assert.equal(parsed.parse_errors,10);assert.equal(parsed.examples.length,5);
   assert.deepEqual(parsed.examples[0],{reference:'line:0',reason:'parser_failed'});
 });
+
+test('event page source provenance includes only returned recordings at the pinned boundary',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'request-export-provenance-'));let collector;
+  try {
+    collector=await startCollector({directory:dir,port:0,activate:false});
+    const first=await collector.enroll({platform:'server',registration_id:'export-first',environment_id:'one',app_id:'A',installation_id:'A'});
+    const second=await collector.enroll({platform:'server',registration_id:'export-second',environment_id:'two',app_id:'A',installation_id:'A'});
+    const events=await capture();await collector.ingest(first.source_token,events.map(JSON.stringify).join('\n')+'\n');const high=collector.store.cursor;
+    const later=events.map(e=>({...e,event_id:'later:'+e.event_id,recording_id:'later:'+e.recording_id,session_id:'later'}));
+    await collector.ingest(second.source_token,later.map(JSON.stringify).join('\n')+'\n');
+    const page=await collector.store.page({session_namespace:'test',session_id:events[0].session_id,high_water:high});
+    assert.deepEqual(Object.keys(page.recording_sources),[events[0].recording_id]);assert.equal(page.recording_sources[events[0].recording_id],first.source_id);
+    const empty=await collector.store.page({session_id:'missing'});assert.deepEqual(empty.recording_sources,{});
+  }finally{await collector?.close();await rm(dir,{recursive:true,force:true});}
+});
