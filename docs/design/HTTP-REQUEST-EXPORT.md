@@ -8,9 +8,9 @@ Collector event pages supply additive `recording_sources` metadata separately fr
 
 Canonical file imports do not establish physical device identity. Client recordings stay separate when identity is unavailable; imported backend invocations group by recorded service/environment/runtime. Sources include the selected session's related backend recordings. Ordering follows recording appearance and local request sequence; independent clocks are not aligned.
 
-Request metadata, capture limitations, response observations and event provenance appear as comments before request payloads. Captured UTF-8 bodies and duplicate headers remain literal. Missing request starts stay observations. Binary/base64 payloads remain in comments with an explicit inline limitation. Payloads containing HTTP-client directives, delimiters or variable syntax are preserved as escaped JSON comments with the request disabled; they cannot become unintended requests, file includes or scripts. This is an inspection/export feature; no requests execute in the viewer.
+The request file contains numbered request headings, verb and explicit endpoint, headers, and body. It excludes producer/session/recording/trace metadata, responses and event evidence. JSON bodies are indented with a lexical formatter that preserves duplicate keys, literal numbers and strings; other text remains literal. Duplicate headers retain their order. Response-only observations are excluded. A short comment represents unavailable or binary/base64 bodies. Payloads containing HTTP-client directives, delimiters or variable syntax retain only their request fields as escaped comments; they cannot become unintended requests, file includes or scripts. This is an inspection/export feature; no requests execute in the viewer.
 
-## Reviews and verification — October 13, 2026
+## Initial reviews and verification — October 13, 2026
 
 A separate agent reviewed the design. Independent agents reviewed serializer, UI and collector integration. Review fixes preserve source selection on pause, split services sharing an adapter, retain configured methods/request targets/header redaction metadata, and republish identical captures after collector identity reset.
 
@@ -25,3 +25,9 @@ Verified with Node 24.13.0 and installed Chrome 155.0.8059.40:
 - `npm run check:comparison`: production comparison acceptance passed.
 
 Browser evidence is generated under ignored `artifacts/http-export/`. These checks use synthetic canonical fixtures through the real collector and production browser; they do not claim new native SDK capture behavior or binary replay support.
+
+## Request-only formatting update
+
+The preview and both download formats now match a concise HTTP request file: `### 1. POST /path`, the full recorded URL, headers, a blank line and the body. Numbering continues across the selected source’s recordings. Source labels omit internal UUIDs, with short ordinal labels when needed to distinguish sources. The UI removes repeated session/source/recording details and explanatory paragraphs.
+
+Verified the formatting update with 415 Node tests, production Chrome HTTP export acceptance, 12 SVG downloads and realtime viewer checks. The browser acceptance checks absence of capture metadata, matching `.http`/`.rest` downloads, readable literal JSON and compact desktop/mobile UI. The running viewer was refreshed and opened to the bundled three-origin sample’s HTTP requests view.
