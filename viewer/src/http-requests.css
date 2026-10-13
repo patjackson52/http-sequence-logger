@@ -4,8 +4,7 @@
 .http-request-source select{width:min(100%,640px);min-width:240px;font-weight:400}
 .http-request-source span{font-weight:400;overflow-wrap:anywhere}
 .http-request-downloads{display:flex;gap:8px;flex-wrap:wrap}
-.http-request-scope,.http-request-help{font-size:12px;overflow-wrap:anywhere;color:var(--muted);flex-shrink:0}
-.http-request-scope strong{color:#1b2430}
+.http-request-scope{font-size:12px;overflow-wrap:anywhere;color:var(--muted);flex-shrink:0}
 .http-request-text{flex:1;min-height:120px;margin:0;background:#fff;padding:16px;white-space:pre;overflow-wrap:normal;word-break:normal;overflow:auto;user-select:text;tab-size:2;line-height:1.6}
 .http-request-text code{font:inherit}
-@media(max-width:719px){.http-requests{padding:10px}.http-request-controls{align-items:stretch}.http-request-source{width:100%}.http-request-source select{min-width:0;width:100%}.http-request-downloads{width:100%}.http-request-downloads button{flex:1}.http-request-text{padding:12px;font-size:12px}.http-request-help{font-size:11px}}
+@media(max-width:719px){.http-requests{padding:10px}.http-request-controls{align-items:stretch}.http-request-source{width:100%}.http-request-source select{min-width:0;width:100%}.http-request-downloads{width:100%}.http-request-downloads button{flex:1}.http-request-text{padding:12px;font-size:12px}}
