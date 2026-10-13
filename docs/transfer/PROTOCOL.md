@@ -43,7 +43,7 @@ A script on the collector's ordinary viewer URL bootstraps using `GET /api/v2/bo
 - `/api/v2/health`: public loopback service/runtime identity.
 - `/api/v2/sources`: registered source metadata and environment/app projections.
 - `/api/v2/sessions`: bounded logical-session summaries, optionally filtered by source.
-- `/api/v2/events`: bounded lines, with `after`, `high_water`, `source_id`, `session_namespace`, `session_id` filters.
+- `/api/v2/events`: bounded original `lines`, with `after`, `high_water`, `source_id`, `session_namespace`, `session_id` filters. The additive `recording_sources` object maps each returned recording ID to its owning collector source ID; it includes only recordings represented in this page. The map is scoped to the response `collector_id`; readers may treat an absent map from an older collector as unavailable provenance. Source metadata remains separate from canonical event JSON.
 - `/api/v2/stream`: authenticated Fetch SSE; ready/changed hints carry `collector_id`, `event_cursor`, `registry_revision`.
 - `/api/v2/download`: bounded keyset export pinned to immutable event high-water; each page releases its database read before socket backpressure.
 - `/api/v2/status` and `/api/v2/pairing`: local diagnostics and explicit pairing candidates.

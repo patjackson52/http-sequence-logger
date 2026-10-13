@@ -19,6 +19,16 @@ Pause live stops viewer updates; collection continues. Importing a file pauses l
 
 Build with `npm run build:viewer`; verify live bootstrap/reconnect/import/pause/resume through `npm run check:live-setup` with installed Google Chrome.
 
+## HTTP request files
+
+Open a session and choose **HTTP requests**. When the loaded session has multiple sources, **Request source** selects one source's requests. App and SDK requests on the same captured client share a source; backends remain distinct. A single source displays its label without a picker. Recorded source identity determines grouping; captures without enough identity retain separate recording groups rather than guessing that devices match.
+
+The read-only, selectable request file shows all captured HTTP requests for the selected source in the loaded session, across its recording periods. Search, owner, outcome, origin, HTTP-only and recording filters from the sequence/list views do not limit this file. The scope label identifies the session, source, recording count and request count. Source order and local recording order are preserved; independent recording clocks do not establish global timing. Unchanged live updates preserve source selection and scroll. Switching views or entering and exiting comparison preserves the request source; another session, import or collector resets selection.
+
+**Download .http** and **Download .rest** save the displayed UTF-8 text with the corresponding extension. Requests use `###` separators, recorded method and URL, recorded headers, and an optional captured body. Capture limitations, provenance and response observations are comments. Missing, omitted or truncated values remain explicitly incomplete; downloaded files may need editing before replay in an HTTP file client. The viewer displays text locally and does not execute requests.
+
+Run `npm run check:http-export` with installed Chrome for source selection, filter independence, matching downloads, live polling and narrow-screen keyboard verification.
+
 ## Related server logs
 
 **Refresh related logs** starts a bounded collector job across its configured source adapters for the selected session's trace IDs. The same control becomes **Cancel refresh** while running. The compact status shows queued/collecting, updated, no new logs, no configured sources, partial logs, cancellation or failure. Hover the status for per-source diagnostics. Partial logs include sampling, truncation or parse errors; completed lookup does not prove every downstream call was recorded. Configure adapters and server logging before executing the request; refreshing retrieves retained observations.
