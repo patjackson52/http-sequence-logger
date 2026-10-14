@@ -29,6 +29,14 @@ The read-only, selectable request file shows all captured HTTP requests for the 
 
 Run `npm run check:http-export` with installed Chrome for source selection, filter independence, matching downloads, live polling and narrow-screen keyboard verification.
 
+## Base64 request previews
+
+The **Request** inspector adds a compact **Base64 · Decode** control only for detected query parameter or non-redacted header values, including Basic authorization values. Request bodies use one toggle for the whole encoded payload, nested JSON string values, or URL-encoded form values; repeated parameter names and their order are retained. Paired comparison **Request** panels offer the same preview for each side. **Encoded** returns to the recorded presentation. Decoded content is inert text, and body Copy always copies recorded content.
+
+Detection accepts canonical standard Base64 and Base64URL with optional padding, then requires readable UTF-8. It is deliberately conservative: ambiguous short unpadded strings, ordinary words/IDs, invalid encodings and binary data stay unchanged. Explicit capture `content.encoding: base64` can preview readable text without inference. Redacted, truncated or partial bodies are not decoded. Large inputs and deeply nested structures are bounded. Each toggle decodes one layer.
+
+Previews never modify captured events, URLs, matching rules, findings or downloads. **Raw events**, comparison **Evidence**, **Save capture**, and the literal **HTTP requests** file retain recorded values. Verify with `npm run check:base64` using installed Chrome.
+
 ## Related server logs
 
 **Refresh related logs** starts a bounded collector job across its configured source adapters for the selected session's trace IDs. The same control becomes **Cancel refresh** while running. The compact status shows queued/collecting, updated, no new logs, no configured sources, partial logs, cancellation or failure. Hover the status for per-source diagnostics. Partial logs include sampling, truncation or parse errors; completed lookup does not prove every downstream call was recorded. Configure adapters and server logging before executing the request; refreshing retrieves retained observations.

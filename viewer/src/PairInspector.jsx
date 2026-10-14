@@ -1,4 +1,6 @@
-import React, { useId, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
+import { Base64Control } from './Base64Value.jsx';
+import { inspectRequestMetadata, inspectRequestBodyData } from './request-base64.mjs';
 import './comparison-inspector.css';
 
 const TABS = ['Changes', 'Request', 'Response', 'Context', 'Evidence'];
@@ -57,9 +59,17 @@ function CopyFinding({ pair, diff, snapshots }) {
   }}>Copy finding</button><span role="status">{state}</span>{state.startsWith('Clipboard') && <pre tabIndex={0}>{JSON.stringify(findingFor(pair, diff, snapshots), null, 2)}</pre>}</div>;
 }
 
-function PairedValue({ title, values, dimension }) {
+function PairedPreview({ observation, inspect }) {
+  const recorded = pairedValueText(observation);
+  const match = useMemo(() => observation?.present && inspect ? inspect(observation.value) : null, [inspect, observation?.present, observation?.value]);
+  const [selected, setSelected] = useState(null);
+  const active = !!match && selected === recorded;
+  return <>{match && <Base64Control count={match.count} active={active} onClick={() => setSelected(active ? null : recorded)} />}{active && <p className="base64-preview-label">Decoded preview · capture metadata remains recorded</p>}<pre>{active ? match.decoded : recorded}</pre></>;
+}
+
+function PairedValue({ title, values, dimension, inspect }) {
   return <section className="paired-field"><header><code>{title || '/'}</code>{dimension && <span className="pair-dimension">Δ {dimension}</span>}</header>
-    <div className="paired-values">{SIDES.map(side => <div className={`paired-value ${side}`} key={side}><span className="pair-side-label">{side}</span><pre>{pairedValueText(values[side])}</pre></div>)}</div>
+    <div className="paired-values">{SIDES.map(side => <div className={`paired-value ${side}`} key={side}><span className="pair-side-label">{side}</span><PairedPreview observation={values[side]} inspect={inspect}/></div>)}</div>
   </section>;
 }
 
@@ -70,10 +80,10 @@ function SourceSummary({ reference, events }) {
     <small>Execution: {terminal ? words(terminal.data.outcome ?? terminal.data.completion ?? terminal.data.reason ?? 'terminal event observed') : reference ? 'terminal completion not observed' : 'no counterpart'}{response ? ` · HTTP ${response.data.response.status_code}` : ''}</small></>;
 }
 
-function RawPairedEvents({ title, events, select }) {
+function RawPairedEvents({ title, events, select, inspect }) {
   const chosen = Object.fromEntries(SIDES.map(side => [side, events[side].filter(select)]));
   const count = Math.max(chosen.primary.length, chosen.secondary.length);
-  return <section><h3>{title}</h3>{count ? Array.from({ length: count }, (_, index) => <PairedValue key={index} title={`${title} ${index + 1}`} values={Object.fromEntries(SIDES.map(side => [side, { present: !!chosen[side][index], value: chosen[side][index]?.data ?? null }]))} />) : <p className="muted">No observation captured on either side.</p>}</section>;
+  return <section><h3>{title}</h3>{count ? Array.from({ length: count }, (_, index) => <PairedValue key={index} title={`${title} ${index + 1}`} inspect={inspect} values={Object.fromEntries(SIDES.map(side => [side, { present: !!chosen[side][index], value: chosen[side][index]?.data ?? null }]))} />) : <p className="muted">No observation captured on either side.</p>}</section>;
 }
 
 export default function PairInspector({ pair, diff, snapshots, tab = 'Changes', onTab, onClose, onResolve, onLocate }) {
@@ -104,7 +114,7 @@ export default function PairInspector({ pair, diff, snapshots, tab = 'Changes', 
         <section><h3>Excluded by profile</h3>{pair.ignored_paths.length ? <ul>{pair.ignored_paths.map(path => <li key={path}><code>{path || '/ (whole projection)'}</code></li>)}</ul> : <p className="muted">No projected paths excluded for this pair.</p>}<p>Ignored headers: {diff.profile.ignore_headers.join(', ') || 'none'}</p></section>
         <details><summary>Captured context, including unchanged values</summary><RawPairedEvents title="Start metadata" events={events} select={event => event.event_type.endsWith('.started')} /></details>
       </>}
-      {selectedTab === 'Request' && <><PairedValue title="Request metadata, URL, repeated headers" values={Object.fromEntries(SIDES.map(side => [side, observed(request[side], 'request')]))} /><RawPairedEvents title="Request body capture" events={events} select={event => event.event_type === 'http.body.captured' && event.data.direction === 'request'} /><RawPairedEvents title="Local invocation" events={events} select={event => event.event_type === 'operation.started'} /><p className="muted">Values are preserved as recorded. Absent, null, empty strings, redacted and truncated captures remain distinct. Local arguments are not captured.</p></>}
+      {selectedTab === 'Request' && <><PairedValue key={pair.id} title="Request metadata, URL, repeated headers" inspect={inspectRequestMetadata} values={Object.fromEntries(SIDES.map(side => [side, observed(request[side], 'request')]))} /><RawPairedEvents key={pair.id} title="Request body capture" inspect={inspectRequestBodyData} events={events} select={event => event.event_type === 'http.body.captured' && event.data.direction === 'request'} /><RawPairedEvents title="Local invocation" events={events} select={event => event.event_type === 'operation.started'} /><p className="muted">Values are preserved as recorded. Absent, null, empty strings, redacted and truncated captures remain distinct. Local arguments are not captured.</p></>}
       {selectedTab === 'Response' && <><RawPairedEvents title="Response metadata and headers" events={events} select={event => event.event_type === 'http.response.headers'} /><RawPairedEvents title="Response body capture" events={events} select={event => event.event_type === 'http.body.captured' && event.data.direction === 'response'} /><RawPairedEvents title="Trailers" events={events} select={event => event.event_type === 'http.trailers'} /><RawPairedEvents title="Terminal execution outcome" events={events} select={event => event.event_type === 'http.ended' || event.event_type === 'operation.ended' || event.event_type === 'session.ended'} /><p className="muted">Header arrival does not establish successful completion. Local business return values are not captured.</p></>}
       {selectedTab === 'Context' && <><section><h3>Correspondence</h3><p>{words(pair.matching.basis)} · confidence {pair.matching.confidence}</p><p className="muted">Exact matching describes source identity or a unique key, not equivalent behavior.</p>{pair.matching.candidate_node_ids.length > 0 && <pre>{JSON.stringify(pair.matching.candidate_node_ids, null, 2)}</pre>}{pair.presence !== 'both' && onResolve && <button onClick={() => onResolve(pair)}>Resolve match…</button>}</section><PairedValue title="Source identity and ancestry" values={Object.fromEntries(SIDES.map(side => [side, { present: !!pair[side], value: pair[side] }]))} />{parent && <button onClick={() => onLocate?.(parent.id)}>Open paired ancestor · {parent.primary?.label || parent.secondary?.label}</button>}<section><h3>Locate in layout</h3><div className="actions">{['aligned', 'outline', 'connections'].map(layout => <button key={layout} onClick={() => onLocate?.(pair.id, layout)}>{layout === 'aligned' ? 'Aligned sequences' : layout === 'outline' ? 'Change outline' : 'Order connections'}</button>)}</div></section><section><h3>Comparison scope</h3><p>Included: {diff.scope.included.join('; ')}</p><p>Excluded: {diff.scope.excluded.join('; ') || 'none'}</p><p className="muted">Presentation filters do not change matching or compared input.</p></section></>}
       {selectedTab === 'Evidence' && <><CopyFinding pair={pair} diff={diff} snapshots={snapshots} /><p className="muted">Pointers address the immutable canonical snapshot, and each ID is checked against that event. Recorded content is inert text.</p>{SIDES.map(side => <section key={side}><h3 className={`pair-evidence-heading ${side}`}>{side} source events</h3>{!pair[side] && <p>No counterpart.</p>}{evidence[side].map((item, index) => <details key={`${item.pointer}-${index}`}><summary>{item.event?.event_type || 'Unavailable evidence'} · {item.pointer}</summary><p className="mono">Event ID: {item.eventId}</p>{item.original?.fileName && <p>{item.original.fileName} · line {item.original.line}</p>}<p className={item.valid ? 'muted' : 'error'}>{item.valid ? '✓ Pointer and event ID verified' : 'Reference does not resolve to the expected event'}</p>{item.event && <pre>{JSON.stringify(item.event, null, 2)}</pre>}{item.event && item.original?.text && <details><summary>Original source line</summary><pre>{item.original.text}</pre></details>}</details>)}</section>)}</>}

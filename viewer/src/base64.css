@@ -1,0 +1,4 @@
+.base64-control{display:inline-flex;align-items:center;gap:2px;margin-left:6px;color:var(--muted);font-family:'Source Sans 3',system-ui,sans-serif;font-size:10px;white-space:nowrap}
+.base64-control .small{margin-left:3px}
+.base64-value{overflow-wrap:anywhere;white-space:pre-wrap}
+.base64-preview-label{color:var(--muted);font-size:11px;margin-top:6px}
