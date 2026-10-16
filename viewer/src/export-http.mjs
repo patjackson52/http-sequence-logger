@@ -109,17 +109,81 @@ function formatBody(body, request) {
   return result;
 }
 
+// All response/capture information is comments before the active request. Nothing
+// can accidentally become request payload bytes or an HTTP-client directive.
+const note = (label, value) => `# ${label}: ${json(value)}`;
+const oneLine = value => String(value).replace(/[\x00-\x1f\x7f\u2028\u2029]/g, char => JSON.stringify(char).slice(1, -1));
+function endpointNotes(label, url) {
+  if (!url) return [`# ${label} URL: not recorded`];
+  const notes = [`# ${label} URL: ${oneLine(url)}`];
+  try {
+    const parsed = new URL(url);
+    notes.push(`# ${label} host: ${oneLine(parsed.hostname)}`, `# ${label} port: ${parsed.port || (parsed.protocol === 'https:' ? '443 (URL default)' : '80 (URL default)')}`);
+  } catch { /* Preserve recorded URL; never invent an address. */ }
+  return notes;
+}
+function headerNotes(label, headers, includeValues = true) {
+  if (!headers) return [`# ${label}: not recorded`];
+  const { entries, ...details } = headers;
+  const notes = [note(label, { ...details, entries: (entries || []).map(({ name, redacted }) => ({ name, redacted })) })];
+  if (includeValues) for (const header of entries || []) notes.push(`# ${oneLine(header.name)}: ${oneLine(header.value)}`);
+  return notes;
+}
+function bodyNotes(label, body, inline = false, headers = null) {
+  if (!body) return [`# ${label}: not recorded`];
+  const { content, ...details } = body;
+  const notes = [note(label, { ...details, encoding: content?.encoding ?? null })];
+  if (content && !inline) {
+    if (content.encoding === 'base64') notes.push(note(`${label} (base64)`, content.data));
+    else if (/[\x00-\x08\x0b-\x1f\x7f\u2028\u2029]/.test(content.data)) notes.push(note(`${label} (escaped UTF-8)`, content.data));
+    else notes.push(...formatBody(body, {headers}).split('\n').map(line => `# ${line.replace(/\r/g, '\\r')}`));
+  }
+  return notes;
+}
+function exchangeNotes(exchange, unsafe) {
+  const notes = [], request = exchange.request, body = exchange.requestBody;
+  const events = exchange.rawEvents || [];
+  notes.push(...endpointNotes('Request', request?.url));
+  if (request) {
+    const { method, url, headers, ...details } = request;
+    notes.push(note('Request details', details), ...headerNotes('Request headers', headers, !!unsafe));
+  } else notes.push('# Request start: not recorded');
+  const extraStart = {...exchange.start?.data};delete extraStart.request;
+  if (Object.keys(extraStart).length) notes.push(note('Request observation', extraStart));
+  notes.push(...bodyNotes('Request body', body, !!request && !unsafe && body?.content?.encoding === 'utf-8'));
+  const extraBodies = events.filter(event => event.event_type === 'http.body.captured' && event.data.direction === 'request' && event.data.body !== body);
+  for (const event of extraBodies) notes.push(...bodyNotes('Additional request body', event.data.body));
+  const responses = events.filter(event => event.event_type === 'http.response.headers').map(event => event.data);
+  if (!responses.length && exchange.response) responses.push({phase:'final', response:exchange.response});
+  for (const {phase, response} of responses) {
+    notes.push(`# Response (${oneLine(phase)}): HTTP ${response.status_code}${response.status_text ? ' '+oneLine(response.status_text) : ''}`,
+      ...endpointNotes('Response', response.url), note('Response URL redacted', response.url_redacted), ...headerNotes('Response headers', response.headers));
+  }
+  if (!responses.length) notes.push('# Response headers: not recorded');
+  const responseBodies = events.filter(event => event.event_type === 'http.body.captured' && event.data.direction === 'response').map(event => event.data.body);
+  if (!responseBodies.includes(exchange.responseBody) && exchange.responseBody) responseBodies.unshift(exchange.responseBody);
+  if (!responseBodies.length) notes.push('# Response body: not recorded');
+  for (const value of responseBodies) notes.push(...bodyNotes('Response body', value, false, exchange.response?.headers));
+  for (const event of events.filter(event => event.event_type === 'http.trailers')) notes.push(...headerNotes(`${event.data.direction} trailers`, event.data.headers));
+  for (const event of events.filter(event => event.event_type === 'http.metrics')) notes.push(note('Transport metrics', event.data));
+  if (exchange.end) notes.push(note('Completion', exchange.end.data));
+  else notes.push('# Completion: not recorded');
+  for (const event of events.filter(event => event.event_type.startsWith('http.') && event.extensions)) notes.push(note(`${event.event_type} extensions`, event.extensions));
+  return notes;
+}
+
 function exportExchange(exchange, number) {
   const request = exchange.request, body = exchange.requestBody;
-  const unsafe = unsafeRequest(request, body);
+  const unsafe = request ? unsafeRequest(request, body) : null;
   let path;
-  try { path = new URL(request.url).pathname; } catch { path = 'Request'; }
-  const title = `${request.method} ${path}`.replace(/[\x00-\x1f\x7f\u2028\u2029]/g, ' ').slice(0, 200);
-  const lines = [`### ${number}. ${title}`];
+  try { path = new URL(request?.url || exchange.response?.url).pathname; } catch { path = ''; }
+  const title = `${request ? request.method : 'Response only'} ${path}`.replace(/[\x00-\x1f\x7f\u2028\u2029]/g, ' ').slice(0, 200);
+  const lines = [`### ${number}. ${title}`, ...exchangeNotes(exchange, unsafe)];
+  if (!request) return lines.join('\n');
   if (unsafe) {
-    // Only request fields survive this fallback, escaped so none become directives.
     lines.push('# Request cannot be represented literally; shown as comments.', `# Method: ${json(request.method)}`, `# URL: ${json(request.url)}`);
     for (const header of request.headers?.entries || []) lines.push(`# Header: ${json(`${header.name}: ${header.value}`)}`);
+    // Escaped original request data remains recoverable even for client syntax.
     if (body?.content) lines.push(`# Body${body.content.encoding === 'base64' ? ' (base64)' : ''}: ${json(body.content.data)}`);
     return lines.join('\n');
   }
@@ -140,7 +204,7 @@ export function exportHTTP(session, sourceId, options = {}) {
   const parts = [];
   for (const recording of source.recordings) {
     for (const exchange of [...(recording.exchanges || [])].sort((a, b) => sequenceOf(a) - sequenceOf(b))) {
-      if (exchange.request && !exchange.orphan) parts.push(exportExchange(exchange, parts.length + 1));
+      parts.push(exportExchange(exchange, parts.length + 1));
     }
   }
   return { text: parts.length ? parts.join('\n\n') + '\n' : '', filename: `${filenamePart(session.name || session.sessionId)}-${filenamePart(source.label)}.${extension}`, requestCount: source.requestCount, observationCount: source.observationCount, source, extension };

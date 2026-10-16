@@ -8,3 +8,5 @@
 .http-request-text{flex:1;min-height:120px;margin:0;background:#fff;padding:16px;white-space:pre;overflow-wrap:normal;word-break:normal;overflow:auto;user-select:text;tab-size:2;line-height:1.6}
 .http-request-text code{font:inherit}
 @media(max-width:719px){.http-requests{padding:10px}.http-request-controls{align-items:stretch}.http-request-source{width:100%}.http-request-source select{min-width:0;width:100%}.http-request-downloads{width:100%}.http-request-downloads button{flex:1}.http-request-text{padding:12px;font-size:12px}}
+
+.http-request-events{flex-shrink:0;max-height:220px;overflow:auto;min-width:0}.http-request-events summary{cursor:pointer;padding:6px 0;color:var(--muted)}

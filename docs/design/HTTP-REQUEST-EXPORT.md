@@ -31,3 +31,23 @@ Browser evidence is generated under ignored `artifacts/http-export/`. These chec
 The preview and both download formats now match a concise HTTP request file: `### 1. POST /path`, the full recorded URL, headers, a blank line and the body. Numbering continues across the selected source’s recordings. Source labels omit internal UUIDs, with short ordinal labels when needed to distinguish sources. The UI removes repeated session/source/recording details and explanatory paragraphs.
 
 Verified the formatting update with 415 Node tests, production Chrome HTTP export acceptance, 12 SVG downloads and realtime viewer checks. The browser acceptance checks absence of capture metadata, matching `.http`/`.rest` downloads, readable literal JSON and compact desktop/mobile UI. The running viewer was refreshed and opened to the bundled three-origin sample’s HTTP requests view.
+
+## Complete HTTP exchange view
+
+The request file now retains recorded response data alongside every request.
+Response and capture/connection details are HTTP-file comments before the active
+request line; the active request's body remains the last part of its block.
+Every recorded response header event, request/response body observation, trailer,
+transport metric, request detail, completion/error and HTTP extension is included.
+URL-default ports are distinguished from observed remote ports. Duplicate headers,
+full payloads, redaction markers, binary Base64 and response-only captures remain
+visible and downloadable. The view adds no redaction or payload-length limit.
+No missing data is inferred, decoded or recovered.
+
+Verified this exchange update with 435 Node tests (29 HTTP export cases), the
+production viewer build, Chrome source-selection/download/mobile acceptance,
+12 SVG exports and realtime viewer checks. Browser acceptance checks full
+request/response URLs and explicit ports, complete response payloads, duplicate
+and unredacted headers, remote port/protocol, preserved redaction markers,
+expandable original HTTP events and response-only downloads. Comments remain
+before the request line/body to preserve executable request-file boundaries.
