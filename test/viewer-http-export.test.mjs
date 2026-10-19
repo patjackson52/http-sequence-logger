@@ -17,23 +17,6 @@ const sessionWith = recordings => ({ ...load(), recordings });
 const client = { platform: 'android', app_id: 'example.app' };
 const backend = { platform: 'server', app_id: 'backend.app', service_name: 'Orders', environment: 'dev', runtime: 'node' };
 
-test('common request syntax keeps method, literal URL, repeated headers and exact UTF-8 body', () => {
-  const session = load(), exchange = session.exchanges[0];
-  exchange.request.headers.entries.push({ name: 'X-Repeat', value: 'one', redacted: false }, { name: 'X-Repeat', value: 'two', redacted: false });
-  exchange.requestBody.media_type = 'text/plain';
-  exchange.requestBody.content.data = '  {"array":[1,2]}\r\n  \r\n';
-  const exported = exportOne(session);
-  assert.equal(exported.requestCount, 1);
-  assert.equal(exported.observationCount, 1);
-  assert.match(exported.filename, /\.http$/);
-  assert.ok(exported.text.endsWith('POST https://api.example/verify?tag=mobile&tag=checkout\nContent-Type: application/json\nAuthorization: [REDACTED]\nX-Repeat: one\nX-Repeat: two\n\n  {"array":[1,2]}\r\n  \r\n\n'));
-  assert.match(exported.text, /# Response \(final\): HTTP 200/);
-  assert.match(exported.text, /# Set-Cookie: \[REDACTED\]/);
-  assert.equal((exported.text.match(/^# Set-Cookie:/gm)||[]).length,2);
-  assert.doesNotMatch(exported.text, /Evidence|trace_id|success.ndjson/);
-
-});
-
 test('app and SDK requests group by confirmed client identity, not executor or origin', () => {
   const app = record('app', client), sdk = record('sdk', client), otherDevice = record('device-2', client);
   app.exchanges[0].owner = 'integrator'; sdk.exchanges[0].owner = 'sdk';
@@ -84,191 +67,165 @@ test('one live collection adapter keeps distinct backend service/environment/run
   assert.equal(new Set(groups.map(group => group.label)).size, 4);
 });
 
-test('request file preserves request details, additional bodies and responses', () => {
+test('approved transcript contains only request and response lines, headers and readable bodies', () => {
   const session = load(), exchange = session.exchanges[0];
-  exchange.request.configured_method = 'HEAD'; exchange.request.request_target = { value: '*', source: 'observed', redacted: false };
-  const bodyEvent = structuredClone(exchange.rawEvents.find(e => e.event_type === 'http.body.captured' && e.data.direction === 'request'));
-  bodyEvent.data.body.content.data = 'a second observation'; exchange.rawEvents.push(bodyEvent);
-  const { text } = exportOne(session);
-  assert.match(text, /configured_method/);assert.match(text, /request_target/);assert.match(text, /a second observation/);assert.match(text, /Set-Cookie/);
-  assert.doesNotMatch(text, /Evidence|"trace_id":|"span_id":/);
-  assert.match(text, /^### 1\. POST \/verify\n# Request URL: https:\/\/api.example\/verify\?/);
+  exchange.request.headers = { availability:'captured', entries:[{name:'Content-Type',value:'application/json'},{name:'X-Repeat',value:'one'},{name:'X-Repeat',value:'two'}] };
+  exchange.response.headers = { availability:'captured', entries:[{name:'Content-Type',value:'application/json'},{name:'Set-Cookie',value:'one'},{name:'Set-Cookie',value:'two'}] };
+  exchange.requestBody.content.data = '{"phoneNumber":"+12025550123"}';
+  exchange.responseBody.content.data = '{"verified":true}';
+  exchange.request.configured_method = 'HEAD';
+  exchange.start.data.extra = 'capture-only';
+  exchange.rawEvents.push({event_type:'http.metrics',data:{protocol_version:'h2',remote_address:'192.0.2.9',remote_port:443,phases:[]}});
+  assert.equal(exportOne(session).text, `POST https://api.example/verify?tag=mobile&tag=checkout HTTP/2
+Content-Type: application/json
+X-Repeat: one
+X-Repeat: two
+
+{
+  "phoneNumber": "+12025550123"
+}
+
+# Response
+HTTP/2 200
+Content-Type: application/json
+Set-Cookie: one
+Set-Cookie: two
+
+{
+  "verified": true
+}
+`);
 });
 
-test('JSON bodies use readable indentation while preserving literal numbers and duplicate keys', () => {
-  const session = load();session.exchanges[0].requestBody.content.data = '{"name":"Jane Doe","id":9007199254740993123,"id":2,"exponent":1e+42,"list":[true,{},"comma, colon: and \\"quotes\\""],"nested":{"email":"jane@example.com"}}';
-  const original = session.exchanges[0].requestBody.content.data;
-  const { text } = exportOne(session), body = text.slice(text.indexOf('\n\n') + 2).trimEnd();
-  assert.match(body, /^\{\n  "name": "Jane Doe",\n  "id": 9007199254740993123,\n  "id": 2,/);
-  assert.match(body, /"exponent": 1e\+42/);
-  assert.match(body, /"nested": \{\n    "email": "jane@example.com"\n  \}/);
-  assert.deepEqual(JSON.parse(body), JSON.parse(original));
+test('unknown protocol and transport are omitted; conflicting transaction versions are not guessed', () => {
+  const session=load(), exchange=session.exchanges[0];
+  assert.match(exportOne(session).text, /^POST [^\n]+\n# Headers partially captured\nContent-Type:/);
+  assert.doesNotMatch(exportOne(session).text, /HTTP\/|Transport|TLS|TCP/);
+  exchange.rawEvents.push({event_type:'http.metrics',data:{protocol_version:'h2'}},{event_type:'http.metrics',data:{protocol_version:'http/1.1'}});
+  assert.doesNotMatch(exportOne(session).text, /HTTP\//);
+  exchange.rawEvents.pop();
+  assert.match(exportOne(session).text, /HTTP\/2/);
+  exchange.rawEvents.at(-1).data.protocol_version=null;
+  assert.doesNotMatch(exportOne(session).text, /HTTP\//);
 });
 
-test('invalid, deeply nested and non-JSON bodies retain their captured text', () => {
-  const session = load(), exchange = session.exchanges[0];
-  for (const body of ['{"unfinished":', '['.repeat(40) + '1' + ']'.repeat(40)]) {
-    exchange.requestBody.content.data = body;assert.ok(exportOne(session).text.endsWith('\n\n'+body+'\n'));
-  }
-  exchange.requestBody.media_type='text/plain';exchange.requestBody.content.data='{"compact":true}';
-  assert.ok(exportOne(session).text.endsWith('\n\n{"compact":true}\n'));
-});
-
-test('recording first appearance and local sequence win over independent wall-clock timestamps', () => {
-  const first = record('first', backend, 2), second = record('second', backend);
-  first.exchanges[0].request.url = 'https://example.test/one';
-  first.exchanges[1].request.url = 'https://example.test/two';
-  second.exchanges[0].request.url = 'https://example.test/three';
+test('all sources have separate sections, while one source needs no heading', () => {
+  const first=record('first',client,2), second=record('second',backend);
+  first.exchanges[0].request.url='https://client.test/one';
+  first.exchanges[1].request.url='https://client.test/two';
+  second.exchanges[0].request.url='https://server.test/three';
   first.exchanges.reverse();
-  first.startedAt = '2099-01-01T00:00:00Z'; second.startedAt = '1900-01-01T00:00:00Z';
-  const { text } = exportOne(sessionWith([first, second]));
-  assert.ok(text.indexOf('\nPOST https://example.test/one') < text.indexOf('\nPOST https://example.test/two'));
-  assert.ok(text.indexOf('\nPOST https://example.test/two') < text.indexOf('\nPOST https://example.test/three'));
-  assert.deepEqual([...text.matchAll(/^### (\d+)\./gm)].map(m => m[1]), ['1', '2', '3']);
+  first.startedAt='2099-01-01T00:00:00Z';second.startedAt='1900-01-01T00:00:00Z';
+  const session=sessionWith([first,second]);
+  const all=exportHTTP(session,null);
+  assert.equal(all.requestCount,3);
+  assert.equal((all.text.match(/^### Source:/gm)||[]).length,2);
+  assert.ok(all.text.indexOf('https://client.test/one')<all.text.indexOf('https://client.test/two'));
+  assert.ok(all.text.indexOf('https://client.test/two')<all.text.indexOf('https://server.test/three'));
+  const selected=exportHTTP(session,requestSources(session)[1].id);
+  assert.match(selected.text,/^### Source: Backend/);
+  assert.doesNotMatch(selected.text,/client.test/);
+  assert.doesNotMatch(exportHTTP(load(),null).text,/^### Source:/m);
+  assert.throws(()=>exportHTTP(session,'unknown'),/Select an available/);
+  assert.equal(exportHTTP(session,null,{extension:'rest'}).text,all.text);
+  assert.match(exportHTTP(session,null,{extension:'rest'}).filename,/\.rest$/);
 });
 
-test('response-only orphan observations remain visible without inventing a request', () => {
-  const events = fixture('success').trim().split('\n').map(JSON.parse).filter(e => e.event_type !== 'http.request.started');
-  const session = importFiles([{ name: 'orphan.ndjson', text: events.map(JSON.stringify).join('\n') }]).sessions[0];
-  const { text, requestCount, observationCount } = exportOne(session);
-  assert.equal(requestCount, 0);assert.equal(observationCount, 1);assert.match(text,/Response only/);assert.match(text,/HTTP 200/);assert.match(text,/verified/);assert.doesNotMatch(text,/^(?:GET|POST) /m);
+test('JSON formatting preserves large numeric literals, duplicate keys, exponents and original events', () => {
+  const session=load(), body=session.exchanges[0].requestBody;
+  const original='{"id":9007199254740993123,"id":2,"exponent":1e+42,"nested":{"email":"jane@example.com"}}';
+  body.content.data=original;
+  const text=exportOne(session).text;
+  assert.match(text, /"id": 9007199254740993123,\n  "id": 2,/);
+  assert.match(text, /"exponent": 1e\+42/);
+  assert.match(text, /"nested": \{\n    "email": "jane@example.com"/);
+  assert.equal(body.content.data,original);
 });
 
-test('unavailable and base64 bodies explicitly retain limitations without inventing binary bytes', () => {
-  const session = load(), exchange = session.exchanges[0];
-  exchange.requestBody = { availability: 'captured', representation: 'wire', truncated: true, redacted: true, reason: 'capture_limit', content: { encoding: 'base64', data: 'AAH/Qg==' } };
-  const { text } = exportOne(session);
-  assert.match(text, /# Body \(base64\): "AAH\/Qg=="\nPOST /);
-  assert.match(text, /capture_limit/);assert.match(text,/"truncated":true/);
-  assert.ok(text.endsWith('Authorization: [REDACTED]\n'));
-  exchange.requestBody = null;
-  assert.match(exportOne(session).text, /# Body not captured\./);
-
+test('plain, invalid JSON and CRLF request bodies retain their captured text', () => {
+  const session=load(), body=session.exchanges[0].requestBody;
+  for(const value of ['{"unfinished":','['.repeat(40)+'1'+']'.repeat(40),'line one\r\nline two\r\n']) {
+    body.content.data=value;
+    assert.ok(exportOne(session).text.includes('\n\n'+value+'\n\n# Response'));
+  }
+  body.media_type='text/plain';body.content.data='{"compact":true}';
+  assert.ok(exportOne(session).text.includes('\n\n{"compact":true}\n\n# Response'));
 });
 
-test('captured truncated/redacted UTF-8 stays literal with capture state', () => {
-  const session = load(), exchange = session.exchanges[0];
-  exchange.requestBody.truncated = true; exchange.requestBody.redacted = true;
-  exchange.requestBody.content.data = '{"secret":"[REDACTED]","unfinished":';
-  const { text } = exportOne(session);
-  assert.match(text,/"truncated":true,"redacted":true/);
-  assert.ok(text.endsWith('\n\n{"secret":"[REDACTED]","unfinished":\n'));
+test('missing bodies, truncation, binary and missing responses use short markers', () => {
+  const session=load(), exchange=session.exchanges[0];
+  exchange.requestBody=null;
+  assert.match(exportOne(session).text,/# Body not captured/);
+  exchange.requestBody={availability:'captured',truncated:true,redacted:true,content:{encoding:'base64',data:'AAH/Qg=='}};
+  let text=exportOne(session).text;
+  assert.match(text,/# Body truncated\n# Body redacted\n# Body \(base64\)\nAAH\/Qg==/);
+  assert.doesNotMatch(text,/stored_bytes|availability|capture_limit/);
+  exchange.requestBody={availability:'not_applicable'};
+  exchange.responseBody={availability:'not_applicable'};
+  text=exportOne(session).text;
+  assert.doesNotMatch(text,/# Body/);
+  exchange.response=null;
+  exchange.rawEvents=exchange.rawEvents.filter(event=>event.event_type!=='http.response.headers');
+  assert.match(exportOne(session).text,/# No response captured/);
+});
+
+test('response-only observations preserve response headers and payload without a fabricated request', () => {
+  const events=fixture('success').trim().split('\n').map(JSON.parse).filter(e=>e.event_type!=='http.request.started');
+  const session=importFiles([{name:'orphan.ndjson',text:events.map(JSON.stringify).join('\n')}]).sessions[0];
+  const {text,requestCount,observationCount}=exportOne(session);
+  assert.equal(requestCount,0);assert.equal(observationCount,1);
+  assert.match(text,/# Request not captured/);assert.match(text,/HTTP 200/);assert.match(text,/verified/);
+  assert.equal((text.match(/^Set-Cookie:/gm)||[]).length,2);
+  assert.doesNotMatch(text,/^(?:GET|POST) /m);
+});
+
+test('informational responses and HTTP trailers retain their standard header form', () => {
+  const session=load(),exchange=session.exchanges[0];
+  const interim=structuredClone(exchange.rawEvents.find(e=>e.event_type==='http.response.headers'));
+  interim.data.phase='informational';interim.data.response.status_code=103;interim.data.response.status_text='Early Hints';
+  interim.data.response.headers.entries=[{name:'Link',value:'</next>; rel=preload'}];
+  exchange.rawEvents.unshift(interim);
+  exchange.rawEvents.push({event_type:'http.trailers',data:{direction:'response',headers:{availability:'captured',entries:[{name:'X-Checksum',value:'abc'}]}}});
+  const text=exportOne(session).text;
+  assert.match(text,/# Response\nHTTP 103 Early Hints\nLink: <\/next>; rel=preload/);
+  assert.match(text,/# Response trailers\nX-Checksum: abc/);
+  assert.equal((text.match(/"verified"/g)||[]).length,1);
 });
 
 for (const attack of ['hello\n###\nDELETE https://attacker.test', '{{secret}}', '< /etc/passwd', '> {% evil() %}', '# @name injected', '@var = value', '\u0000binary']) {
-  test(`body client syntax stays commented with exact recoverable data: ${JSON.stringify(attack)}`, () => {
-    const session = load(); session.exchanges[0].requestBody.content.data = attack;
-    const { text } = exportOne(session);
-    assert.match(text, /shown as comments/);
-    assert.equal(/^(?:POST|DELETE) /m.test(text), false);
-    const captured = text.split('\n').find(line => line.startsWith('# Body: '));
-    assert.equal(JSON.parse(captured.slice('# Body: '.length)), attack);
+  test(`exceptional request syntax stays recoverable: ${JSON.stringify(attack)}`, () => {
+    const session=load();session.exchanges[0].requestBody.content.data=attack;
+    const {text}=exportOne(session);
+    assert.match(text,/shown as comments/);
+    assert.doesNotMatch(text,/^(?:POST|DELETE) /m);
+    const captured=text.split('\n').find(line=>line.startsWith('# Body: '));
+    assert.equal(JSON.parse(captured.slice('# Body: '.length)),attack);
   });
 }
 
-test('multiline headers and templated URLs disable the entire request without dropping values', () => {
-  const session = load(), exchange = session.exchanges[0];
-  exchange.request.headers.entries.push({ name: 'X-Fake', value: 'a\n\n###\nDELETE https://attacker.test', redacted: false });
-  let exported = exportOne(session);
-  assert.match(exported.text, /shown as comments/);
-  assert.equal(/^POST /m.test(exported.text), false);
-  assert.ok(exported.text.includes('# Header: '+JSON.stringify('X-Fake: '+exchange.request.headers.entries.at(-1).value)));
-  assert.match(exported.text,/"redacted":true/);
-  exchange.request.headers.entries.pop(); exchange.request.url += '?secret={{token}}';
-  exported = exportOne(session);
-  assert.match(exported.text, /shown as comments/);
-  assert.equal(/^POST /m.test(exported.text), false);
-});
-
-test('metadata cannot introduce directives, filename paths, or additional executable requests', () => {
-  const session = load(); session.name = '../../test\n###\nGET https://attacker.test';
-  session.recordings[0].producer.app_id = 'app\n# @name fake\nGET https://attacker.test';
-  const exported = exportOne(session);
-  assert.equal(exported.filename.includes('/'), false);
-  assert.equal(exported.filename.includes('\n'), false);
-  assert.equal(/^GET /m.test(exported.text), false);
-  assert.equal(/^# @name/m.test(exported.text), false);
-  assert.equal(exported.text.includes(session.name), false);
-  assert.doesNotMatch(exported.text, /Session|Selected source|Producer|Recording/);
-});
-
-test('RFC token method/header names that clients parse as comments stay recoverable', () => {
-  const session = load(), exchange = session.exchanges[0];
-  exchange.request.method = '#GET';
-  assert.match(exportOne(session).text, /shown as comments/);
-  exchange.request.method = 'POST'; exchange.request.headers.entries.push({ name: '#Header', value: 'literal', redacted: false });
-  const { text } = exportOne(session);
-  assert.match(text, /shown as comments/);
-  assert.equal(/^POST /m.test(text), false);
-  assert.match(text, /# Header: "#Header: literal"/);
-});
-
-test('empty sources remain inspectable, selection is explicit, and rest uses identical syntax', () => {
-  const session = sessionWith([record('empty', client, 0), record('other', client)]);
-  const groups = requestSources(session);
-  assert.equal(groups[0].requestCount, 0);
-  assert.equal(exportHTTP(session, groups[0].id).text, '');
-  assert.throws(() => exportHTTP(session, null), /Select an available/);
-  assert.throws(() => exportHTTP(session, 'unknown'), /Select an available/);
-  const http = exportHTTP(session, groups[1].id), rest = exportHTTP(session, groups[1].id, { extension: 'rest' });
-  assert.equal(http.text, rest.text);
-  assert.match(rest.filename, /\.rest$/);
-  assert.deepEqual(requestSources(null), []);
-});
-
-
-test('request and response URLs retain explicit ports, queries, headers and all payload bytes', () => {
+test('response bodies and headers cannot introduce extra transcript sections', () => {
   const session=load(), exchange=session.exchanges[0];
-  exchange.request.url='https://api.example:8443/verify?tag=one&tag=two';
-  exchange.response.url='http://edge.example:8088/result?id=42';
-  exchange.request.headers.entries.push({name:'X-Request',value:'visible-request-header',redacted:false});
-  exchange.response.headers.entries.push({name:'X-Response',value:'visible-response-header',redacted:false});
-  exchange.responseBody.media_type='text/plain';exchange.responseBody.content.data='response-start\n'+'x'.repeat(300000)+'response-end';
-  const {text}=exportOne(session);
-  for(const value of ['https://api.example:8443/verify?tag=one&tag=two','# Request port: 8443','http://edge.example:8088/result?id=42','# Response port: 8088','X-Request: visible-request-header','# X-Response: visible-response-header','response-start','response-end'])assert.ok(text.includes(value),value);
-  assert.ok(text.includes('x'.repeat(300000)));
-  assert.ok(text.indexOf('# Response body:')<text.indexOf('\nPOST https://'));
-  assert.match(text,/# Request headers: .*"redacted":true/);
+  const value='line one\r\n###\r\nDELETE https://attacker.test\r\n> {% run() %}';
+  exchange.responseBody.media_type='text/plain';exchange.responseBody.content.data=value;
+  exchange.response.headers.entries.push({name:'X-Test',value:'a\n\n###\nDELETE https://attacker.test'});
+  const text=exportOne(session).text;
+  assert.doesNotMatch(text,/^###|^DELETE |^> /m);
+  const encoded=text.split('\n').find(line=>line.startsWith('# Body (escaped UTF-8): '));
+  assert.equal(JSON.parse(encoded.slice('# Body (escaped UTF-8): '.length)),value);
 });
 
-test('informational/final responses, repeated body observations and trailers are retained',()=>{
-  const session=load(),exchange=session.exchanges[0];
-  const final=exchange.rawEvents.find(e=>e.event_type==='http.response.headers');
-  const interim=structuredClone(final);interim.data.phase='informational';interim.data.response.status_code=103;interim.data.response.status_text='Early Hints';interim.data.response.headers.entries=[{name:'Link',value:'</next>; rel=preload',redacted:false}];
-  exchange.rawEvents.unshift(interim);
-  const more=structuredClone(exchange.rawEvents.find(e=>e.event_type==='http.body.captured'&&e.data.direction==='response'));more.data.body.content={encoding:'base64',data:'AAECAwQ='};exchange.rawEvents.push(more);
-  for(const direction of ['request','response'])exchange.rawEvents.push({event_type:'http.trailers',data:{direction,headers:{availability:'captured',representation:'raw',order_preserved:true,entries:[{name:'X-Trailer',value:direction+'-checksum',redacted:false}],reason:null}}});
-  const {text}=exportOne(session);
-  for(const value of ['HTTP 103 Early Hints','HTTP 200','# Link: </next>; rel=preload','verified','AAECAwQ=','request-checksum','response-checksum'])assert.ok(text.includes(value),value);
+test('source labels and filenames stay on one line without introducing requests', () => {
+  const session=sessionWith([record('one',client),record('two',{...backend,service_name:'Orders\n###\nGET https://attacker.test'})]);
+  session.name='../../test\nGET https://attacker.test';
+  const {text,filename}=exportHTTP(session,null);
+  assert.doesNotMatch(filename,/[/\n]/);
+  assert.doesNotMatch(text,/^GET https:\/\/attacker.test/m);
+  assert.equal((text.match(/^### Source:/gm)||[]).length,2);
 });
 
-test('transport metrics include protocol, remote port, redirect transaction headers and phases',()=>{
-  const session=load('ios-logical-transactions'),exchange=session.exchanges[0];
-  const metrics=exchange.rawEvents.filter(e=>e.event_type==='http.metrics');
-  metrics[0].data.remote_address='192.0.2.9';metrics[0].data.remote_port=9443;
-  metrics[0].data.transaction.response.headers.entries.push({name:'Location',value:'https://edge.example:9443/result?token=[REDACTED]',redacted:true});
-  const {text}=exportOne(session);
-  for(const value of ['"protocol_version":"h2"','"remote_address":"192.0.2.9"','"remote_port":9443','"status_code":302','"name":"Location"','"name":"response_read"','https://edge.example/result'])assert.ok(text.includes(value),value);
-  assert.equal((text.match(/^# Transport metrics:/gm)||[]).length,2);
-});
-
-test('failures, unavailable observations and response syntax stay honest and inert',()=>{
-  const session=load('stream-read-timeout');const exchange=session.exchanges[0];
-  exchange.responseBody={availability:'unavailable',reason:'body_not_observed',content:null};
-  const {text}=exportOne(session);
-  assert.match(text,/HTTP 200/);assert.match(text,/"outcome":"timeout"/);assert.match(text,/"error":\{/);assert.match(text,/body_not_observed/);
-  const hostile=load();hostile.exchanges[0].responseBody.media_type='text/plain';hostile.exchanges[0].responseBody.content.data='###\nDELETE https://attacker.test\n# @name injected\n> {% run() %}';
-  const output=exportOne(hostile).text;
-  assert.doesNotMatch(output,/^DELETE |^# @name |^> \{%/m);
-  assert.match(output,/# DELETE https:\/\/attacker.test/);
-  assert.equal((output.match(/^### /gm)||[]).length,1);
-});
-
-test('response text with CRLF remains losslessly recoverable and does not create request syntax',()=>{
-  const session=load(),body=session.exchanges[0].responseBody;
-  body.media_type='text/plain';body.content.data='line one\r\nline two\r\n###\r\nGET https://attacker.test';
-  const {text}=exportOne(session);
-  const encoded=text.split('\n').find(line=>line.startsWith('# Response body (escaped UTF-8): '));
-  assert.equal(JSON.parse(encoded.slice('# Response body (escaped UTF-8): '.length)),body.content.data);
-  assert.equal((text.match(/^### /gm)||[]).length,1);assert.doesNotMatch(text,/^GET https:\/\/attacker.test/m);
+test('empty sources have no invented traffic and empty sessions remain downloadable as empty text', () => {
+  const session=sessionWith([record('empty',client,0)]);
+  assert.equal(exportOne(session).text,'');
+  assert.equal(exportHTTP(session,null).observationCount,0);
+  assert.deepEqual(requestSources(null),[]);
 });
