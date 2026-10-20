@@ -11,13 +11,23 @@ Choose the route from the logger checkout after `npm ci` with Node 24.13.x:
 
 Run `npm start` from the contract repository. Open the collector's ordinary loopback URL. Reader credentials bootstrap automatically and stay separate from producer credentials.
 
-Devices and environments → Apps → Sessions lists enrolled sources, including apps with no events. Browser environments are origin-scoped local IDs, not verified physical devices. Native labels use actual package/bundle identifiers. Last-seen means recent presence is unknown; it does not complete a session.
+The sidebar (**Logs and sessions**) is one explorer. **Devices and environments** → Apps → Sessions lists enrolled sources, including apps with no events; it stays listed while live viewing is paused or a file is open, with **Resume live** in its header. Clicking a source or session while paused resumes live with that selection. Browser environments are origin-scoped local IDs, not verified physical devices. Native labels use actual package/bundle identifiers. Last-seen means recent presence is unknown; it does not complete a session.
 
 Session summaries are paged separately from capture events. Selecting a source or logical session uses its retained trace IDs as entry points and includes related server events at a fixed high-water mark. Selection, pause and collector changes fence old responses. Shared logical sessions preserve their identity across sources; source filtering restricts the seed client recordings; correlated server recordings remain visible. Very large selected sessions exceed the diagram limit and require capture export/smaller file inspection.
+
+Rows show `{session name}` and a short 24-hour start time (`14:32`, `Tue 14:32`, `Oct 3`, `2025-10-03`); hover for the full name, file or session ID, ISO time and event count. The open log or session is marked `aria-current` with an accent bar. Source rows show the platform with ● (ready/delivering) or ◌ (last seen); status details are in the tooltip unless attention is needed.
 
 Pause live stops viewer updates; collection continues. Importing a file pauses live viewing. Resume live returns to the collector. Save capture exports collector retention, rather than only the selected session. Static `npm run viewer` remains a local file viewer.
 
 Build with `npm run build:viewer`; verify live bootstrap/reconnect/import/pause/resume through `npm run check:live-setup` with installed Google Chrome.
+
+## Log folders and imported files
+
+**This machine · {name}** (the collector's host name from `/api/v2/status`; **This computer** in the static viewer) lists folders you add. **+ Add folder…** uses the browser's read-only folder picker (desktop Chrome or Edge). Folder handles are remembered per viewer origin in IndexedDB (`network-log-lab-explorer`), up to 20; after reload a folder whose permission needs confirmation shows **Reconnect**. Expanding a folder lists its subfolders (A→Z) and `*.ndjson` logs newest first, reading at most 256 KiB per file for the first `session.started` name and time; dot-folders and `node_modules` are skipped, 500 entries per level and 5,000 scanned files are shown at most. Files over 16 MiB are listed as **Too large**; unreadable heads are marked. **Refresh** re-lists and **Remove** forgets the folder; files on disk are never changed. Without the picker, **Add folder (this visit only)** lists a one-time snapshot of a chosen directory; with neither, use **Import files**.
+
+Clicking a log opens it through the same import pipeline and limits, goes straight to the workspace and pauses live viewing (a too-large file is rejected first, so live keeps running). A multi-session log lists its sessions under the row once open. **Imported files** lists the latest import: single-session files as rows, multi-session files as expandable nodes. Recording periods for a multi-recording session are in a collapsed node at the bottom.
+
+Verify with `npm run check:log-explorer` (installed Chrome; stubs the picker with an origin-private directory).
 
 ## HTTP request files
 

@@ -2,8 +2,8 @@ import { createComparisonSnapshot, SNAPSHOT_LIMITS } from './comparison-data.mjs
 
 // Source registry and session summaries are independent of selected-session capture pages.
 export class CollectorClient {
-  constructor({token,automatic=false,fetcher=(...args)=>fetch(...args),onCapture=()=>{},onStatus=()=>{},onPairing=()=>{},onDevice=()=>{},onReset=()=>{},onSources=()=>{},onSessions=()=>{},onRevision=()=>{},onCollection=()=>{},retryMs=1000}) {
-    Object.assign(this,{token,automatic,fetcher,onCapture,onStatus,onPairing,onDevice,onReset,onSources,onSessions,onRevision,onCollection,retryMs});
+  constructor({token,automatic=false,fetcher=(...args)=>fetch(...args),onCapture=()=>{},onStatus=()=>{},onPairing=()=>{},onDevice=()=>{},onReset=()=>{},onSources=()=>{},onSessions=()=>{},onRevision=()=>{},onCollection=()=>{},onMachine=()=>{},retryMs=1000}) {
+    Object.assign(this,{token,automatic,fetcher,onCapture,onStatus,onPairing,onDevice,onReset,onSources,onSessions,onRevision,onCollection,onMachine,retryMs});
     this.cursor=0;this.lines=[];this.recordingSources={};this.collectorId=null;this.generation=0;this.selection={};this.sessions=[];this.followLatest=true;this._work=Promise.resolve();
     this.snapshotGeneration=0;this.snapshotReads=new Set();
   }
@@ -38,6 +38,8 @@ export class CollectorClient {
     const status=await(await this.request('/api/v2/status',signal)).json();signal.throwIfAborted();
     if(generation!==this.generation)return;
     this._publish('device',status.adapters||{},this.onDevice);
+    // Display-only host label; absent from older collectors.
+    this._publish('machine',typeof status.machine_name==='string'&&status.machine_name.trim()?status.machine_name.trim().slice(0,255):null,this.onMachine);
     const sources=await(await this.request('/api/v2/sources',signal)).json();signal.throwIfAborted();
     if(!this.collectorId)this.collectorId=sources.collector_id;
     if(sources.collector_id!==this.collectorId)throw new Error('Collector changed; reconnecting…');

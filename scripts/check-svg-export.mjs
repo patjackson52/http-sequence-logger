@@ -89,6 +89,7 @@ try {
 
   await open('examples/multi-session.ndjson');
   const recordings = await download('all-recordings');
+  await page.locator('.session-nav .recording-periods > summary').click();
   await page.getByRole('button', { name: /Recording 2 · schema/ }).click();
   const single = await download('single-recording');
   assert.equal(recordings.textLabels.filter(text => text.startsWith('Recording ')).length, 2);
