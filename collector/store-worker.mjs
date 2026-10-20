@@ -801,15 +801,17 @@ const api = {
     )
       fail(400, "Invalid session watermark");
     const L = Math.min(limit, 100);
+    // Wall timestamp of the earliest retained event: one primary-key lookup per returned row.
+    const firstAt = "(select json_extract(f.normalized,'$.timestamp') from events f where f.position=q.first_position) first_event_at";
     const clientFilter = client_only ? " and source_id in (select id from sources where json_extract(metadata,'$.platform') <> 'server')" : '';
     let rows;
     if (H === w.event_cursor) {
       rows = prepare(
-        `select namespace session_namespace,session session_id,min(first_position) first_position,max(last_position) last_position,sum(event_count) event_count,group_concat(distinct source_id) source_ids,max(name) name from recordings where (? is null or source_id=?)${clientFilter} group by namespace,session having max(last_position)>? order by last_position ${latest ? "desc" : "asc"} limit ?`,
+        `select q.*,${firstAt} from (select namespace session_namespace,session session_id,min(first_position) first_position,max(last_position) last_position,sum(event_count) event_count,group_concat(distinct source_id) source_ids,max(name) name from recordings where (? is null or source_id=?)${clientFilter} group by namespace,session having max(last_position)>? order by last_position ${latest ? "desc" : "asc"} limit ?) q order by q.last_position ${latest ? "desc" : "asc"}`,
       ).all(source_id ?? null, source_id ?? null, after, L);
     } else {
       rows = prepare(
-        `select r.namespace session_namespace,r.session session_id,min(e.position) first_position,max(e.position) last_position,count(*) event_count,group_concat(distinct r.source_id) source_ids,max(case when r.name_position<=? then r.name end) name from recordings r join events e on e.recording_id=r.id where e.position<=? and (? is null or r.source_id=?)${clientFilter} group by r.namespace,r.session having max(e.position)>? order by last_position ${latest ? "desc" : "asc"} limit ?`,
+        `select q.*,${firstAt} from (select r.namespace session_namespace,r.session session_id,min(e.position) first_position,max(e.position) last_position,count(*) event_count,group_concat(distinct r.source_id) source_ids,max(case when r.name_position<=? then r.name end) name from recordings r join events e on e.recording_id=r.id where e.position<=? and (? is null or r.source_id=?)${clientFilter} group by r.namespace,r.session having max(e.position)>? order by last_position ${latest ? "desc" : "asc"} limit ?) q order by q.last_position ${latest ? "desc" : "asc"}`,
       ).all(H, H, source_id ?? null, source_id ?? null, after, L);
     }
     return {

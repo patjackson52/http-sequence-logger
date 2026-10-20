@@ -1,4 +1,5 @@
 import http from "node:http";
+import { hostname } from "node:os";
 import { CollectionManager } from "./collections.mjs";
 import https from "node:https";
 import { timingSafeEqual, createHash, X509Certificate } from "node:crypto";
@@ -378,6 +379,7 @@ export async function startCollector({
           reply(res, 200, {
             ...(await store.status()),
             adapters: adapterStatus,
+            machine_name: hostname(),
           });
           return;
         }
