@@ -6,7 +6,7 @@ plugins {
 android {
     namespace = "dev.networklog.app"
     compileSdk = 35
-    defaultConfig { minSdk = 26; applicationId = "dev.networklog.sample"; versionCode = 2; versionName = "0.2.0"; targetSdk = 35
+    defaultConfig { minSdk = 26; applicationId = "dev.networklog.sample"; versionCode = 3; versionName = "0.3.0"; targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

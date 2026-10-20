@@ -25,5 +25,5 @@ const files = starts.map((session, index) => {
   return { file: name, description: descriptions[index], captured_at: session.timestamp, summary: validation.summary };
 });
 writeFileSync(resolve(output, 'multi-session.ndjson'), raw);
-writeFileSync(resolve(output, 'manifest.json'), JSON.stringify({ synthetic: false, source: 'Android emulator live HTTPS requests via SampleFlow / LiveFlowTest', android_version: androidVersion, api_level: api, capture_sdk: '0.2.0', redaction: 'Applied on device before writing; captures are not retrospectively fabricated or edited.', files }, null, 2) + '\n');
+writeFileSync(resolve(output, 'manifest.json'), JSON.stringify({ synthetic: false, source: 'Android emulator live HTTPS requests via SampleFlow / LiveFlowTest', android_version: androidVersion, api_level: api, capture_sdk: '0.3.0', redaction: 'Applied on device before writing; captures are not retrospectively fabricated or edited.', files }, null, 2) + '\n');
 console.log(JSON.stringify({ output: resolve(output), ...result.summary }, null, 2));

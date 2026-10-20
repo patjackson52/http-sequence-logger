@@ -1,5 +1,5 @@
 import { createPolicy, cleanURL, cleanHeaders, missingBody, safeError } from '../web-sdk/src/policy.mjs';
-export const SDK_VERSION = '0.2.0';
+export const SDK_VERSION = '0.3.0';
 const hex = n => [...crypto.getRandomValues(new Uint8Array(n))].map(x => x.toString(16).padStart(2, '0')).join('');
 export function parseTraceparent(value) {
   const match = /^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/.exec(value || '');

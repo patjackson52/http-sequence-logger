@@ -1,6 +1,6 @@
 {
   "name": "http-sequence-logger",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Structured mobile and browser HTTP and handler logging with a local sequence viewer",

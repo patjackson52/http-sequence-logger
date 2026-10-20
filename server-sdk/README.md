@@ -1,6 +1,6 @@
 # Server capture SDK
 
-This development recorder runs in Node and Cloudflare Workers using standard Request/Response/Fetch APIs. Import `server-sdk/index.mjs` from the pinned logger checkout. It shares the logger's sanitization policy module; copy/package the whole checkout or preserve that dependency. The local package is private and is not published to npm. Capture schema is **1.3**, SDK/package version **0.2.0**.
+This development recorder runs in Node and Cloudflare Workers using standard Request/Response/Fetch APIs. Import `server-sdk/index.mjs` from the pinned logger checkout. It shares the logger's sanitization policy module; copy/package the whole checkout or preserve that dependency. The local package is private and is not published to npm. Capture schema is **1.3**, SDK/package version **0.3.0**.
 
 ```js
 import { createServerLogger } from '/absolute/logger/server-sdk/index.mjs';

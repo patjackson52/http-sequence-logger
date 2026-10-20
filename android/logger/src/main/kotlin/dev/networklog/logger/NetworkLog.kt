@@ -68,7 +68,7 @@ class Session internal constructor(
         require(sessionId.isNotEmpty() && sessionId.length <= 512)
         guarded {
             emit("session.started", null, obj("name" to name, "id_source" to if (providedId == null) "generated" else "provided",
-                "producer" to obj("platform" to "android", "app_id" to appId, "app_version" to "0.2.0", "os_version" to osVersion, "sdk_version" to "0.2.0"),
+                "producer" to obj("platform" to "android", "app_id" to appId, "app_version" to "0.3.0", "os_version" to osVersion, "sdk_version" to "0.3.0"),
                 "adapters" to array(listOf("customer.manual", "httpurlconnection").map { adapter ->
                     obj("adapter" to adapter(adapter), "capabilities" to obj("attempts" to "logical", "request_body" to "partial", "response_body" to "partial", "transaction_metrics" to false))
                 }), "capture_policy" to policy.json(), "trace_propagation" to if (propagationOrigins.isEmpty()) "disabled" else "allowlist", "propagation_origins" to array(propagationOrigins.toList())), 0L)

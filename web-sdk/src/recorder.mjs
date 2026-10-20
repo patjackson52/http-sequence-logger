@@ -1,7 +1,7 @@
 import { noOpLogger } from './api.mjs';
 import { createPolicy, cleanURL, cleanHeaders, cleanBody, missingBody, safeError } from './policy.mjs';
 
-export const SDK_VERSION = '0.2.0';
+export const SDK_VERSION = '0.3.0';
 const fallback = noOpLogger.startSession();
 const label = (value, fallbackValue = 'unknown') => typeof value === 'string' && value.length ? value.slice(0, 512) : fallbackValue;
 const actor = value => ({ owner: ['integrator', 'sdk', 'system', 'unknown'].includes(value?.owner) ? value.owner : 'unknown', component: label(value?.component), method: value?.method ? label(value.method) : null });
