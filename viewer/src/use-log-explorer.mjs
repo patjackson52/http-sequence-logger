@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import { EXPLORER_LIMITS, listDirectory, memoryDirectory } from './log-explorer.mjs';
+import { EXPLORER_LIMITS, headerIndex, limiter, memoryDirectory, scanTree } from './log-explorer.mjs';
 import { memoryFolderStore, openFolderStore } from './folder-store.mjs';
 
 export function folderSupport(win = typeof window === 'undefined' ? undefined : window) {
@@ -19,10 +19,11 @@ const newId = () => globalThis.crypto?.randomUUID?.() ?? String(Date.now() + Mat
 export class LogExplorerController {
   constructor({ limits = EXPLORER_LIMITS, openStore = openFolderStore, support = folderSupport(), picker = () => window.showDirectoryPicker({ id: 'network-log-lab', mode: 'read' }), progressMs = 150, clock = () => Date.now() } = {}) {
     Object.assign(this, { limits: { ...EXPLORER_LIMITS, ...limits }, openStore, support, picker, progressMs, clock });
-    this.state = { folders: [], listings: {}, expanded: new Set(['machine']), notice: '', storageNotice: '', focusId: null, durable: null };
-    this.listeners = new Set(); this.scans = new Map(); this.store = null; this.disposed = false;
+    // Tree nodes and sections default open; only user-collapsed keys are kept (shared by the nav and the sheet).
+    this.state = { folders: [], listings: {}, collapsed: new Set(), shown: {}, notice: '', storageNotice: '', focusId: null, durable: null };
+    this.listeners = new Set(); this.scans = new Map(); this.heads = limiter(this.limits.concurrency); this.store = null; this.disposed = false;
     this.subscribe = this.subscribe.bind(this); this.getState = () => this.state;
-    for (const name of ['init', 'toggle', 'addFolder', 'addFiles', 'remove', 'refresh', 'reconnect', 'clearFocus']) this[name] = this[name].bind(this);
+    for (const name of ['init', 'toggle', 'showMore', 'addFolder', 'addFiles', 'remove', 'refresh', 'reconnect', 'clearFocus']) this[name] = this[name].bind(this);
   }
   subscribe(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
   _set(patch) { if (this.disposed) return; const next = typeof patch === 'function' ? patch(this.state) : patch; this.state = { ...this.state, ...next }; for (const listener of this.listeners) listener(); }
@@ -40,43 +41,52 @@ export class LogExplorerController {
       let records = [];
       try { records = await store.list(); } catch {}
       const restored = await Promise.all(records.filter(r => r?.handle).map(async r => ({ id: r.id, name: r.name || r.handle.name, handle: r.handle, added: r.added, persisted: durable, status: statusOf(await permission(r.handle)) })));
-      this._set(s => ({ folders: [...restored.filter(r => !s.folders.some(f => f.id === r.id)), ...s.folders] }));
+      const added = restored.filter(r => !this.state.folders.some(f => f.id === r.id));
+      this._set(s => ({ folders: [...added, ...s.folders] }));
+      // Restored folders scan one after another; head reads are also bounded across folders by this.heads.
+      (async () => { for (const folder of added) if (folder.status === 'ready' && this._folder(folder.id)) await this.load(folder.id, folder.handle); })();
     })();
     return this.ready;
   }
   dispose() { this.disposed = true; for (const scan of this.scans.values()) scan.abort(); this.scans.clear(); this.store?.close(); this.store = null; }
 
   _abort(prefix) { for (const [key, scan] of this.scans) if (key.startsWith(prefix)) { scan.abort(); this.scans.delete(key); } }
-  async load(folderId, path, handle) {
-    const key = nodeKey(folderId, path), controller = new AbortController();
+  // One bounded recursive scan per folder; a newer scan, Refresh or Remove aborts the previous one.
+  async load(folderId, handle) {
+    const key = nodeKey(folderId), controller = new AbortController();
     this.scans.get(key)?.abort(); this.scans.set(key, controller);
-    this._set(s => ({ listings: { ...s.listings, [key]: { ...s.listings[key], handle, state: 'loading', progress: 0 } } }));
+    // The previous tree stays visible while a refresh scans.
+    const previous = headerIndex(this.state.listings[key]?.entries);
+    this._set(s => ({ listings: { ...s.listings, [key]: { ...s.listings[key], state: 'loading', progress: '' } } }));
     const current = () => this.scans.get(key) === controller && !controller.signal.aborted && !!this._folder(folderId);
     let shown = 0;
-    const onProgress = (scanned, read) => {
+    const onProgress = (found, read) => {
       const at = this.clock(); if (at - shown < this.progressMs || !current()) return; shown = at;
-      this._set(s => s.listings[key]?.state === 'loading' ? { listings: { ...s.listings, [key]: { ...s.listings[key], progress: read ?? scanned } } } : {});
+      const progress = read == null ? `${found} logs` : `${read}/${found} logs`;
+      this._set(s => s.listings[key]?.state === 'loading' ? { listings: { ...s.listings, [key]: { ...s.listings[key], progress } } } : {});
     };
     try {
-      const result = await listDirectory(handle, { limits: this.limits, path, signal: controller.signal, onProgress });
+      const result = await scanTree(handle, { limits: this.limits, signal: controller.signal, onProgress, limit: this.heads, previous });
       if (!current()) return;
       this.scans.delete(key);
-      this._set(s => ({ listings: { ...s.listings, [key]: { handle, state: 'ready', ...result, at: this.clock() } } }));
-      if (!path && this._folder(folderId)?.status !== 'ready') this._setFolder(folderId, { status: 'ready' });
+      // A snapshot capped while it was built is reported like a scan that hit the entry limit.
+      this._set(s => ({ listings: { ...s.listings, [key]: { state: 'ready', ...result, truncated: result.truncated || !!handle.truncated, at: this.clock() } } }));
+      if (this._folder(folderId)?.status !== 'ready') this._setFolder(folderId, { status: 'ready' });
     } catch (error) {
       if (!current() || error?.name === 'AbortError') return;
       this.scans.delete(key);
-      this._set(s => ({ listings: { ...s.listings, [key]: { handle, state: 'error', error: error?.message || 'Folder could not be read' } } }));
+      this._set(s => ({ listings: { ...s.listings, [key]: { state: 'error', error: error?.message || 'Folder could not be read' } } }));
       const status = listingError(error);
-      if (status && !path) this._setFolder(folderId, { status });
+      if (status) this._setFolder(folderId, { status });
     }
   }
-  toggle(key, open, folder, path = '', handle) {
-    const { expanded, listings } = this.state;
-    if (expanded.has(key) !== open) { const next = new Set(expanded); open ? next.add(key) : next.delete(key); this._set({ expanded: next }); }
-    const live = folder && this._folder(folder.id);
-    if (open && live?.status === 'ready' && !listings[nodeKey(live.id, path)]) this.load(live.id, path, handle ?? live.handle);
+  toggle(key, open) {
+    const { collapsed } = this.state;
+    if (collapsed.has(key) === !open) return;
+    const next = new Set(collapsed); open ? next.delete(key) : next.add(key); this._set({ collapsed: next });
   }
+  // Rendered logs per folder level grow a page at a time.
+  showMore(key) { this._set(s => ({ shown: { ...s.shown, [key]: (s.shown[key] ?? this.limits.pageLogs) + this.limits.pageLogs } })); }
   async _insert(handle, remember) {
     for (const folder of this.state.folders) {
       try { if (folder.handle === handle || await folder.handle.isSameEntry?.(handle)) { this._set({ focusId: folder.id, notice: `${folder.name}/ is already listed.` }); return folder.id; } } catch {}
@@ -90,8 +100,8 @@ export class LogExplorerController {
       }
     }
     if (this.disposed) return null;
-    this._set(s => ({ folders: [...s.folders, folder], expanded: new Set([...s.expanded, 'machine', nodeKey(folder.id)]), focusId: folder.id }));
-    this.load(folder.id, '', handle);
+    this._set(s => ({ folders: [...s.folders, folder], collapsed: new Set([...s.collapsed].filter(key => key !== 'machine')), focusId: folder.id }));
+    this.load(folder.id, handle);
     return folder.id;
   }
   async addFolder() {
@@ -105,7 +115,6 @@ export class LogExplorerController {
     this._set({ notice: '' });
     const handle = memoryDirectory(fileList, { maxFiles: this.limits.maxScanned });
     if (!handle.count) { this._set({ notice: 'The chosen folder has no .ndjson logs.' }); return Promise.resolve(null); }
-    if (handle.truncated) this._set({ notice: `Only the first ${this.limits.maxScanned} logs of ${handle.name}/ are listed.` });
     return this._insert(handle, false);
   }
   async remove(id) {
@@ -116,15 +125,13 @@ export class LogExplorerController {
       catch (error) { this._set({ notice: `Couldn’t remove ${folder.name}/: ${error?.message || 'storage error'}` }); return false; }
     }
     this._abort(id + ':');
-    this._set(s => ({ folders: s.folders.filter(f => f.id !== id), listings: Object.fromEntries(Object.entries(s.listings).filter(([key]) => !key.startsWith(id + ':'))), notice: `Removed ${folder.name}/ from the explorer. Files on disk are unchanged.` }));
+    const own = key => key.startsWith(id + ':');
+    this._set(s => ({ folders: s.folders.filter(f => f.id !== id), listings: Object.fromEntries(Object.entries(s.listings).filter(([key]) => !own(key))), collapsed: new Set([...s.collapsed].filter(key => !own(key))), shown: Object.fromEntries(Object.entries(s.shown).filter(([key]) => !own(key))), notice: `Removed ${folder.name}/ from the explorer. Files on disk are unchanged.` }));
     return true;
   }
   refresh(id) {
-    const folder = this._folder(id); if (!folder) return;
-    const listed = Object.entries(this.state.listings).filter(([key]) => key.startsWith(id + ':'));
-    this._abort(id + ':');
-    if (!listed.some(([key]) => key === nodeKey(id))) this.load(id, '', folder.handle);
-    for (const [key, listing] of listed) this.load(id, key.slice(id.length + 1), key === nodeKey(id) ? folder.handle : listing.handle);
+    const folder = this._folder(id); if (!folder || folder.status !== 'ready') return;
+    this.load(id, folder.handle);
   }
   async reconnect(id) {
     const folder = this._folder(id); if (!folder) return;
@@ -134,7 +141,7 @@ export class LogExplorerController {
     const status = statusOf(state);
     if (!this._folder(id)) return;
     this._setFolder(id, { status });
-    if (status === 'ready') { this._set(s => ({ expanded: new Set([...s.expanded, nodeKey(id)]) })); this.load(id, '', folder.handle); }
+    if (status === 'ready') { this._set(s => ({ collapsed: new Set([...s.collapsed].filter(key => key !== nodeKey(id))) })); this.load(id, folder.handle); }
   }
   clearFocus(id) { if (this.state.focusId && (id === undefined || this.state.focusId === id)) this._set({ focusId: null }); }
 }
@@ -146,5 +153,7 @@ export function useLogExplorer(options) {
   const controller = ref.current;
   useEffect(() => { controller.init(); return () => controller.dispose(); }, [controller]);
   const state = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
-  return useMemo(() => ({ ...state, support: controller.support, limits: controller.limits, nodeKey, toggle: controller.toggle, addFolder: controller.addFolder, addFiles: controller.addFiles, remove: controller.remove, refresh: controller.refresh, reconnect: controller.reconnect, clearFocus: controller.clearFocus }), [state, controller]);
+  // Stable actions let memoized folder rows skip renders caused by other folders' progress.
+  const actions = useMemo(() => ({ nodeKey, limits: controller.limits, toggle: controller.toggle, showMore: controller.showMore, remove: controller.remove, refresh: controller.refresh, reconnect: controller.reconnect }), [controller]);
+  return useMemo(() => ({ ...state, ...actions, actions, support: controller.support, addFolder: controller.addFolder, addFiles: controller.addFiles, clearFocus: controller.clearFocus }), [state, actions, controller]);
 }

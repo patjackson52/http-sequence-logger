@@ -1,7 +1,7 @@
 import { IMPORT_LIMITS } from './model.mjs';
 
 // Folder listing reads bounded file heads only; full parsing happens on open through the import pipeline.
-export const EXPLORER_LIMITS = Object.freeze({ headBytes: 256 * 1024, maxEntries: 500, maxScanned: 5000, maxDepth: 8, concurrency: 4, maxFolders: 20, maxFileBytes: IMPORT_LIMITS.maxFileBytes, maxNameLength: 120 });
+export const EXPLORER_LIMITS = Object.freeze({ firstHeadBytes: 64 * 1024, headBytes: 256 * 1024, maxLogs: 2000, pageLogs: 200, maxScanned: 5000, maxDepth: 8, concurrency: 4, maxFolders: 20, maxFileBytes: IMPORT_LIMITS.maxFileBytes, maxNameLength: 120 });
 const LOG_EXTENSION = /\.ndjson$/i;
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
@@ -39,13 +39,14 @@ export function readLogHeader(text, { complete = true, maxNameLength = EXPLORER_
   // A head with no complete line (first line longer than the head) is unknown, not broken: label falls back to the filename.
   const unknown = !complete && !events && !invalid;
   const error = !events && !unknown ? (invalid ? 'Unreadable' : 'No sessions') : null;
-  return { name, startedAt, sessions: sessions.size, events, invalid, complete, unknown, error };
+  return { name, startedAt, sessions: sessions.size, events, invalid, complete, unknown, error, found: started.size > 0 };
 }
 
-export async function readHead(file, bytes = EXPLORER_LIMITS.headBytes) {
-  const complete = file.size <= bytes;
-  const text = await (complete ? file : file.slice(0, bytes)).text();
-  return readLogHeader(text, { complete });
+// Reads a small first slice; only a larger file without session.started in it escalates to the full head.
+export async function readHead(file, bytes = EXPLORER_LIMITS.headBytes, first = EXPLORER_LIMITS.firstHeadBytes) {
+  const read = async size => { const complete = file.size <= size; return readLogHeader(await (complete ? file : file.slice(0, size)).text(), { complete }); };
+  if (first < bytes && file.size > first) { const head = await read(first); if (head.found) return head; }
+  return read(bytes);
 }
 
 // Intl.DateTimeFormat construction dominates formatting cost; reuse one per (kind, locale, zone).
@@ -115,39 +116,84 @@ export async function mapLimit(items, limit, task) {
   return results;
 }
 
-// Lists one directory level: subfolders and *.ndjson files, newest logs first, bounded per level.
-export async function listDirectory(handle, { limits = EXPLORER_LIMITS, signal, path = '', onProgress = () => {} } = {}) {
-  const caps = { ...EXPLORER_LIMITS, ...limits }, directories = [], files = [];
-  let scanned = 0, truncated = false;
-  for await (const child of handle.values()) {
+// Runs at most n tasks at once; one instance is shared by every folder scan so head reads stay bounded overall.
+export function limiter(n) {
+  let active = 0; const waiting = [];
+  const next = () => {
+    if (active >= n || !waiting.length) return;
+    active++; const { task, resolve, reject } = waiting.shift();
+    Promise.resolve().then(task).then(resolve, reject).finally(() => { active--; next(); });
+  };
+  return task => new Promise((resolve, reject) => { waiting.push({ task, resolve, reject }); next(); });
+}
+
+// path → log entry of a previous scan, so unchanged files (same size and lastModified) keep their header.
+export function headerIndex(entries, index = new Map()) {
+  for (const entry of entries || []) entry.kind === 'directory' ? headerIndex(entry.entries, index) : entry.header && index.set(entry.path, entry);
+  return index;
+}
+
+// Walks an added folder breadth-first (bounded by depth and scanned entries), keeps the newest maxLogs logs,
+// reads their heads and returns the nested tree of folders that contain logs somewhere below; empty folders are pruned.
+export async function scanTree(handle, { limits = EXPLORER_LIMITS, signal, onProgress = () => {}, limit, previous } = {}) {
+  const caps = { ...EXPLORER_LIMITS, ...limits }, run = limit ?? limiter(caps.concurrency);
+  const root = { kind: 'directory', name: handle.name, path: '', handle, entries: [] }, files = [], queue = [[root, 0]];
+  let scanned = 0, truncated = false, tooDeep = 0, unreadable = 0;
+  walk: for (const [node, depth] of queue) {
     signal?.throwIfAborted();
-    if (skipEntry(child.name)) continue;
-    if (scanned >= caps.maxScanned) { truncated = true; break; }
-    scanned++;
-    if (child.kind === 'directory') directories.push({ kind: 'directory', name: child.name, path: path + child.name + '/', handle: child });
-    else if (child.kind === 'file' && isLogFile(child.name)) files.push(child);
-    if (scanned % 100 === 0) onProgress(scanned);
+    // The added folder itself failing is a folder error; one unreadable subfolder only drops that branch.
+    const failed = error => { if (node === root || error?.name === 'AbortError' || signal?.aborted) throw error; unreadable++; };
+    let iterator;
+    try { iterator = node.handle.values(); } catch (error) { failed(error); continue; }
+    for (;;) {
+      let step;
+      try { step = await iterator.next(); } catch (error) { failed(error); break; }
+      if (step.done) break;
+      signal?.throwIfAborted();
+      const child = step.value;
+      if (skipEntry(child.name)) continue;
+      if (scanned >= caps.maxScanned) { truncated = true; await iterator.return?.(); break walk; }
+      scanned++;
+      if (child.kind === 'directory') {
+        // depth counts subfolders below the added folder; maxDepth of them are scanned.
+        if (depth >= caps.maxDepth) tooDeep++;
+        else { const dir = { kind: 'directory', name: child.name, path: node.path + child.name + '/', handle: child, entries: [] }; node.entries.push(dir); queue.push([dir, depth + 1]); }
+      } else if (child.kind === 'file' && isLogFile(child.name)) {
+        const entry = { kind: 'file', name: child.name, path: node.path + child.name, handle: child };
+        node.entries.push(entry); files.push(entry);
+      }
+      if (scanned % 100 === 0) onProgress(files.length);
+    }
   }
-  const stats = await mapLimit(files, caps.concurrency * 4, async child => {
+  // Metadata is cheap; it decides which logs are kept (newest first) before any head is read.
+  await mapLimit(files, caps.concurrency * 4, async entry => {
     signal?.throwIfAborted();
-    try { const file = await child.getFile(); return { kind: 'file', name: child.name, path: path + child.name, handle: child, size: file.size, lastModified: file.lastModified, file }; }
-    catch (error) { return { kind: 'file', name: child.name, path: path + child.name, handle: child, size: null, lastModified: null, error: error.message || 'Unreadable' }; }
+    try { const file = await entry.handle.getFile(); Object.assign(entry, { size: file.size, lastModified: file.lastModified, file }); }
+    catch { Object.assign(entry, { size: null, lastModified: null, header: { error: 'Unreadable' } }); }
   });
-  stats.sort((a, b) => (b.lastModified ?? -Infinity) - (a.lastModified ?? -Infinity));
-  const keptDirs = directories.sort((a, b) => collator.compare(a.name, b.name)).slice(0, caps.maxEntries);
-  const keptLogs = stats.slice(0, caps.maxEntries);
-  let done = 0;
-  await mapLimit(keptLogs, caps.concurrency, async entry => {
+  const kept = new Set([...files].sort((a, b) => (b.lastModified ?? -Infinity) - (a.lastModified ?? -Infinity)).slice(0, caps.maxLogs));
+  for (const entry of files) if (!kept.has(entry)) delete entry.file;
+  onProgress(kept.size, 0);
+  let read = 0;
+  await mapLimit([...kept], caps.concurrency, entry => run(async () => {
+    const { file } = entry; delete entry.file;
     signal?.throwIfAborted();
-    if (entry.error) entry.header = { error: 'Unreadable' };
-    else if (entry.size > caps.maxFileBytes) entry.header = { error: 'Too large' };
-    else { try { entry.header = await readHead(entry.file, caps.headBytes); } catch (error) { entry.header = { error: 'Unreadable', message: error.message }; } }
-    delete entry.file;
-    onProgress(scanned, ++done);
-  });
-  // Overflow counts only folders and logs that were found but not shown; truncated means the scan itself stopped.
-  const overflow = directories.length - keptDirs.length + stats.length - keptLogs.length;
-  return { entries: sortEntries([...keptDirs, ...keptLogs]), overflow, truncated, scanned, logs: stats.length };
+    const old = previous?.get(entry.path);
+    // An unreadable file already carries its error header; an unchanged one keeps the previous scan's header.
+    const reuse = old?.header && old.size === entry.size && old.lastModified === entry.lastModified;
+    if (file) entry.header = reuse ? old.header : file.size > caps.maxFileBytes ? { error: 'Too large' } : await readHead(file, caps.headBytes, caps.firstHeadBytes).catch(error => ({ error: 'Unreadable', message: error.message }));
+    onProgress(kept.size, ++read);
+  }));
+  const finish = ({ handle: _, ...node }) => {
+    const entries = []; let logs = 0;
+    for (const child of node.entries) {
+      if (child.kind === 'file') { if (kept.has(child)) { entries.push(child); logs++; } }
+      else { const sub = finish(child); if (sub.logs) { entries.push(sub); logs += sub.logs; } }
+    }
+    return { ...node, entries: sortEntries(entries), logs };
+  };
+  const tree = finish(root);
+  return { entries: tree.entries, logs: tree.logs, scanned, truncated, logLimit: files.length > kept.size, tooDeep, unreadable };
 }
 
 // Directory-handle shape over an <input webkitdirectory> FileList. Snapshot only; never persisted.
@@ -157,7 +203,7 @@ export function memoryDirectory(fileList, { maxFiles = EXPLORER_LIMITS.maxScanne
   for (const file of fileList) {
     if (count >= maxFiles) { const parts = String(file.webkitRelativePath || file.name).split('/'); if (isLogFile(parts.at(-1))) { truncated = true; break; } continue; }
     const parts = String(file.webkitRelativePath || file.name).split('/').filter(Boolean);
-    // Same visibility rules as listDirectory, applied before the cap so ignored files never use it.
+    // Same visibility rules as scanTree, applied before the cap so ignored files never use it.
     if (!parts.length || !isLogFile(parts.at(-1)) || parts.slice(parts.length > 1 ? 1 : 0, -1).some(skipEntry)) continue;
     count++;
     if (!root.name && parts.length > 1) root.name = parts[0];
