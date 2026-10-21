@@ -15,7 +15,7 @@ const example = name => readFile(`examples/${name}.ndjson`, 'utf8');
 // Distinct session start times make newest-first ordering observable.
 const startAt = (text, timestamp, name) => { const [first, ...rest] = text.split('\n'), event = JSON.parse(first); return [JSON.stringify({ ...event, timestamp, data: { ...event.data, name: name ?? event.data.name } }), ...rest].join('\n'); };
 const longName = 'Checkout with saved card, address change and a very long descriptive session name';
-const fixtures = { 'logs/checkout.ndjson': startAt(await example('success'), '2026-09-28T10:00:00.000Z'), 'logs/multi.ndjson': await example('multi-session'), 'logs/retry.ndjson': startAt(await example('retry'), '2026-09-28T12:00:00.000Z'), 'logs/long-name.ndjson': startAt(await example('http-error'), '2026-09-27T08:00:00.000Z', longName), 'logs/notes.txt': 'not a log', 'logs/sub/timeout.ndjson': await example('timeout') };
+const fixtures = { 'logs/checkout.ndjson': startAt(await example('success'), '2026-09-28T10:00:00.000Z'), 'logs/multi.ndjson': await example('multi-session'), 'logs/retry.ndjson': startAt(await example('retry'), '2026-09-28T12:00:00.000Z'), 'logs/long-name.ndjson': startAt(await example('http-error'), '2026-09-27T08:00:00.000Z', longName), 'logs/notes.txt': 'not a log', 'logs/sub/timeout.ndjson': await example('timeout'), 'logs/sub/deeper/level3/deep.ndjson': startAt(await example('success'), '2026-09-26T08:00:00.000Z', 'deep-success'), 'logs/empty/readme.txt': 'no logs here', 'logs/empty/inner/notes.txt': 'still none' };
 const machine = hostname().split('.')[0];
 let collector, browser;
 try {
@@ -48,13 +48,29 @@ try {
   await expect(page.getByRole('heading', { name: 'handler-http', exact: true })).toBeVisible();
   const nav = page.getByRole('navigation', { name: 'Logs and sessions' });
   const machineNode = nav.locator('.tree-machine');
-  await expect(machineNode.locator('> summary')).toHaveText(`This machine · ${machine}`);
-  await expect(machineNode.locator('> summary')).toHaveAttribute('title', hostname());
+  const machineButton = machineNode.locator('.tree-section-head button');
+  await expect(machineButton).toHaveText(`This machine · ${machine}`);
+  await expect(machineButton).toHaveAttribute('title', hostname());
+  await expect(nav.getByRole('heading', { level: 3, name: `This machine · ${machine}` })).toBeVisible();
   const liveRow = nav.locator('.live-session');
   await expect(liveRow).toHaveCount(1);
   await expect(liveRow.locator('.label')).toHaveText('handler-http');
   await expect(liveRow.locator('time')).toHaveText(/started \d\d:\d\d|started \w{3} \d\d:\d\d|started \w{3} \d+|started \d{4}-\d\d-\d\d/);
   await expect(liveRow).toHaveAttribute('aria-current', 'true');
+
+  // Sections collapse and expand; the state is shared with the sheet instance.
+  const sessionsSummary = nav.locator('.tree-section-head button').filter({ hasText: 'Sessions' });
+  await expect(sessionsSummary).toHaveAttribute('aria-expanded', 'true');
+  await sessionsSummary.click();
+  await expect(sessionsSummary).toHaveAttribute('aria-expanded', 'false');
+  await expect(liveRow).toHaveCount(0);
+  await sessionsSummary.click();
+  await expect(liveRow).toHaveCount(1);
+  const devicesSummary = nav.locator('.tree-section-head button').filter({ hasText: 'Devices and environments' });
+  await devicesSummary.click();
+  await expect(nav.locator('.source-row')).toHaveCount(0);
+  await devicesSummary.click();
+  await expect(nav.locator('.source-row')).toHaveCount(1);
 
   await nav.getByRole('button', { name: 'Add folder…' }).click();
   const folder = machineNode.locator('.tree-root-folder');
@@ -74,11 +90,34 @@ try {
   await expect(folder.locator('.log-row').filter({ hasText: 'multi-android' }).locator('.count')).toHaveText('+1');
   await expect(rows.first()).toHaveAttribute('title', /\.ndjson/);
   await expect(folder).not.toContainText('notes.txt');
+  // The whole tree is scanned on add: nested logs are visible without expanding anything; empty folders are hidden.
   const sub = folder.locator('details.tree-folder').filter({ has: page.locator('summary', { hasText: 'sub/' }) });
   await expect(sub).toHaveCount(1);
-  assert.equal(await sub.evaluate(node => node.open), false);
+  assert.equal(await sub.evaluate(node => node.open), true, 'subfolders with logs start open');
+  await expect(sub.locator(':scope > .log-row .label')).toHaveText('timeout');
+  const deep = sub.locator('details.tree-folder').filter({ has: page.locator('summary', { hasText: 'level3/' }) });
+  await expect(deep.locator('.log-row .label')).toHaveText('deep-success');
+  await expect(deep.locator('.log-row')).toBeVisible();
+  await expect(folder.locator('.log-row')).toHaveCount(6);
+  await expect(folder).not.toContainText('empty/');
+  await expect(folder.locator('details.tree-folder > summary .name')).toHaveText(['sub/', 'deeper/', 'level3/']);
+  await expect(folder.locator('> summary small')).toHaveText('6');
+  // Collapsing a nested folder is user state; − and ↻ stay reachable on the collapsed root row.
   await sub.locator('> summary').click();
-  await expect(sub.locator('.log-row .label')).toHaveText('timeout');
+  await expect(sub.locator('.log-row')).toHaveCount(0);
+  await sub.locator('> summary').click();
+  await expect(deep.locator('.log-row')).toBeVisible();
+  await folder.locator('> summary').click();
+  await expect(nav.getByRole('button', { name: 'Remove folder logs' })).toBeVisible();
+  await expect(nav.getByRole('button', { name: 'Refresh folder logs' })).toBeVisible();
+  const [summaryBox, removeBox] = [await folder.locator('> summary').boundingBox(), await nav.getByRole('button', { name: 'Remove folder logs' }).boundingBox()];
+  assert.ok(removeBox.y >= summaryBox.y - 1 && removeBox.y + removeBox.height <= summaryBox.y + summaryBox.height + 1 && removeBox.x + removeBox.width <= summaryBox.x + summaryBox.width + 1, 'remove sits on the folder row');
+  await folder.locator('> summary').click();
+  await expect(rows).toHaveCount(4);
+  await nav.getByRole('button', { name: 'Refresh folder logs' }).click();
+  await expect(folder.locator('.log-row')).toHaveCount(6);
+  await expect(folder.locator('> [role=status]')).toHaveCount(0);
+  await page.mouse.move(700, 900);
   await page.screenshot({ path: join(artifact, 'explorer-desktop.png') });
   await nav.screenshot({ path: join(artifact, 'explorer-sidebar.png') });
 
@@ -88,11 +127,16 @@ try {
   await expect(rows.filter({ hasText: 'retry' })).toHaveAttribute('aria-current', 'true');
   assert.equal(await nav.locator('[aria-current="true"]').count(), 1);
   assert.equal(await sub.evaluate(node => node.open), true, 'opening a log keeps tree expansion');
-  await expect(nav.locator('.source-navigation > details').first()).toContainText('Explorer phone');
+  await expect(nav.locator('.tree-section').first()).toContainText('Explorer phone');
   await expect(nav.locator('.source-row')).toHaveCount(1);
   await expect(liveRow).toHaveCount(1);
   await expect(nav.locator('h3').first()).toContainText('Paused');
-  await expect(nav.locator('.tree-resume')).toHaveText('Resume live');
+  await expect(nav.locator('.tree-section-head > .tree-resume')).toHaveText('Resume live');
+  // Resume live stays reachable on the header line when Devices is collapsed.
+  await devicesSummary.click();
+  await expect(nav.locator('.source-row')).toHaveCount(0);
+  await expect(nav.locator('.tree-resume')).toBeVisible();
+  await devicesSummary.click();
 
   await folder.locator('.log-row').filter({ hasText: 'multi-android' }).click();
   await expect(page.getByRole('heading', { name: 'multi-android', exact: true })).toBeVisible();
@@ -114,13 +158,13 @@ try {
   await expect(restored).toHaveCount(1);
   await expect(restored.locator('> summary .name')).toHaveText('logs/');
   await expect(restored.locator('> summary small')).toHaveText('· access needed');
-  await restored.locator('> summary').click();
   await expect(restored.locator(':scope > .log-row')).toHaveCount(0);
   await restored.getByRole('button', { name: 'Reconnect', exact: true }).click();
   assert.equal(await page.evaluate(() => window.__permissionRequests), 1);
   await expect(restored.locator(':scope > .log-row')).toHaveCount(4);
-  await expect(restored.locator('> summary small')).toHaveCount(0);
-  await restored.locator('.log-row').filter({ hasText: 'success' }).click();
+  await expect(restored.locator('.log-row')).toHaveCount(6);
+  await expect(restored.locator('> summary small')).toHaveText('6');
+  await restored.locator(':scope > .log-row').filter({ hasText: 'success' }).click();
   await expect(page.getByRole('heading', { name: 'success', exact: true })).toBeVisible();
   await expect(page.getByText('Live updates paused', { exact: true })).toBeVisible();
   await collector.ingest(source.source_token, await example('cancelled'));
@@ -137,16 +181,23 @@ try {
   // Expansion state is shared with the desktop navigator, so the folder is already open.
   assert.equal(await sheet.locator('.tree-root-folder').evaluate(node => node.open), true);
   await expect(sheet.locator('.tree-root-folder > .log-row')).toHaveCount(4);
+  await expect(sheet.locator('.tree-root-folder .log-row')).toHaveCount(6);
+  await expect(sheet.getByRole('button', { name: 'Remove folder logs' })).toBeVisible();
+  await sheet.locator('.tree-section-head button').filter({ hasText: 'Sessions' }).click();
+  await expect(sheet.locator('.live-session')).toHaveCount(0);
+  await sheet.locator('.tree-section-head button').filter({ hasText: 'Sessions' }).click();
+  await expect(sheet.locator('.live-session')).toHaveCount(2);
   await page.screenshot({ path: join(artifact, 'explorer-mobile-sheet.png') });
-  const overflow = await sheet.evaluate(node => [...node.querySelectorAll('.tree-row,summary')].filter(el => el.scrollWidth > el.clientWidth + 1 && !el.closest('.name')).length);
+  const overflow = await sheet.evaluate(node => [...node.querySelectorAll('.tree-row,summary,.tree-section-head button')].filter(el => el.scrollWidth > el.clientWidth + 1 && !el.closest('.name')).length);
   assert.equal(overflow, 0, 'sheet rows do not overflow horizontally');
   await sheet.locator('.tree-root-folder .log-row').filter({ hasText: 'retry' }).click();
   await expect(sheet).toHaveCount(0);
   await expect(page.locator('.mobile-bar strong')).toHaveText('retry');
   await page.setViewportSize({ width: 1440, height: 1000 });
 
-  await page.locator('.session-nav .tree-root-folder').getByRole('button', { name: 'Remove', exact: true }).click();
+  await page.locator('.session-nav').getByRole('button', { name: 'Remove folder logs' }).click();
   await expect(page.locator('.session-nav .tree-root-folder')).toHaveCount(0);
+  await expect(page.locator('.session-nav .tree-add')).toBeFocused();
   await page.reload();
   await expect(page.locator('.live-actions strong')).toContainText('● Live');
   await expect(page.locator('.tree-machine .tree-add')).toBeVisible();
@@ -154,7 +205,10 @@ try {
 
   // Browsers without showDirectoryPicker fall back to a one-visit webkitdirectory snapshot.
   const snapshot = join(privateDir, 'snapshot', 'captures');
-  await mkdir(join(snapshot, 'nested'), { recursive: true });
+  await mkdir(join(snapshot, 'nested', 'two'), { recursive: true });
+  await mkdir(join(snapshot, 'nothing'), { recursive: true });
+  await writeFile(join(snapshot, 'nothing', 'readme.md'), '#');
+  await writeFile(join(snapshot, 'nested', 'two', 'deep.ndjson'), fixtures['logs/sub/deeper/level3/deep.ndjson']);
   await writeFile(join(snapshot, 'retry.ndjson'), fixtures['logs/retry.ndjson']);
   await writeFile(join(snapshot, 'nested', 'timeout.ndjson'), fixtures['logs/sub/timeout.ndjson']);
   const fallbackContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
@@ -169,8 +223,8 @@ try {
   await expect(snap.locator('> summary')).toContainText('captures/');
   await expect(snap.locator('> summary')).toContainText('this visit');
   await expect(snap.locator(':scope > .log-row .label')).toHaveText('retry');
-  await snap.locator('details.tree-folder > summary').click();
-  await expect(snap.locator('details.tree-folder .log-row .label')).toHaveText('timeout');
+  await expect(snap.locator('details.tree-folder > summary .name')).toHaveText(['nested/', 'two/']);
+  await expect(snap.locator('details.tree-folder .log-row .label')).toHaveText(['deep-success', 'timeout']);
   await snap.locator(':scope > .log-row').click();
   await expect(fallback.getByRole('heading', { name: 'retry', exact: true })).toBeVisible();
   await fallback.reload();
@@ -179,7 +233,7 @@ try {
   await fallbackContext.close();
 
   assert.deepEqual(errors, []);
-  const result = { browser: browser.version(), checks: ['machine name label', 'live session name + time row', 'add folder via picker handle', 'folder rows labeled by session name + time, newest first', 'non-ndjson ignored', 'multi-session +N badge', 'lazy subfolder expand', 'open log → workspace with aria-current', 'devices listed while paused', 'multi-session file lists sessions after open', 'live session click resumes live', 'reload restores folder from IndexedDB', 'prompt permission after reload → Reconnect grants and lists', 'explorer Resume live', 'mobile sheet tree', 'remove survives reload', 'webkitdirectory fallback snapshot not persisted'], errors };
+  const result = { browser: browser.version(), checks: ['machine name label', 'live session name + time row', 'add folder via picker handle', 'folder rows labeled by session name + time, newest first', 'non-ndjson ignored', 'multi-session +N badge', 'recursive scan shows nested logs without expanding', 'empty folders hidden', 'nested collapse toggles', 'sections collapse (nav + sheet)', 'remove/refresh on collapsed folder row', 'refresh rescans tree', 'open log → workspace with aria-current', 'devices listed while paused', 'multi-session file lists sessions after open', 'live session click resumes live', 'reload restores folder from IndexedDB', 'prompt permission after reload → Reconnect grants and lists', 'explorer Resume live', 'mobile sheet tree', '− removes folder, focus moves, survives reload', 'webkitdirectory fallback snapshot nested + not persisted'], errors };
   await writeFile(join(artifact, 'browser.json'), JSON.stringify(result, null, 2) + '\n');
   console.log(`PASS Chrome ${result.browser}: ${result.checks.length} log explorer checks`);
 } finally {
