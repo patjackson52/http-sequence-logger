@@ -1,6 +1,6 @@
 {
   "name": "@http-sequence-logger/sequence-diff",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Standalone canonical HTTP sequence comparison for humans and agents",
   "type": "module",
   "license": "MIT",
